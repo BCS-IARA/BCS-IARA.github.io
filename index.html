@@ -645,6 +645,11 @@ async function carregarDoSheets() {
       if(!o.criadoEm && local.criadoEm) o.criadoEm = local.criadoEm;
       // classificacao é campo crítico dos módulos — restaurar se Sheets devolveu vazio
       if(!o.classificacao && local.classificacao) o.classificacao = local.classificacao;
+      // Campos do módulo escolar — Sheets não os preserva, restaurar sempre do local
+      if(!o.escolaNome && local.escolaNome) o.escolaNome = local.escolaNome;
+      if(!o.escolaId   && local.escolaId)   o.escolaId   = local.escolaId;
+      if(!o.tipoOcEscola && local.tipoOcEscola) o.tipoOcEscola = local.tipoOcEscola;
+      if(!o.tipoViolenciaEscola && local.tipoViolenciaEscola) o.tipoViolenciaEscola = local.tipoViolenciaEscola;
       // Preservar complementos locais se Sheets não os tiver
       if((!o.esc_registros || !o.esc_registros.length) && local.esc_registros && local.esc_registros.length) o.esc_registros = local.esc_registros;
       if((!o.ps_registros  || !o.ps_registros.length)  && local.ps_registros  && local.ps_registros.length)  o.ps_registros  = local.ps_registros;
@@ -4831,11 +4836,20 @@ function renderModuloEscolar(main){
       h.push("<span style='color:#22c55e;font-size:10px;font-weight:700'>"+fmtData(o.data)+(o.hora?" · "+o.hora:"")+"</span>");
       h.push("</div>");
 
-      if(o.local||o.bairro) h.push("<p style='color:#4a7a9a;font-size:10px;margin:0 0 5px'>&#128205; "+esc(o.local||o.bairro||"")+"</p>");
+      // Linha local + policial
+      var _infoRow=[];
+      if(o.local||o.bairro) _infoRow.push("&#128205; "+esc(o.local||o.bairro||""));
+      if(o.policiais) _infoRow.push("&#128110; "+esc(o.policiais));
+      if(_infoRow.length) h.push("<p style='color:#4a7a9a;font-size:10px;margin:0 0 5px;line-height:1.6'>"+_infoRow.join(" &nbsp;|&nbsp; ")+"</p>");
+
       var dinamica=(o.descricao_dinamica||o.texto_original||o.descricao||"").trim();
       if(dinamica){
-        var trunc=dinamica.length>200?dinamica.slice(0,200)+"...":dinamica;
-        h.push("<div style='background:#060d1c;border-radius:5px;padding:7px 9px;margin-bottom:7px'><p style='color:#c0d0e0;font-size:10px;line-height:1.6;margin:0;white-space:pre-wrap'>"+esc(trunc)+"</p></div>");
+        var _expanded=state._escExpandido&&state._escExpandido[o.id];
+        var trunc=_expanded||dinamica.length<=300?dinamica:dinamica.slice(0,300)+"...";
+        h.push("<div style='background:#060d1c;border-radius:5px;padding:7px 9px;margin-bottom:7px'>");
+        h.push("<p style='color:#c0d0e0;font-size:10px;line-height:1.6;margin:0;white-space:pre-wrap'>"+esc(trunc)+"</p>");
+        if(dinamica.length>300) h.push("<button data-oc='"+o.id+"' onclick=\"if(!state._escExpandido)state._escExpandido={};state._escExpandido[this.dataset.oc]=!state._escExpandido[this.dataset.oc];var _m=document.getElementById('main')||document.getElementById('main-content');if(_m)renderModuloEscolar(_m);\" style='background:none;border:none;color:#38bdf8;font-size:9px;cursor:pointer;padding:2px 0;margin-top:2px'>"+(_expanded?"▲ recolher":"▼ ver completo")+"</button>");
+        h.push("</div>");
       }
 
       // Registros de complemento
@@ -4944,13 +4958,34 @@ function gerarPDFEscolar(escolaNome){
   });});
 
   var rows=lista.map(function(o){
+    var dinamica=(o.descricao_dinamica||o.texto_original||o.descricao||"").trim();
     var rRows=(o.esc_registros||[]).map(function(r){
-      return "<tr style='background:#f8fbff'><td style='padding:5px 8px;font-size:10px;color:#555'>"+esc(r.tipo+(r.subtipo?" - "+r.subtipo:""))+"</td><td style='padding:5px 8px;font-size:10px'>"+esc(r.data+(r.hora?" "+r.hora:""))+"</td><td style='padding:5px 8px;font-size:10px'>"+esc(r.tema||"-")+"</td><td style='padding:5px 8px;font-size:10px;text-align:center'>"+esc(String(r.nAlunos||"-"))+"</td><td style='padding:5px 8px;font-size:10px'>"+esc(r.resultado||r.observacoes||"-")+"</td></tr>";
+      return "<tr style='background:#f8fbff'>"
+        +"<td style='padding:5px 8px;font-size:10px;color:#1a3a6a;font-weight:600'>"+esc(r.tipo+(r.subtipo?" — "+r.subtipo:""))+"</td>"
+        +"<td style='padding:5px 8px;font-size:10px'>"+esc(r.data+(r.hora?" "+r.hora:""))+"</td>"
+        +"<td style='padding:5px 8px;font-size:10px'>"+esc(r.tema||"-")+"</td>"
+        +"<td style='padding:5px 8px;font-size:10px;text-align:center'>"+esc(String(r.nAlunos||"-"))+"</td>"
+        +"<td style='padding:5px 8px;font-size:10px'>"+esc(r.resultado||r.observacoes||"-")+"</td>"
+        +"</tr>";
     }).join("");
-    return "<tr style='background:#dde8f5'><td colspan='5' style='padding:8px;font-size:11px;font-weight:700;color:#1a3a6a'>"+esc(fmtData(o.data)+(o.hora?" "+o.hora:""))+" — "+esc(o.tipo||"Ronda Escolar")+(o.escolaNome?" · "+esc(o.escolaNome):"")+(o.numero?" (No "+esc(o.numero)+")":"")+"</td></tr>"
-      +(o.local||o.bairro?"<tr><td colspan='5' style='padding:3px 8px;font-size:9px;color:#555'>Local: "+esc(o.local||o.bairro||"")+"</td></tr>":"")
-      +rRows;
-  }).join("");
+    // Cabeçalho da ronda
+    var cab="<tr style='background:#1a3a6a'>"
+      +"<td colspan='5' style='padding:8px 10px;font-size:11px;font-weight:700;color:#fff'>"
+      +"&#128660; "+esc(fmtData(o.data)+(o.hora?" · "+o.hora:""))
+      +(o.numero?" &nbsp;|&nbsp; N° "+esc(o.numero):"")
+      +(o.tipo&&o.tipo!=="Ronda Escolar"?" &nbsp;|&nbsp; "+esc(o.tipo):"")
+      +"</td></tr>";
+    // Linha de local + policial
+    var meta=[];
+    if(o.local||o.bairro) meta.push("📍 "+esc(o.local||o.bairro||""));
+    if(o.policiais)        meta.push("👮 "+esc(o.policiais));
+    var metaRow=meta.length?"<tr style='background:#dde8f5'><td colspan='5' style='padding:4px 10px;font-size:10px;color:#2a4a6a'>"+meta.join(" &nbsp;·&nbsp; ")+"</td></tr>":"";
+    // Narrativa da ocorrência
+    var narrRow=dinamica?"<tr style='background:#eef4ff'><td colspan='5' style='padding:6px 10px;font-size:10px;color:#333;line-height:1.6;white-space:pre-wrap'>"+esc(dinamica)+"</td></tr>":"";
+    // Separador vazio se não tiver esc_registros
+    var sepRow=rRows?"<tr style='background:#c8d8f0'><td colspan='5' style='padding:2px 10px;font-size:9px;color:#1a3a6a;font-weight:700;letter-spacing:.5px;text-transform:uppercase'>Atividades Complementares</td></tr>":"";
+    return cab+metaRow+narrRow+sepRow+rRows;
+  }).join("<tr><td colspan='5' style='padding:6px'></td></tr>");
 
   var proxRondas=(state.eventosAvulsos||[]).filter(function(e){
     return e.tipo==="Ronda Escolar Agendada" && (!escolaNome||(e.escolaNome||e.titulo||"").includes(escolaNome)) && e.data>=hoje();
@@ -4960,18 +4995,28 @@ function gerarPDFEscolar(escolaNome){
     return "<tr><td style='padding:5px 8px;font-size:10px'>"+esc(e.escolaNome||e.titulo||"")+"</td><td style='padding:5px 8px;font-size:10px'>"+esc(fmtData(e.data)+" "+e.hora)+"</td><td style='padding:5px 8px;font-size:10px'>"+esc(e.responsavel||"-")+"</td><td style='padding:5px 8px;font-size:10px'>"+esc(e.observacoes||"-")+"</td></tr>";
   }).join("");
 
-  var html="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>"+titulo+"</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#222;font-size:12px}h1{font-size:17px;color:#1a3a6a;border-bottom:3px solid #38bdf8;padding-bottom:8px;margin-bottom:4px}h2{font-size:13px;color:#1a3a6a;margin:20px 0 6px}table{width:100%;border-collapse:collapse;margin-top:6px}th{background:#1a3a6a;color:#fff;padding:7px 8px;font-size:10px;text-align:left;font-weight:600}td{border-bottom:1px solid #dde}tr:hover{background:#f0f5ff}@media print{.no-print{display:none!important}}</style></head><body>";
+  var html="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>"+titulo+"</title>"
+    +"<style>body{font-family:Arial,sans-serif;margin:24px;color:#222;font-size:12px}"
+    +"h1{font-size:17px;color:#1a3a6a;border-bottom:3px solid #38bdf8;padding-bottom:8px;margin-bottom:4px}"
+    +"h2{font-size:13px;color:#1a3a6a;margin:20px 0 6px}"
+    +"table{width:100%;border-collapse:collapse;margin-top:6px}"
+    +"th{background:#1a3a6a;color:#fff;padding:7px 8px;font-size:10px;text-align:left;font-weight:600}"
+    +"td{border-bottom:1px solid #dde}"
+    +"@media print{.no-print{display:none!important}}</style></head><body>";
   html+="<div style='display:flex;justify-content:space-between;align-items:start;margin-bottom:14px'>";
   html+="<div><h1>"+esc(titulo)+"</h1><p style='color:#555;font-size:11px;margin:0'>77a CIPM / BCS · Gerado em "+esc(dataRel)+"</p></div>";
-  html+="<button class='no-print' onclick='window.print()' style='background:#1a3a6a;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer'>Imprimir / PDF</button>";
+  html+="<button class='no-print' onclick='window.print()' style='background:#1a3a6a;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer'>&#128424; Imprimir / Salvar PDF</button>";
   html+="</div>";
   html+="<div style='display:flex;gap:18px;flex-wrap:wrap;background:#e8f0ff;border-radius:8px;padding:10px 16px;margin-bottom:14px'>";
-  [[lista.length,"Rondas"],[nV,"Visitas"],[nP,"Palestras"],[nPE,"Proj.Educ."],[nR,"Reuniões"],[nVi,"Ocorr.Violencia"],[nA,"Alunos Atingidos"]].forEach(function(k){
+  [[lista.length,"Rondas"],[nV,"Visitas"],[nP,"Palestras"],[nPE,"Proj.Educ."],[nR,"Reuniões"],[nVi,"Ocorr.Violência"],[nA,"Alunos Atingidos"]].forEach(function(k){
     html+="<div style='text-align:center'><div style='font-size:22px;font-weight:700;color:#1a3a6a'>"+k[0]+"</div><div style='font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.3px'>"+k[1]+"</div></div>";
   });
   html+="</div>";
   if(lista.length){
-    html+="<h2>Historico de Rondas</h2><table><thead><tr><th>Atividade</th><th>Data/Hora</th><th>Tema</th><th>Alunos</th><th>Resultado / Obs.</th></tr></thead><tbody>"+rows+"</tbody></table>";
+    html+="<h2>Histórico de Rondas Escolares</h2>"
+      +"<table><thead><tr>"
+      +"<th>Atividade / Narrativa</th><th>Data / Hora</th><th>Tema</th><th>Alunos</th><th>Resultado / Obs.</th>"
+      +"</tr></thead><tbody>"+rows+"</tbody></table>";
   } else {
     html+="<p style='color:#888;text-align:center;padding:30px'>Nenhuma ronda registrada.</p>";
   }
