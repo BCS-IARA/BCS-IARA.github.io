@@ -616,8 +616,13 @@ async function carregarDoSheets() {
     const ocApenas = ocNaoSigespol.filter(function(o){
       return !idsSheets.has(String(o.id).trim()) && !idsArquivadas.has(String(o.id).trim());
     });
+    // Mapa de edições locais pendentes (não sincronizadas com Sheets ainda)
+    var _editadosLocalMap = {};
+    ocNaoSigespol.forEach(function(o){ if(o._editadoLocal) _editadosLocalMap[String(o.id).trim()] = o; });
     // SIGESPOL sempre na frente; Sheets preenche o resto (sem duplicar IDs SIGESPOL)
-    const sheetsNaoSigespol = ocMescladas.filter(function(o){ return !sigespolIds.has(String(o.id).trim()); });
+    // Se occurrence tem _editadoLocal=true, preserva versão local (evita sobrescrever edições não sincronizadas)
+    const sheetsNaoSigespol = ocMescladas.filter(function(o){ return !sigespolIds.has(String(o.id).trim()); })
+      .map(function(o){ var localEdit=_editadosLocalMap[String(o.id).trim()]; return localEdit||o; });
     // Se há dados SIGESPOL E modo protegido ativo → não adicionar registros do Sheets
     if(sigespolLocais.length>0 && localStorage.getItem("bcs_import_lock")){
       state.db.ocorrencias = sigespolLocais.concat(ocApenas);
@@ -625,10 +630,23 @@ async function carregarDoSheets() {
       state.db.ocorrencias = sigespolLocais.concat(sheetsNaoSigespol).concat(ocApenas);
     }
 
-    // Restaurar texto_original (não enviado ao Sheets em versões antigas) a partir do cache local
+    // Restaurar campos locais que não são enviados ao Sheets
     var localOcMap = {};
-    ocLocais.forEach(function(o){ if(o.texto_original) localOcMap[String(o.id).trim()] = o.texto_original; });
-    state.db.ocorrencias.forEach(function(o){ if(!o.texto_original && localOcMap[String(o.id).trim()]) o.texto_original = localOcMap[String(o.id).trim()]; });
+    ocLocais.forEach(function(o){
+      var k=String(o.id).trim();
+      localOcMap[k] = o;
+    });
+    state.db.ocorrencias.forEach(function(o){
+      var k=String(o.id).trim();
+      var local=localOcMap[k];
+      if(!local) return;
+      if(!o.texto_original && local.texto_original) o.texto_original = local.texto_original;
+      // criadoEm é stripped antes de enviar ao Sheets — restaurar sempre do local
+      if(!o.criadoEm && local.criadoEm) o.criadoEm = local.criadoEm;
+      // Preservar complementos locais se Sheets não os tiver
+      if((!o.esc_registros || !o.esc_registros.length) && local.esc_registros && local.esc_registros.length) o.esc_registros = local.esc_registros;
+      if((!o.ps_registros  || !o.ps_registros.length)  && local.ps_registros  && local.ps_registros.length)  o.ps_registros  = local.ps_registros;
+    });
 
     // Restaurar dados FRIDA nas ocorrências (campos locais perdidos no reload)
     if(rj0.dados.frida && rj0.dados.frida.length > 0){
@@ -8602,7 +8620,8 @@ function renderOcorrenciasGestor(el, perfil_atual){
         ocM.relatorio = document.getElementById("ed-relatorio").value.trim();
         ocM.posto   = document.getElementById("ed-posto").value.trim()||"BCS";
         ocM.tipo    = document.getElementById("ed-tipo").value.trim();
-        ocM.data    = document.getElementById("ed-data").value;
+        var _novaData = document.getElementById("ed-data").value;
+        ocM.data    = _novaData || ocM.data || hoje(); // preserva data original se campo vazio
         ocM.hora    = document.getElementById("ed-hora").value;
         ocM.zona    = document.getElementById("ed-zona").value;
         var localVal = document.getElementById("ed-local").value.trim();
