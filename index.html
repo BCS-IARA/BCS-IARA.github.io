@@ -616,44 +616,48 @@ async function carregarDoSheets() {
     const ocApenas = ocNaoSigespol.filter(function(o){
       return !idsSheets.has(String(o.id).trim()) && !idsArquivadas.has(String(o.id).trim());
     });
+    // Mapa COMPLETO de ocorrências locais — construído ANTES do merge para uso imediato
+    var _localFullMap = {};
+    ocLocais.forEach(function(o){ _localFullMap[String(o.id).trim()] = o; });
+
     // Mapa de edições locais pendentes (não sincronizadas com Sheets ainda)
     var _editadosLocalMap = {};
     ocNaoSigespol.forEach(function(o){ if(o._editadoLocal) _editadosLocalMap[String(o.id).trim()] = o; });
+
     // SIGESPOL sempre na frente; Sheets preenche o resto (sem duplicar IDs SIGESPOL)
-    // Se occurrence tem _editadoLocal=true, preserva versão local (evita sobrescrever edições não sincronizadas)
+    // Campos críticos (classificacao, escolaNome, etc.) são SEMPRE restaurados do local
+    // porque o Sheets não tem colunas para esses campos específicos dos módulos
     const sheetsNaoSigespol = ocMescladas.filter(function(o){ return !sigespolIds.has(String(o.id).trim()); })
-      .map(function(o){ var localEdit=_editadosLocalMap[String(o.id).trim()]; return localEdit||o; });
+      .map(function(o){
+        var k = String(o.id).trim();
+        // Se editado localmente, usa versão local inteira
+        if(_editadosLocalMap[k]) return _editadosLocalMap[k];
+        // Usa versão do Sheets mas restaura campos que Sheets não preserva
+        var loc = _localFullMap[k];
+        if(loc){
+          // Classificação de módulo — SEMPRE preferir local (Sheets não tem coluna para isso)
+          if(loc.classificacao) o.classificacao = loc.classificacao;
+          // Campos do módulo escolar — SEMPRE preferir local
+          if(loc.escolaNome) o.escolaNome = loc.escolaNome;
+          if(loc.escolaId)   o.escolaId   = loc.escolaId;
+          if(loc.tipoOcEscola) o.tipoOcEscola = loc.tipoOcEscola;
+          if(loc.tipoViolenciaEscola) o.tipoViolenciaEscola = loc.tipoViolenciaEscola;
+          // Complementos — preferir local se Sheets não retornou
+          if((!o.esc_registros||!o.esc_registros.length) && loc.esc_registros && loc.esc_registros.length) o.esc_registros = loc.esc_registros;
+          if((!o.ps_registros ||!o.ps_registros.length)  && loc.ps_registros  && loc.ps_registros.length)  o.ps_registros  = loc.ps_registros;
+          // Outros campos que Sheets pode não devolver
+          if(!o.texto_original && loc.texto_original) o.texto_original = loc.texto_original;
+          if(!o.criadoEm && loc.criadoEm) o.criadoEm = loc.criadoEm;
+        }
+        return o;
+      });
+
     // Se há dados SIGESPOL E modo protegido ativo → não adicionar registros do Sheets
     if(sigespolLocais.length>0 && localStorage.getItem("bcs_import_lock")){
       state.db.ocorrencias = sigespolLocais.concat(ocApenas);
     } else {
       state.db.ocorrencias = sigespolLocais.concat(sheetsNaoSigespol).concat(ocApenas);
     }
-
-    // Restaurar campos locais que não são enviados ao Sheets
-    var localOcMap = {};
-    ocLocais.forEach(function(o){
-      var k=String(o.id).trim();
-      localOcMap[k] = o;
-    });
-    state.db.ocorrencias.forEach(function(o){
-      var k=String(o.id).trim();
-      var local=localOcMap[k];
-      if(!local) return;
-      if(!o.texto_original && local.texto_original) o.texto_original = local.texto_original;
-      // criadoEm é stripped antes de enviar ao Sheets — restaurar sempre do local
-      if(!o.criadoEm && local.criadoEm) o.criadoEm = local.criadoEm;
-      // classificacao é campo crítico dos módulos — restaurar se Sheets devolveu vazio
-      if(!o.classificacao && local.classificacao) o.classificacao = local.classificacao;
-      // Campos do módulo escolar — Sheets não os preserva, restaurar sempre do local
-      if(!o.escolaNome && local.escolaNome) o.escolaNome = local.escolaNome;
-      if(!o.escolaId   && local.escolaId)   o.escolaId   = local.escolaId;
-      if(!o.tipoOcEscola && local.tipoOcEscola) o.tipoOcEscola = local.tipoOcEscola;
-      if(!o.tipoViolenciaEscola && local.tipoViolenciaEscola) o.tipoViolenciaEscola = local.tipoViolenciaEscola;
-      // Preservar complementos locais se Sheets não os tiver
-      if((!o.esc_registros || !o.esc_registros.length) && local.esc_registros && local.esc_registros.length) o.esc_registros = local.esc_registros;
-      if((!o.ps_registros  || !o.ps_registros.length)  && local.ps_registros  && local.ps_registros.length)  o.ps_registros  = local.ps_registros;
-    });
 
     // Restaurar dados FRIDA nas ocorrências (campos locais perdidos no reload)
     if(rj0.dados.frida && rj0.dados.frida.length > 0){
