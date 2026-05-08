@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <title>IARA</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -249,6 +252,20 @@ function carregarLocal() {
       db.visitas = l.visitas||[];
       db.agendamentos = l.agendamentos||[];
     }
+    // 🔒 Restaurar backup SIGESPOL (imune ao Sheets — chave separada)
+    try {
+      const spRaw = localStorage.getItem("bcs_sigespol_backup");
+      if(spRaw){
+        const spList = JSON.parse(spRaw);
+        if(spList && spList.length>0){
+          const spIds = new Set(spList.map(function(o){ return String(o.id).trim(); }));
+          // Remover duplicatas e re-inserir SIGESPOL no início
+          db.ocorrencias = db.ocorrencias.filter(function(o){ return !spIds.has(String(o.id).trim()); });
+          db.ocorrencias = spList.concat(db.ocorrencias);
+          console.log("[BCS] Restaurado backup SIGESPOL:",spList.length,"registros");
+        }
+      }
+    } catch(e2){ console.warn("[BCS] Erro ao restaurar SIGESPOL backup:",e2); }
     console.log("[BCS] Carregado local - OC:",db.ocorrencias.length,"Ag:",db.agendamentos.length);
     return db;
   } catch(e){
@@ -308,7 +325,12 @@ function importarDadosBCS(input){
       if(dados.ocorrenciasEncerradas) state.ocorrenciasEncerradas=dados.ocorrenciasEncerradas;
       if(dados.alertasGraves) state.alertasGraves=dados.alertasGraves;
       if(dados.filaPendente) state.filaPendente=dados.filaPendente;
-      // 🔒 Guardar registros importados em chave própria — imune ao Sheets
+      // 🔒 Guardar registros SIGESPOL em chave SEPARADA — imune ao Sheets mesmo se cache antigo
+      var sigespolParaBackup = (state.db.ocorrencias||[]).filter(function(o){ return o.fonte==='SIGESPOL'; });
+      if(sigespolParaBackup.length>0){
+        localStorage.setItem("bcs_sigespol_backup", JSON.stringify(sigespolParaBackup));
+        console.log("[BCS] Backup SIGESPOL salvo:",sigespolParaBackup.length,"registros");
+      }
       localStorage.setItem("bcs_import_lock","1");
       localStorage.setItem("bcs_protected_ocs", JSON.stringify(state.db.ocorrencias||[]));
       salvarLocal();
@@ -6414,7 +6436,7 @@ function renderTela() {
       g.push("<div style='width:100%;background:#1a0d00;border:1px solid #c8601a;border-radius:5px;padding:6px 10px;display:flex;align-items:center;gap:8px;margin-top:4px'>");
       g.push("<span style='font-size:13px'>🔒</span>");
       g.push("<span style='color:#e07030;font-size:10px;font-weight:700;flex:1'>Modo protegido ativo — dados importados preservados. Sheets não vai sobrescrever.</span>");
-      g.push("<button onclick=\"localStorage.removeItem('bcs_import_lock');localStorage.removeItem('bcs_ids_importados');showToast('Proteção removida. Próximo sync usará o Sheets.');render()\" style='background:#2a1000;border:1px solid #c8601a;color:#c8601a;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer'>🔓 Liberar</button>");
+      g.push("<button onclick=\"localStorage.removeItem('bcs_import_lock');localStorage.removeItem('bcs_ids_importados');localStorage.removeItem('bcs_sigespol_backup');showToast('Proteção removida. Próximo sync usará o Sheets.');render()\" style='background:#2a1000;border:1px solid #c8601a;color:#c8601a;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer'>🔓 Liberar</button>");
       g.push("</div>");
     } else {
       g.push("<div id='sheets-status' style='color:#3a4a28;font-size:10px;width:100%'>Sincronização automática ativa.</div>");
@@ -7589,7 +7611,8 @@ function renderDashboardOperador(main,ocs,hoje_){
   h+="<h2 style='font-size:22px;font-weight:700;color:#e8e0cc'>Painel do Operador</h2>";
   h+="<p style='color:#5a5535;font-size:12px;margin-top:2px'>"+new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})+" · "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</p></div>";
   h+="<div style='text-align:right'><div style='display:flex;align-items:center;gap:6px;justify-content:flex-end;margin-bottom:4px'><span class='painel-dot'></span><span style='color:#6a8a50;font-size:11px;font-weight:600'>SERVIÇO ATIVO</span></div>";
-  h+="<div id='sheets-status' style='font-size:10px;color:#4a4530'>"+ocs.length+" ocorrências · <button onclick='carregarDoSheets()' style='background:transparent;border:none;color:#5a5535;font-size:10px;cursor:pointer;text-decoration:underline;padding:0'>↻ sync</button></div></div></div>";
+  var _spBk=localStorage.getItem("bcs_sigespol_backup"); var _spCount=0; try{_spCount=_spBk?JSON.parse(_spBk).length:0;}catch(e){}
+  h+="<div id='sheets-status' style='font-size:10px;color:#4a4530'>"+ocs.length+" ocorrências"+(_spCount>0?" · 🔒"+_spCount+" SIGESPOL":"")+' · <button onclick=\'carregarDoSheets()\' style=\'background:transparent;border:none;color:#5a5535;font-size:10px;cursor:pointer;text-decoration:underline;padding:0\'>↻ sync</button> · <span style="color:#888">v0508</span></div></div></div>';
 
   h+="<div style='background:linear-gradient(135deg,#1e0e08,#180c06);border:1px solid "+(nL>0?"#6a2010":"#3a2010")+";border-radius:14px;overflow:hidden;margin-bottom:16px'>";
   h+="<div style='padding:10px 16px;border-bottom:1px solid #2a1808;display:flex;align-items:center;justify-content:space-between;background:"+(nL>0?"linear-gradient(90deg,#2a1008,#1e0c06)":"transparent")+"'>";
