@@ -4617,23 +4617,353 @@ function abrirRegistroPS(ocId){
 // ══════════════════════════════════════════════════════
 //  MÓDULO ESCOLAR — Refatorado
 // ══════════════════════════════════════════════════════
-var ESC_TIPOS  = ["Visita","Palestra","Projeto Educacional","Reunião"];
-var ESC_CORS   = {"Visita":"#22c55e","Palestra":"#a78bfa","Projeto Educacional":"#38bdf8","Reunião":"#f59e0b"};
-var ESC_ICOS   = {"Visita":"🚗","Palestra":"🎤","Projeto Educacional":"📚","Reunião":"🤝"};
+//  MÓDULO ESCOLAR
+// ══════════════════════════════════════════════════════
+var ESC_REG_TIPOS = ["Visita","Palestra","Projeto Educacional","Reunião","Ocorrência de Violência"];
+var ESC_REG_CORS  = {"Visita":"#22c55e","Palestra":"#a78bfa","Projeto Educacional":"#38bdf8","Reunião":"#f59e0b","Ocorrência de Violência":"#ef4444"};
+var ESC_REG_ICOS  = {"Visita":"🚗","Palestra":"🎤","Projeto Educacional":"📚","Reunião":"🤝","Ocorrência de Violência":"⚠"};
 
 function renderModuloEscolar(main){
-  var tab   = state._escolaTab||"dashboard";
-  var escolas = state.escolas||[];
-  var atividades = state.atividadesEscolares||[];
-  // Migrar visitas antigas para atividades (sem duplicar)
-  (state.visitasEscolares||[]).forEach(function(v){
-    if(!v._migrado && !atividades.find(function(a){return a.id===v.id;})){
-      atividades.push({id:v.id,escolaId:v.escolaId,escolaNome:v.escolaNome,tipo:"Visita",subtipo:v.tipo||"Rotina",data:v.data,hora:v.hora,responsavel:v.policial||"",tema:v.objetivo||"",resultado:v.resultado||"",criadoEm:v.criadoEm});
-    }
+  if(!state._escF) state._escF={periodo:"mes",busca:"",de:"",ate:""};
+  var f=state._escF;
+
+  // Somente Ronda Escolar
+  var todos=(state.db.ocorrencias||[]).filter(function(o){
+    return (o.classificacao||"")==="Ronda Escolar";
   });
-  // Ocorrências vinculadas a escolas (violência)
-  var ocsEsc=(state.db.ocorrencias||[]).filter(function(o){return o.escolaId;});
-  var filtro=(state._escolaFiltro||"").toLowerCase();
+
+  // Filtro temporal (igual ao PS)
+  var agora=new Date();
+  function _pd(ds){ var n=_normData(ds); if(!n)return null; var p=n.split("-"); return new Date(+p[0],+p[1]-1,+p[2],12); }
+  var limDe=null, limAte=new Date(agora.getTime()+86400000);
+  if(f.periodo==="semana") limDe=new Date(agora-7*86400000);
+  else if(f.periodo==="mes") limDe=new Date(agora-30*86400000);
+  else if(f.periodo==="ano") limDe=new Date(agora-365*86400000);
+  else if(f.periodo==="periodo"){
+    if(f.de) limDe=_pd(f.de);
+    if(f.ate) limAte=new Date(_pd(f.ate).getTime()+86400000);
+  }
+  var filtrados=todos.filter(function(o){
+    var dt=_pd(o.data);
+    if(!dt) return true;
+    if(limDe && dt<limDe) return false;
+    if(limAte && dt>limAte) return false;
+    return true;
+  });
+
+  if(state.filtroBairro) filtrados=filtrados.filter(_matchBairro);
+
+  var busca=(f.busca||"").toLowerCase().trim();
+  if(busca) filtrados=filtrados.filter(function(o){
+    return (o.tipo||"").toLowerCase().includes(busca)||
+           (o.escolaNome||"").toLowerCase().includes(busca)||
+           (o.texto_original||o.descricao_dinamica||o.descricao||"").toLowerCase().includes(busca)||
+           (o.bairro||o.local||"").toLowerCase().includes(busca);
+  });
+  filtrados.sort(function(a,b){return (_pd(b.data)||0)-(_pd(a.data)||0);});
+
+  // KPIs a partir dos registros de complemento
+  var totalRondas=filtrados.length;
+  var nVisitas=0,nPalestras=0,nProjEduc=0,nReunioes=0,nViolencia=0,nAlunos=0;
+  filtrados.forEach(function(o){
+    (o.esc_registros||[]).forEach(function(r){
+      if(r.tipo==="Visita") nVisitas++;
+      else if(r.tipo==="Palestra") nPalestras++;
+      else if(r.tipo==="Projeto Educacional") nProjEduc++;
+      else if(r.tipo==="Reunião") nReunioes++;
+      else if(r.tipo==="Ocorrência de Violência") nViolencia++;
+      nAlunos+=(+r.nAlunos||0);
+    });
+  });
+
+  var IS2="width:100%;background:#0e1c2a;border:1px solid #1a3a5a;color:#d0e8f5;padding:9px 11px;border-radius:5px;font-size:12px;outline:none;box-sizing:border-box";
+  var h=[];
+  h.push("<div style='max-width:800px;margin:0 auto;padding:16px 20px 40px'>");
+
+  // Cabeçalho
+  h.push("<div style='display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:12px 16px;background:linear-gradient(135deg,#0a1e2a,#0a2a1a);border:1px solid #1a4a3a;border-radius:8px'>");
+  h.push("<div style='width:42px;height:42px;border-radius:50%;background:#0a2a1e;border:2px solid #38bdf8;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0'>🏫</div>");
+  h.push("<div><h2 style='font-size:15px;font-weight:700;color:#e8f5ff;margin:0 0 2px'>Módulo Escolar</h2><p style='color:#38bdf8;font-size:10px;margin:0;letter-spacing:.5px'>MONITORAMENTO · 77ª CIPM / BCS</p></div>");
+  h.push("<div style='margin-left:auto;text-align:right'><p style='color:#38bdf8;font-size:10px;margin:0'>Rondas no período</p><p style='color:#e8f5ff;font-size:18px;font-weight:700;margin:0'>"+totalRondas+"</p></div>");
+  h.push("</div>");
+
+  // KPIs
+  h.push("<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px'>");
+  [[nVisitas,"Visitas","🚗","#22c55e"],[nPalestras,"Palestras","🎤","#a78bfa"],[nProjEduc,"Proj. Educacionais","📚","#38bdf8"],[nReunioes,"Reuniões","🤝","#f59e0b"],[nViolencia,"Ocorr. Violência","⚠","#ef4444"],[nAlunos,"Alunos Atingidos","👥","#34d399"]].forEach(function(k){
+    h.push("<div style='background:#0a1e2a;border:1px solid "+k[3]+"44;border-top:3px solid "+k[3]+";border-radius:8px;padding:11px 12px;text-align:center'>");
+    h.push("<div style='font-size:18px;margin-bottom:3px'>"+k[2]+"</div>");
+    h.push("<div style='font-size:18px;font-weight:700;color:"+k[3]+";margin-bottom:2px'>"+k[0]+"</div>");
+    h.push("<div style='font-size:9px;color:#4a7a9a;font-weight:600;text-transform:uppercase;letter-spacing:.5px'>"+k[1]+"</div>");
+    h.push("</div>");
+  });
+  h.push("</div>");
+
+  // Filtros temporais
+  h.push("<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center'>");
+  [["semana","7 dias"],["mes","Mês"],["ano","Ano"],["periodo","Período"]].forEach(function(fp){
+    var sel=f.periodo===fp[0];
+    h.push("<button onclick=\"state._escF.periodo='"+fp[0]+"';renderModuloEscolar(document.getElementById('main-content'));\" style='background:"+(sel?"#0a2a1e":"#0a1a2a")+";border:1px solid "+(sel?"#38bdf8":"#1a3a5a")+";color:"+(sel?"#e8f5ff":"#4a7a9a")+";padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer'>"+fp[1]+"</button>");
+  });
+  if(f.periodo==="periodo"){
+    h.push("<input type='date' value='"+esc(f.de||"")+"' onchange=\"state._escF.de=this.value;renderModuloEscolar(document.getElementById('main-content'));\" style='"+IS2+";width:140px'>");
+    h.push("<span style='color:#4a7a9a;font-size:11px'>até</span>");
+    h.push("<input type='date' value='"+esc(f.ate||"")+"' onchange=\"state._escF.ate=this.value;renderModuloEscolar(document.getElementById('main-content'));\" style='"+IS2+";width:140px'>");
+  }
+  h.push("</div>");
+
+  h.push(_htmlFiltrosBairro("renderModuloEscolar(document.getElementById('main-content'))","#38bdf8"));
+
+  // Busca
+  h.push("<input id='esc-busca' type='text' placeholder='Buscar por escola, tipo, bairro, narrativa...' value='"+esc(f.busca||"")+"' style='"+IS2+";margin-bottom:14px'>");
+
+  // Lista
+  if(!filtrados.length){
+    h.push("<div style='text-align:center;padding:50px 20px;color:#1a3a5a'>");
+    h.push("<div style='font-size:40px;margin-bottom:12px'>🏫</div>");
+    h.push("<p style='font-size:14px;font-weight:600;margin:0 0 6px;color:#2a5a7a'>Nenhuma ronda escolar no período</p>");
+    h.push("<p style='font-size:11px;margin:0;color:#1a3a5a'>Lance uma ocorrência e classifique como <b style='color:#38bdf8'>Ronda Escolar</b></p>");
+    h.push("</div>");
+  }
+
+  filtrados.forEach(function(o){
+    var regs=o.esc_registros||[];
+    var sumAlunos=regs.reduce(function(s,r){return s+(+r.nAlunos||0);},0);
+
+    var cor="#38bdf8";
+    var t=(o.tipo||"").toLowerCase();
+    if(/homicídio|homicidio|feminicídio/.test(t)) cor="#ef4444";
+    else if(/roubo/.test(t)) cor="#f97316";
+    else if(/furto/.test(t)) cor="#eab308";
+    else if(/violência|violencia/.test(t)) cor="#ef4444";
+    else if(/droga|entorpecente/.test(t)) cor="#a78bfa";
+
+    var fcS="font-size:10px;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:2px";
+    var fcV="font-size:11px;color:#c5e0f5;line-height:1.5";
+
+    h.push("<div style='background:#0a1e2a;border:1px solid #1a3a5a;border-left:3px solid "+cor+";border-radius:12px;padding:14px;margin-bottom:10px'>");
+
+    // Linha 1: tipo + escola + nAlunos
+    h.push("<div style='display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;margin-bottom:6px'>");
+    h.push("<div style='display:flex;gap:6px;flex-wrap:wrap;align-items:center'>");
+    h.push("<span style='background:"+cor+"18;color:"+cor+";padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase'>🏫 "+esc((o.tipo||"Ronda Escolar").toUpperCase())+"</span>");
+    if(o.numero) h.push("<span style='background:#0a2a3a;color:#38bdf8;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600'>Nº "+esc(o.numero)+"</span>");
+    if(o.escolaNome) h.push("<span style='background:#0a2a1e;color:#22c55e;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600'>"+esc(o.escolaNome)+"</span>");
+    h.push("</div>");
+    if(sumAlunos){
+      h.push("<span style='background:#0a2a1e;border:1px solid #34d39944;color:#34d399;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>👥 "+sumAlunos+"</span>");
+    }
+    h.push("</div>");
+
+    // Linha 2: data · bairro
+    h.push("<p style='color:#4a7a9a;font-size:11px;margin:0 0 10px'>"+fmtData(o.data)+(o.hora?" · "+o.hora:"")+(o.bairro?" · "+o.bairro:o.local?" · "+o.local:"")+"</p>");
+
+    // Campos estruturados
+    var temCampos=o.vitima_nome||o.local||o.descricao_dinamica||o.texto_original;
+    if(temCampos){
+      h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px'>");
+      if(o.local||o.bairro) h.push("<div><span style='"+fcS+"'>Local</span><span style='"+fcV+"'>"+esc(o.local||o.bairro||"")+"</span></div>");
+      if(o.vitima_nome) h.push("<div><span style='"+fcS+"'>Envolvido</span><span style='"+fcV+"'>"+esc(o.vitima_nome)+(o.vitima_idade?" · "+o.vitima_idade+" anos":"")+"</span></div>");
+      h.push("</div>");
+      var dinamica=o.descricao_dinamica||o.texto_original||o.descricao||"";
+      if(dinamica) h.push("<div style='background:#060d1c;border:1px solid #1a3358;border-radius:6px;padding:10px;margin-bottom:10px'><span style='"+fcS+"'>Narrativa</span><p style='color:#c8d8f0;font-size:11px;line-height:1.7;margin:0;white-space:pre-wrap'>"+esc(dinamica)+"</p></div>");
+    } else {
+      var relato=(o.texto_original||o.descricao_dinamica||o.descricao||"").trim();
+      if(relato) h.push("<pre style='white-space:pre-wrap;word-break:break-word;color:#c8d8f0;font-size:11px;line-height:1.8;font-family:inherit;margin:0 0 10px;background:#060d1c;border-radius:8px;padding:12px'>"+esc(relato)+"</pre>");
+    }
+
+    // Registros de complemento
+    if(regs.length){
+      h.push("<div style='margin-bottom:10px'>");
+      regs.slice().reverse().slice(0,2).forEach(function(r){
+        var rcor=ESC_REG_CORS[r.tipo]||"#6b7280";
+        var rico=ESC_REG_ICOS[r.tipo]||"📋";
+        h.push("<div style='background:#060d1c;border:1px solid #1a2a3a;border-left:2px solid "+rcor+";border-radius:6px;padding:8px 10px;margin-bottom:6px'>");
+        h.push("<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:"+(r.resultado||r.observacoes?"4px":"0")+"'>");
+        h.push("<span style='background:"+rcor+"22;color:"+rcor+";padding:1px 7px;border-radius:4px;font-size:9px;font-weight:700'>"+rico+" "+esc(r.tipo+(r.subtipo?" — "+r.subtipo:""))+"</span>");
+        h.push("<span style='color:#4a7a9a;font-size:10px'>📅 "+esc(r.data)+(r.hora?" "+r.hora:"")+"</span>");
+        if(r.nAlunos) h.push("<span style='color:#34d399;font-size:10px;font-weight:700'>👥 "+r.nAlunos+"</span>");
+        if(r.turmas) h.push("<span style='color:#60a5fa;font-size:10px'>🎓 "+esc(r.turmas)+"</span>");
+        h.push("</div>");
+        if(r.tema) h.push("<p style='color:#c8d8f0;font-size:10px;margin:0 0 3px;font-weight:600'>"+esc(r.tema)+"</p>");
+        if(r.resultado||r.observacoes) h.push("<p style='color:#7a9ab0;font-size:10px;line-height:1.5;margin:0'>"+esc(r.resultado||r.observacoes||"")+"</p>");
+        h.push("</div>");
+      });
+      if(regs.length>2) h.push("<p style='color:#4a7a9a;font-size:10px;text-align:center;margin:4px 0 0'>+ "+(regs.length-2)+" registro(s) anteriores</p>");
+      h.push("</div>");
+    }
+
+    // Botões
+    h.push("<div style='display:flex;gap:8px'>");
+    h.push("<button data-oc='"+o.id+"' onclick=\"state.popEditarOc='"+o.id+"';renderOcorrenciasGestor(document.getElementById('main-content'),'gestor')\" style='background:#0a1a2a;border:1px solid #2a3a5a;color:#6a8aba;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>✏ Editar</button>");
+    h.push("<button data-oc='"+o.id+"' onclick='abrirRegistroEsc(this.dataset.oc)' style='flex:1;background:#0a1e2a;border:1px solid #38bdf8;color:#38bdf8;padding:7px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>📋 Registrar Complemento</button>");
+    h.push("</div>");
+    h.push("</div>");
+  });
+
+  h.push("</div>");
+  main.innerHTML=h.join("");
+
+  // Busca debounce
+  var bEl=document.getElementById("esc-busca");
+  if(bEl){
+    var _t=null;
+    bEl.oninput=function(){
+      state._escF.busca=this.value;
+      clearTimeout(_t);
+      _t=setTimeout(function(){renderModuloEscolar(document.getElementById("main-content"));},300);
+    };
+  }
+}
+
+// Modal de complemento de Ronda Escolar
+function abrirRegistroEsc(ocId){
+  var oc=(state.db.ocorrencias||[]).find(function(o){return o.id===ocId;});
+  if(!oc){showToast("Ocorrência não encontrada","error");return;}
+  if(!oc.esc_registros) oc.esc_registros=[];
+
+  var IS="width:100%;background:#0a1e2a;border:1px solid #1a3a5a;color:#d0e8f5;padding:9px 10px;border-radius:5px;font-size:12px;outline:none;box-sizing:border-box";
+  var LS="color:#38bdf8;font-size:10px;text-transform:uppercase;font-weight:700;letter-spacing:.5px;display:block;margin-bottom:5px";
+
+  var modal=document.createElement("div");
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;box-sizing:border-box";
+
+  var mh=[];
+  mh.push("<div style='background:#0a1e2a;border:2px solid #1a4a6a;border-radius:14px;max-width:580px;width:100%;margin:auto;padding:20px;box-sizing:border-box'>");
+  // Header
+  mh.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid #1a3a5a;padding-bottom:12px'>");
+  mh.push("<div><h3 style='color:#e8f5ff;font-size:15px;font-weight:700;margin:0 0 2px'>📋 Registrar Complemento</h3><p style='color:#38bdf8;font-size:10px;margin:0'>"+esc(oc.tipo||"Ronda Escolar")+(oc.escolaNome?" · "+oc.escolaNome:"")+(oc.data?" · "+oc.data:"")+"</p></div>");
+  mh.push("<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#0a1a2a;border:1px solid #1a3a5a;color:#38bdf8;font-size:18px;cursor:pointer;border-radius:7px;width:32px;height:32px;line-height:1'>×</button>");
+  mh.push("</div>");
+
+  // Tipo de atividade
+  mh.push("<div style='margin-bottom:12px'><label style='"+LS+"'>Tipo de Atividade *</label>");
+  mh.push("<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:7px' id='esc-reg-tipo-btns'>");
+  ESC_REG_TIPOS.forEach(function(t){
+    var c=ESC_REG_CORS[t]||"#6b7280";
+    var ic=ESC_REG_ICOS[t]||"📋";
+    mh.push("<button type='button' data-tipo='"+t+"' onclick='_escRegTipo(this)' style='background:#060d1c;border:1px solid #1a2a3a;color:#4a7a9a;padding:8px 4px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;text-align:center'>"+ic+" "+t+"</button>");
+  });
+  mh.push("</div><input type='hidden' id='esc-reg-tipo' value=''></div>");
+
+  // Data/Hora
+  mh.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>");
+  mh.push("<div><label style='"+LS+"'>Data</label><input id='esc-reg-data' type='date' value='"+new Date().toISOString().split("T")[0]+"' style='"+IS+"'/></div>");
+  mh.push("<div><label style='"+LS+"'>Hora</label><input id='esc-reg-hora' type='time' value='"+new Date().toTimeString().slice(0,5)+"' style='"+IS+"'/></div>");
+  mh.push("</div>");
+
+  // Subtipo (Visita)
+  mh.push("<div id='esc-reg-subtipo-div' style='margin-bottom:12px;display:none'><label style='"+LS+"'>Subtipo de Visita</label>");
+  mh.push("<div style='display:flex;gap:8px;flex-wrap:wrap'>");
+  ["Rotina","Solidária","Preventiva","Institucional"].forEach(function(s){
+    mh.push("<button type='button' data-sub='"+s+"' onclick='_escRegSub(this)' style='background:#060d1c;border:1px solid #1a2a3a;color:#4a7a9a;padding:6px 12px;border-radius:6px;font-size:10px;cursor:pointer'>"+s+"</button>");
+  });
+  mh.push("</div><input type='hidden' id='esc-reg-subtipo' value='Rotina'></div>");
+
+  // Tipo de violência (Ocorrência de Violência)
+  mh.push("<div id='esc-reg-violencia-div' style='margin-bottom:12px;display:none'><label style='"+LS+"'>Tipo de Violência</label>");
+  mh.push("<select id='esc-reg-tipoViol' style='"+IS+"'><option value=''>-- Selecione --</option>");
+  ["Física","Verbal/Psicológica","Sexual","Bullying","Drogas/Entorpecentes","Ameaça","Furto/Roubo","Vandalismo","Conflito Familiar","Outros"].forEach(function(v){
+    mh.push("<option>"+v+"</option>");
+  });
+  mh.push("</select></div>");
+
+  // Detalhes específicos
+  mh.push("<div style='background:#060d1c;border:1px solid #1a2a3a;border-radius:8px;padding:12px;margin-bottom:12px'>");
+  mh.push("<p style='color:#38bdf8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>Detalhes</p>");
+  mh.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'>");
+  mh.push("<div style='grid-column:1/-1'><label style='"+LS+"'>Tema / Assunto</label><input id='esc-reg-tema' type='text' placeholder='Ex: Prevenção ao Bullying, Palestras sobre Drogas...' style='"+IS+"'/></div>");
+  mh.push("<div><label style='"+LS+"'>👥 Nº de Alunos</label><input id='esc-reg-alunos' type='number' min='0' placeholder='0' style='"+IS+"'/></div>");
+  mh.push("<div><label style='"+LS+"'>🎓 Turmas</label><input id='esc-reg-turmas' type='text' placeholder='Ex: 6º ao 9º' style='"+IS+"'/></div>");
+  mh.push("</div></div>");
+
+  mh.push("<div style='margin-bottom:14px'><label style='"+LS+"'>📝 Resultado / Observações</label><textarea id='esc-reg-resultado' rows='3' placeholder='Descreva o resultado, encaminhamentos, próximas ações...' style='"+IS+";resize:vertical;font-family:inherit;line-height:1.6'></textarea></div>");
+
+  // Histórico
+  if(oc.esc_registros.length){
+    mh.push("<div style='background:#060d1c;border:1px solid #1a2a3a;border-radius:8px;padding:10px;margin-bottom:14px;max-height:160px;overflow-y:auto'>");
+    mh.push("<p style='color:#2a5a7a;font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 8px'>Registros Anteriores ("+oc.esc_registros.length+")</p>");
+    oc.esc_registros.slice().reverse().forEach(function(r){
+      var rcor=ESC_REG_CORS[r.tipo]||"#6b7280";
+      var rico=ESC_REG_ICOS[r.tipo]||"📋";
+      mh.push("<div style='border-bottom:1px solid #1a2a3a;padding:5px 0;margin-bottom:4px'>");
+      mh.push("<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:2px'>");
+      mh.push("<span style='background:"+rcor+"22;color:"+rcor+";padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700'>"+rico+" "+esc(r.tipo+(r.subtipo?" — "+r.subtipo:""))+"</span>");
+      mh.push("<span style='color:#2a5a7a;font-size:10px'>"+r.data+(r.hora?" "+r.hora:"")+"</span>");
+      if(r.nAlunos) mh.push("<span style='color:#34d399;font-size:10px;font-weight:700'>"+r.nAlunos+" alunos</span>");
+      mh.push("</div>");
+      if(r.tema) mh.push("<p style='color:#c8d8f0;font-size:10px;margin:0 0 2px'>"+esc(r.tema)+"</p>");
+      if(r.resultado||r.observacoes) mh.push("<p style='color:#4a7a9a;font-size:10px;margin:0;line-height:1.5'>"+esc(r.resultado||r.observacoes||"")+"</p>");
+      mh.push("</div>");
+    });
+    mh.push("</div>");
+  }
+
+  mh.push("<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px'>");
+  mh.push("<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#0a1a2a;border:1px solid #1a2a3a;color:#2a5a7a;padding:11px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>Cancelar</button>");
+  mh.push("<button id='btn-salvar-esc-reg' style='background:linear-gradient(135deg,#0a2a3a,#0a3a4a);border:1px solid #38bdf8;color:#e8f5ff;padding:11px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>💾 Salvar Registro</button>");
+  mh.push("</div>");
+  mh.push("</div>");
+
+  modal.innerHTML=mh.join("");
+  modal.onclick=function(e){if(e.target===this)this.remove();};
+  document.body.appendChild(modal);
+
+  window._escRegTipo=function(btn){
+    document.querySelectorAll("#esc-reg-tipo-btns button").forEach(function(b){b.style.background="#060d1c";b.style.borderColor="#1a2a3a";b.style.color="#4a7a9a";});
+    var t=btn.dataset.tipo;
+    var c=ESC_REG_CORS[t]||"#38bdf8";
+    btn.style.background=c+"22"; btn.style.borderColor=c; btn.style.color=c;
+    document.getElementById("esc-reg-tipo").value=t;
+    var svDiv=document.getElementById("esc-reg-subtipo-div");
+    var vDiv=document.getElementById("esc-reg-violencia-div");
+    if(svDiv) svDiv.style.display=(t==="Visita"?"block":"none");
+    if(vDiv) vDiv.style.display=(t==="Ocorrência de Violência"?"block":"none");
+  };
+  window._escRegSub=function(btn){
+    document.querySelectorAll("#esc-reg-subtipo-div button").forEach(function(b){b.style.background="#060d1c";b.style.borderColor="#1a2a3a";b.style.color="#4a7a9a";});
+    btn.style.background="#22c55e22"; btn.style.borderColor="#22c55e"; btn.style.color="#22c55e";
+    document.getElementById("esc-reg-subtipo").value=btn.dataset.sub;
+  };
+
+  document.getElementById("btn-salvar-esc-reg").onclick=function(){
+    var tipo=document.getElementById("esc-reg-tipo").value;
+    if(!tipo){showToast("Selecione o tipo de atividade","error");return;}
+    var resultado=(document.getElementById("esc-reg-resultado")||{value:""}).value.trim();
+    var tema=(document.getElementById("esc-reg-tema")||{value:""}).value.trim();
+    if(!tema&&!resultado){showToast("Preencha Tema ou Resultado","error");return;}
+    var reg={
+      tipo:tipo,
+      subtipo:tipo==="Visita"?(document.getElementById("esc-reg-subtipo")||{value:""}).value:"",
+      tipoViolencia:tipo==="Ocorrência de Violência"?(document.getElementById("esc-reg-tipoViol")||{value:""}).value:"",
+      data:(document.getElementById("esc-reg-data")||{value:""}).value,
+      hora:(document.getElementById("esc-reg-hora")||{value:""}).value,
+      tema:tema,
+      nAlunos:+(document.getElementById("esc-reg-alunos")||{value:0}).value||0,
+      turmas:(document.getElementById("esc-reg-turmas")||{value:""}).value.trim(),
+      resultado:resultado,
+      criadoEm:new Date().toISOString()
+    };
+    if(!oc.esc_registros) oc.esc_registros=[];
+    oc.esc_registros.push(reg);
+    salvarLocal();
+    showToast("✓ Registro salvo!");
+    modal.remove();
+    renderModuloEscolar(document.getElementById("main-content"));
+  };
+}
+
+function excluirAtivEscolar(id){
+  if(!confirm("Excluir esta atividade?")) return;
+  state.atividadesEscolares=(state.atividadesEscolares||[]).filter(function(a){return a.id!==id;});
+  salvarLocal(); showToast("Atividade removida."); renderTela();
+}
+
+function excluirVisitaEscolar(id){
+  if(!confirm("Excluir esta visita?")) return;
+  state.visitasEscolares=(state.visitasEscolares||[]).filter(function(v){return v.id!==id;});
+  state.eventosAvulsos=(state.eventosAvulsos||[]).filter(function(e){return e.visitaEscolarId!==id;});
+  salvarLocal(); showToast("Visita removida."); renderTela();
+}
 
   // KPIs globais
   var nAtivTotal  = atividades.length;
@@ -4923,7 +5253,7 @@ function renderModuloEscolar(main){
   main.innerHTML=h.join("")+"</div>";
 }
 
-// ── Registrar Atividade Escolar ───────────────────────
+// ── (legado — substituído por abrirRegistroEsc) ───────
 function abrirAtividadeEscolar(escolaIdPre){
   var IS="width:100%;background:#141208;border:1px solid #2a2818;color:#e8ddd0;padding:9px 10px;border-radius:6px;font-size:12px;outline:none;box-sizing:border-box";
   var LS="color:#5a5535;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:5px";
