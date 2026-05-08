@@ -6488,7 +6488,6 @@ function render(){
         return n>0?` <span style="background:#ff4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${n}</span>`:"";
       })()}</button>
       <button class="nav-btn${state.tela==="avisos"?" active":""}" onclick="setTela('avisos')" style="${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0&&state.tela!=='avisos'?'animation:piscar 1s infinite;color:#c8a84b;':''}"">📣 Avisos${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0?` <span style="background:#c8a84b;color:#0e0c06;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length}</span>`:""}</button>
-      <button class="nav-btn${state.tela==="projetossociais"?" active":""}" data-tela="projetossociais" onclick="setTela('projetossociais')" style="color:${state.tela==='projetossociais'?'#a78bfa':'#a78bfa88'};border-color:${state.tela==='projetossociais'?'#a78bfa':'transparent'}">🌱 Projetos Sociais</button>
       <button class="nav-btn${state.tela==="filtro"?" active":""}" data-tela="filtro" onclick="setTela('filtro')">🔍 Super Filtro</button>
     `:`
       <button class="nav-btn${state.tela==="dashboard"?" active":""}" data-tela="dashboard" onclick="setTela('dashboard')">📊 Painel</button>
