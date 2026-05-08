@@ -4413,76 +4413,74 @@ function renderProjetosSociais(main){
     var sumP=regs.reduce(function(s,r){return s+(+r.pessoas||0);},0);
     var sumA=regs.reduce(function(s,r){return s+(+r.alimentos_kg||0);},0);
 
-    // ── Data formatada
-    var dtStr=(function(){var d=o.data;if(!d)return"";var p=d.split("-");return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:d;})();
+    // ── mesma cor do "Ver Ocorrências"
+    var cor="#a78bfa";
+    var t=(o.tipo||"").toLowerCase();
+    if(/homicídio|homicidio|feminicídio/.test(t)) cor="#ef4444";
+    else if(/roubo/.test(t)) cor="#f97316";
+    else if(/furto/.test(t)) cor="#eab308";
 
-    // ── Descrição limpa: pega descricao (resumo) preferindo texto depois de "Descrição:" ou "Dinâmica:"
-    var descBruta=(o.descricao||o.descricao_dinamica||"").trim();
-    // Remove rótulos de campo comuns do SIGESPOL
-    var descLimpa=descBruta
-      .replace(/^(Cód|Código|Relatório de Serviço|Tipo|Data|Hora|Município|Local|Ponto de referência|Responsável|Ocorrência Avulsa)\s*:\s*[^\n]*/gim,"")
-      .replace(/Descrição\s*:\s*/i,"").replace(/Dinâmica\s*:\s*/i,"")
-      .replace(/\n{2,}/g,"\n").trim();
-    if(!descLimpa && o.descricao_dinamica){
-      var m=o.descricao_dinamica.match(/(?:Descrição|Dinâmica)\s*:\s*([\s\S]{10,})/i);
-      if(m) descLimpa=m[1].trim().slice(0,200);
-    }
-    if(!descLimpa) descLimpa=descBruta.slice(0,200);
+    var fcS="font-size:10px;color:#4a9fd4;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:2px";
+    var fcV="font-size:11px;color:#c5daf5;line-height:1.5";
 
-    // ── Classificação / ícone
-    var classifIcons={"Visita Solidária":"🤝","Acompanhamento VCM":"💜","Ronda Escolar":"🏫","Visita Comunitária":"🏘️","Projeto Social":"🌱","Ocorrência":"🚔"};
-    var classif=o.classificacao||"Projeto Social";
-    var classifIc=classifIcons[classif]||"🌱";
+    h.push("<div style='background:#141208;border:1px solid #2a2818;border-left:3px solid "+cor+";border-radius:12px;padding:14px;margin-bottom:10px'>");
 
-    h.push("<div style='background:#0d0820;border:1px solid #2a1850;border-left:3px solid #a78bfa;border-radius:10px;padding:14px;margin-bottom:10px'>");
-
-    // ── Linha 1: classificação + tipo + nº
-    h.push("<div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px'>");
-    h.push("<span style='background:#a78bfa33;color:#c4b5fd;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700'>"+classifIc+" "+esc(classif)+"</span>");
-    if(o.tipo && o.tipo!==classif) h.push("<span style='background:#1e1040;color:#7060a0;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600'>"+esc(o.tipo)+"</span>");
-    if(o.numero) h.push("<span style='background:#1e1040;color:#5a4a80;padding:3px 8px;border-radius:4px;font-size:10px'>Nº "+esc(o.numero)+"</span>");
-    // Mini KPIs à direita
-    if(sumP||sumA) {
-      h.push("<div style='margin-left:auto;display:flex;gap:6px'>");
-      if(sumP) h.push("<span style='background:#0a1a14;border:1px solid #34d39944;color:#34d399;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>👥 "+sumP+" pessoas</span>");
+    // ── Linha 1: tipo + classificação + nº + KPIs
+    h.push("<div style='display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;margin-bottom:6px'>");
+    h.push("<div style='display:flex;gap:6px;flex-wrap:wrap;align-items:center'>");
+    h.push("<span style='background:"+cor+"18;color:"+cor+";padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase'>🌱 "+esc((o.tipo||"Projeto Social").toUpperCase())+"</span>");
+    if(o.numero) h.push("<span style='background:#1a2818;color:#5a7a4a;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600'>Nº "+esc(o.numero)+"</span>");
+    h.push("</div>");
+    if(sumP||sumA){
+      h.push("<div style='display:flex;gap:6px'>");
+      if(sumP) h.push("<span style='background:#0a1a14;border:1px solid #34d39944;color:#34d399;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>👥 "+sumP+"</span>");
       if(sumA) h.push("<span style='background:#1a1200;border:1px solid #f59e0b44;color:#f59e0b;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>🍱 "+sumA+"kg</span>");
       h.push("</div>");
     }
     h.push("</div>");
 
-    // ── Linha 2: data · hora · local
-    h.push("<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px'>");
-    if(dtStr) h.push("<span style='color:#7060a0;font-size:11px'>📅 "+dtStr+(o.hora?" · "+o.hora:"")+"</span>");
-    var local=o.local||o.bairro||"";
-    if(local) h.push("<span style='color:#6a5a90;font-size:11px'>📍 "+esc(local.slice(0,60))+"</span>");
-    if(o.vitima_nome) h.push("<span style='color:#60a5fa;font-size:11px'>👤 "+esc(o.vitima_nome)+"</span>");
-    h.push("</div>");
+    // ── Linha 2: data · hora · bairro
+    h.push("<p style='color:#5a5535;font-size:11px;margin:0 0 10px'>"+fmtData(o.data)+(o.hora?" · "+o.hora:"")+(o.bairro?" · "+o.bairro:o.local?" · "+o.local:"")+"</p>");
 
-    // ── Linha 3: descrição limpa (completa)
-    if(descLimpa){
-      h.push("<p style='color:#9080c0;font-size:11px;line-height:1.7;margin:0 0 10px;white-space:pre-wrap;word-break:break-word'>"+esc(descLimpa)+"</p>");
+    // ── Campos estruturados (igual "Ver Ocorrências")
+    var temCampos=o.vitima_nome||o.local||o.descricao_dinamica||o.medidas||o.policiais||o.objetos;
+    if(temCampos){
+      h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px'>");
+      if(o.local||o.bairro) h.push("<div><span style='"+fcS+"'>Local</span><span style='"+fcV+"'>"+esc(o.local||o.bairro||"")+"</span></div>");
+      if(o.vitima_nome) h.push("<div><span style='"+fcS+"'>Vítima</span><span style='"+fcV+"'>"+esc(o.vitima_nome)+(o.vitima_idade?" · "+o.vitima_idade+" anos":"")+(o.vitima_telefone?" · "+o.vitima_telefone:"")+"</span></div>");
+      if(o.suspeito_nome) h.push("<div><span style='"+fcS+"'>Autor/Suspeito</span><span style='"+fcV+"'>"+esc(o.suspeito_nome)+"</span></div>");
+      if(o.objetos) h.push("<div style='grid-column:1/-1'><span style='"+fcS+"'>Objetos</span><span style='"+fcV+"'>"+esc(o.objetos)+"</span></div>");
+      h.push("</div>");
+      var dinamica=o.descricao_dinamica||o.texto_original||o.descricao||"";
+      if(dinamica) h.push("<div style='background:#060d1c;border:1px solid #1a3358;border-radius:6px;padding:10px;margin-bottom:10px'><span style='"+fcS+"'>Dinâmica dos Fatos</span><p style='color:#c8d8f0;font-size:11px;line-height:1.7;margin:0;white-space:pre-wrap'>"+esc(dinamica)+"</p></div>");
+    } else {
+      var relato=(o.texto_original||o.descricao_dinamica||o.descricao||"").trim();
+      if(relato) h.push("<pre style='white-space:pre-wrap;word-break:break-word;color:#c8c0a8;font-size:11px;line-height:1.8;font-family:inherit;margin:0 0 10px;background:#0e0c06;border-radius:8px;padding:12px'>"+esc(relato)+"</pre>");
     }
 
-    // ── Últimos registros
+    // ── Registros anteriores
     if(regs.length){
       h.push("<div style='margin-bottom:10px'>");
       regs.slice().reverse().slice(0,2).forEach(function(r){
-        h.push("<div style='background:#180d30;border:1px solid #3a2060;border-radius:6px;padding:8px 10px;margin-bottom:6px'>");
+        h.push("<div style='background:#0e0c06;border:1px solid #2a2818;border-radius:6px;padding:8px 10px;margin-bottom:6px'>");
         h.push("<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:"+(r.complemento?"4px":"0")+"'>");
-        h.push("<span style='color:#6a4a90;font-size:10px'>📅 "+esc(r.data)+(r.hora?" "+r.hora:"")+"</span>");
+        h.push("<span style='color:#5a5535;font-size:10px'>📅 "+esc(r.data)+(r.hora?" "+r.hora:"")+"</span>");
         if(r.pessoas) h.push("<span style='color:#34d399;font-size:10px;font-weight:700'>👥 "+r.pessoas+" pessoas</span>");
         if(r.alimentos_kg) h.push("<span style='color:#f59e0b;font-size:10px;font-weight:700'>🍱 "+r.alimentos_kg+"kg</span>");
         if(r.itens) h.push("<span style='color:#60a5fa;font-size:10px'>📦 "+esc(r.itens)+"</span>");
         h.push("</div>");
-        if(r.complemento) h.push("<p style='color:#8070b0;font-size:10px;line-height:1.5;margin:0'>"+esc(r.complemento)+"</p>");
+        if(r.complemento) h.push("<p style='color:#8a8060;font-size:10px;line-height:1.5;margin:0'>"+esc(r.complemento)+"</p>");
         h.push("</div>");
       });
-      if(regs.length>2) h.push("<p style='color:#5a3a80;font-size:10px;text-align:center;margin:4px 0 0'>+ "+(regs.length-2)+" registro(s) anteriores</p>");
+      if(regs.length>2) h.push("<p style='color:#5a5535;font-size:10px;text-align:center;margin:4px 0 0'>+ "+(regs.length-2)+" registro(s) anteriores</p>");
       h.push("</div>");
     }
 
-    // ── Botão
-    h.push("<button data-ps-id='"+o.id+"' onclick='abrirRegistroPS(this.dataset.psId)' style='width:100%;background:#1a0d35;border:1px solid #a78bfa;color:#a78bfa;padding:9px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>📋 Registrar Atendimento / Complementar</button>");
+    // ── Botões
+    h.push("<div style='display:flex;gap:8px'>");
+    h.push("<button data-oc='"+o.id+"' onclick=\"state.popEditarOc='"+o.id+"';renderOcorrenciasGestor(document.getElementById('main-content'),'gestor')\" style='background:#1a1a2a;border:1px solid #4a5a7a;color:#8a9aba;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>✏ Editar</button>");
+    h.push("<button data-ps-id='"+o.id+"' onclick='abrirRegistroPS(this.dataset.psId)' style='flex:1;background:#0d0820;border:1px solid #a78bfa;color:#a78bfa;padding:7px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>📋 Registrar Atendimento / Complementar</button>");
+    h.push("</div>");
     h.push("</div>");
   });
 
