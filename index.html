@@ -786,6 +786,32 @@ function reenviarFilaPendente() {
 window.addEventListener("online", reenviarFilaPendente);
 
 // ══════════════════════════════════════════════════
+// ENVIAR SIGESPOL AO SHEETS EM LOTE
+// ══════════════════════════════════════════════════
+window._enviarSigespolAoSheets = function(){
+  var spRaw = localStorage.getItem("bcs_sigespol_backup");
+  if(!spRaw){ showToast("Nenhum dado SIGESPOL encontrado","error"); return; }
+  var lista; try{ lista=JSON.parse(spRaw); }catch(e){ showToast("Erro ao ler backup","error"); return; }
+  if(!lista||!lista.length){ showToast("Lista vazia","error"); return; }
+  if(!SHEETS_URL){ showToast("Sheets não configurado","error"); return; }
+  if(!confirm("Enviar "+lista.length+" registros SIGESPOL para o Google Sheets?\n\nIsso pode levar alguns minutos. Não feche a página.\n\nDepois você precisará apagar manualmente as linhas antigas na planilha.")) return;
+  showToast("Enviando "+lista.length+" registros... aguarde.");
+  var total = lista.length;
+  var enviados = 0;
+  lista.forEach(function(oc, i){
+    setTimeout(function(){
+      enviarSheets("ocorrencias", oc);
+      enviados++;
+      if(enviados === total){
+        setTimeout(function(){
+          showToast("✅ "+total+" registros SIGESPOL enviados ao Sheets! Agora apague as linhas antigas na planilha.");
+        }, 1000);
+      }
+    }, i * 350);
+  });
+};
+
+// ══════════════════════════════════════════════════
 // EXTRAÇÃO LOCAL
 // ══════════════════════════════════════════════════
 function extrairLocal(texto) {
@@ -6432,11 +6458,20 @@ function renderTela() {
     g.push("<button onclick=\"carregarDoSheets()\" style='background:#1e2a14;border:1px solid #3a4a28;color:#6b8c42;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>↻ Sincronizar</button>");
     g.push("<button onclick=\"deduplicarPlanilha()\" style='background:#1a1808;border:1px solid #5a3a10;color:#c8601a;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>🧹 Duplicatas</button>");
     var importLockAtivo=localStorage.getItem("bcs_import_lock");
+    var spBackup=null; try{ var _sp=localStorage.getItem("bcs_sigespol_backup"); if(_sp) spBackup=JSON.parse(_sp); }catch(e){}
     if(importLockAtivo){
-      g.push("<div style='width:100%;background:#1a0d00;border:1px solid #c8601a;border-radius:5px;padding:6px 10px;display:flex;align-items:center;gap:8px;margin-top:4px'>");
+      g.push("<div style='width:100%;background:#1a0d00;border:1px solid #c8601a;border-radius:5px;padding:6px 10px;display:flex;flex-direction:column;gap:6px;margin-top:4px'>");
+      g.push("<div style='display:flex;align-items:center;gap:8px'>");
       g.push("<span style='font-size:13px'>🔒</span>");
-      g.push("<span style='color:#e07030;font-size:10px;font-weight:700;flex:1'>Modo protegido ativo — dados importados preservados. Sheets não vai sobrescrever.</span>");
+      g.push("<span style='color:#e07030;font-size:10px;font-weight:700;flex:1'>Modo protegido ativo"+(spBackup?" — "+spBackup.length+" registros SIGESPOL":"")+". Dados do Sheets não vão sobrescrever.</span>");
       g.push("<button onclick=\"localStorage.removeItem('bcs_import_lock');localStorage.removeItem('bcs_ids_importados');localStorage.removeItem('bcs_sigespol_backup');showToast('Proteção removida. Próximo sync usará o Sheets.');render()\" style='background:#2a1000;border:1px solid #c8601a;color:#c8601a;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer'>🔓 Liberar</button>");
+      g.push("</div>");
+      if(spBackup && spBackup.length>0){
+        g.push("<div style='background:#0d1a00;border-radius:4px;padding:6px 8px;font-size:10px;color:#7aaa40;line-height:1.6'>");
+        g.push("⚠️ <strong>Para salvar no Sheets permanentemente:</strong><br>1. Clique em <strong>📤 Enviar ao Sheets</strong> abaixo.<br>2. Depois abra a planilha e apague manualmente as linhas antigas.<br>3. Clique em 🔓 Liberar quando terminar.");
+        g.push("</div>");
+        g.push("<button onclick='_enviarSigespolAoSheets()' style='background:#1a3a00;border:1px solid #6b8c42;color:#9bc460;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;width:100%'>📤 Enviar "+spBackup.length+" registros SIGESPOL ao Sheets</button>");
+      }
       g.push("</div>");
     } else {
       g.push("<div id='sheets-status' style='color:#3a4a28;font-size:10px;width:100%'>Sincronização automática ativa.</div>");
