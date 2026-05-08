@@ -6405,7 +6405,7 @@ function renderTela() {
     g.push("<div style='display:flex;gap:7px;flex-wrap:wrap'>");
     g.push("<button class='btn btn-gold' onclick=\"setTela('lancar')\" style='font-size:12px;padding:8px 14px'>+ Lançar</button>");
     g.push("<button class='btn btn-ghost' onclick=\"abrirFormAgend();setTela('agendamentos')\" style='font-size:12px;padding:8px 14px;color:#b87333;border-color:#b87333'>📅 Agendar</button>");
-    g.push("<button onclick=\"carregarDoSheets()\" style='background:#1e2a14;border:1px solid #3a4a28;color:#6b8c42;padding:8px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-weight:600'>↻ Sync</button>");
+    g.push("<button onclick=\"carregarDoSheets();carregarDadosAppDoSheets()\" style='background:#1e2a14;border:1px solid #3a4a28;color:#6b8c42;padding:8px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-weight:600'>↻ Sync</button>");
     g.push("</div></div>");
 
     // ── BLOCO 1: Alertas criminais graves ─────────
@@ -6525,7 +6525,7 @@ function renderTela() {
     g.push("<div style='background:#0e0c06;border:1px solid #2a2818;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap'>");
     g.push("<span style='background:#6b8c4222;color:#6b8c42;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>✓ Sheets</span>");
     g.push("<span style='color:#3a4a28;font-size:11px;flex:1'>"+ocs.length+" ocorrências · "+ags.length+" agendamentos</span>");
-    g.push("<button onclick=\"carregarDoSheets()\" style='background:#1e2a14;border:1px solid #3a4a28;color:#6b8c42;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>↻ Sincronizar</button>");
+    g.push("<button onclick=\"carregarDoSheets();carregarDadosAppDoSheets()\" style='background:#1e2a14;border:1px solid #3a4a28;color:#6b8c42;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>↻ Sincronizar</button>");
     g.push("<button onclick=\"deduplicarPlanilha()\" style='background:#1a1808;border:1px solid #5a3a10;color:#c8601a;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>🧹 Duplicatas</button>");
     g.push("<button onclick=\"if(confirm('Remover registros antigos do Sheets (+ de 60 dias) mantendo SIGESPOL e lançamentos recentes?')){limparRegistrosAntigos();}\" style='background:#1a0808;border:1px solid #8b2020;color:#c05050;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>🗑️ Limpar Antigos</button>");
     var importLockAtivo=localStorage.getItem("bcs_import_lock");
