@@ -4702,16 +4702,16 @@ function renderModuloEscolar(main){
   h.push("<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center'>");
   [["semana","7 dias"],["mes","Mês"],["ano","Ano"],["periodo","Período"]].forEach(function(fp){
     var sel=f.periodo===fp[0];
-    h.push("<button onclick=\"state._escF.periodo='"+fp[0]+"';renderModuloEscolar(document.getElementById('main-content'));\" style='background:"+(sel?"#0a2a1e":"#0a1a2a")+";border:1px solid "+(sel?"#38bdf8":"#1a3a5a")+";color:"+(sel?"#e8f5ff":"#4a7a9a")+";padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer'>"+fp[1]+"</button>");
+    h.push("<button onclick=\"state._escF.periodo='"+fp[0]+"';renderModuloEscolar(document.getElementById('main')||document.getElementById('main-content'));\" style='background:"+(sel?"#0a2a1e":"#0a1a2a")+";border:1px solid "+(sel?"#38bdf8":"#1a3a5a")+";color:"+(sel?"#e8f5ff":"#4a7a9a")+";padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer'>"+fp[1]+"</button>");
   });
   if(f.periodo==="periodo"){
-    h.push("<input type='date' value='"+esc(f.de||"")+"' onchange=\"state._escF.de=this.value;renderModuloEscolar(document.getElementById('main-content'));\" style='"+IS2+";width:140px'>");
+    h.push("<input type='date' value='"+esc(f.de||"")+"' onchange=\"state._escF.de=this.value;renderModuloEscolar(document.getElementById('main')||document.getElementById('main-content'));\" style='"+IS2+";width:140px'>");
     h.push("<span style='color:#4a7a9a;font-size:11px'>até</span>");
-    h.push("<input type='date' value='"+esc(f.ate||"")+"' onchange=\"state._escF.ate=this.value;renderModuloEscolar(document.getElementById('main-content'));\" style='"+IS2+";width:140px'>");
+    h.push("<input type='date' value='"+esc(f.ate||"")+"' onchange=\"state._escF.ate=this.value;renderModuloEscolar(document.getElementById('main')||document.getElementById('main-content'));\" style='"+IS2+";width:140px'>");
   }
   h.push("</div>");
 
-  h.push(_htmlFiltrosBairro("renderModuloEscolar(document.getElementById('main-content'))","#38bdf8"));
+  h.push(_htmlFiltrosBairro("renderModuloEscolar(document.getElementById('main')||document.getElementById('main-content'))","#38bdf8"));
 
   // Busca
   h.push("<input id='esc-busca' type='text' placeholder='Buscar por escola, tipo, bairro, narrativa...' value='"+esc(f.busca||"")+"' style='"+IS2+";margin-bottom:14px'>");
@@ -4810,7 +4810,7 @@ function renderModuloEscolar(main){
     bEl.oninput=function(){
       state._escF.busca=this.value;
       clearTimeout(_t);
-      _t=setTimeout(function(){renderModuloEscolar(document.getElementById("main-content"));},300);
+      _t=setTimeout(function(){renderModuloEscolar(document.getElementById("main")||document.getElementById("main-content"));},300);
     };
   }
 }
@@ -4930,11 +4930,15 @@ function abrirRegistroEsc(ocId){
     if(!tipo){showToast("Selecione o tipo de atividade","error");return;}
     var resultado=(document.getElementById("esc-reg-resultado")||{value:""}).value.trim();
     var tema=(document.getElementById("esc-reg-tema")||{value:""}).value.trim();
-    if(!tema&&!resultado){showToast("Preencha Tema ou Resultado","error");return;}
+    var tipoViol=(document.getElementById("esc-reg-tipoViol")||{value:""}).value;
+    // Para violência basta selecionar o tipo; para os demais exige tema ou resultado
+    var ehViolencia=(tipo==="Ocorrência de Violência");
+    if(!ehViolencia && !tema && !resultado){showToast("Preencha Tema ou Resultado","error");return;}
+    if(ehViolencia && !tipoViol && !tema && !resultado){showToast("Selecione o tipo de violência ou descreva o fato","error");return;}
     var reg={
       tipo:tipo,
       subtipo:tipo==="Visita"?(document.getElementById("esc-reg-subtipo")||{value:""}).value:"",
-      tipoViolencia:tipo==="Ocorrência de Violência"?(document.getElementById("esc-reg-tipoViol")||{value:""}).value:"",
+      tipoViolencia:tipoViol,
       data:(document.getElementById("esc-reg-data")||{value:""}).value,
       hora:(document.getElementById("esc-reg-hora")||{value:""}).value,
       tema:tema,
@@ -4948,7 +4952,8 @@ function abrirRegistroEsc(ocId){
     salvarLocal();
     showToast("✓ Registro salvo!");
     modal.remove();
-    renderModuloEscolar(document.getElementById("main-content"));
+    var mEl=document.getElementById("main")||document.getElementById("main-content");
+    if(mEl) renderModuloEscolar(mEl); else renderTela();
   };
 }
 
