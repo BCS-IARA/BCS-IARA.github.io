@@ -701,61 +701,37 @@ async function carregarDoSheets() {
       seen.add(k); return true;
     });
     
-    // Aplicar edições locais sobre dados do servidor
-    const ocMescladas = ocDeduplicadas;
-
     // 🔒 Registros SIGESPOL importados NUNCA são sobrescritos pelo Sheets
     const ocLocais = state.db.ocorrencias || [];
     const sigespolLocais = ocLocais.filter(function(o){ return o.fonte==='SIGESPOL'; });
     const sigespolIds = new Set(sigespolLocais.map(function(o){ return String(o.id).trim(); }));
-
-    // Merge padrão (excluindo os IDs SIGESPOL do Sheets, caso existam)
-    const idsSheets = new Set(ocMescladas.map(function(o){return String(o.id).trim();}));
     const ocNaoSigespol = ocLocais.filter(function(o){ return o.fonte!=='SIGESPOL'; });
-    const ocApenas = ocNaoSigespol.filter(function(o){
-      return !idsSheets.has(String(o.id).trim()) && !idsArquivadas.has(String(o.id).trim());
-    });
-    // Mapa COMPLETO de ocorrências locais — construído ANTES do merge para uso imediato
+
+    // Mapa COMPLETO de ocorrências locais
     var _localFullMap = {};
     ocLocais.forEach(function(o){ _localFullMap[String(o.id).trim()] = o; });
 
-    // Mapa de edições locais pendentes (não sincronizadas com Sheets ainda)
-    var _editadosLocalMap = {};
-    ocNaoSigespol.forEach(function(o){ if(o._editadoLocal) _editadosLocalMap[String(o.id).trim()] = o; });
+    // ✅ ESTRATÉGIA: local é sempre a verdade — Sheets só traz ocorrências NOVAS
+    // Ocorrências já existentes no local NUNCA são sobrescritas pelo Sheets
+    // (evita truncar descrições, perder campos de módulo, etc.)
+    var sheetsNovas = ocDeduplicadas.filter(function(o){
+      var k = String(o.id).trim();
+      if(sigespolIds.has(k))    return false; // SIGESPOL: nunca vem do Sheets
+      if(idsArquivadas.has(k))  return false; // arquivada: não recarregar
+      if(_localFullMap[k])      return false; // já existe local → local prevalece
+      return true; // realmente nova: adicionar
+    });
 
-    // SIGESPOL sempre na frente; Sheets preenche o resto (sem duplicar IDs SIGESPOL)
-    // Campos críticos (classificacao, escolaNome, etc.) são SEMPRE restaurados do local
-    // porque o Sheets não tem colunas para esses campos específicos dos módulos
-    const sheetsNaoSigespol = ocMescladas.filter(function(o){ return !sigespolIds.has(String(o.id).trim()); })
-      .map(function(o){
-        var k = String(o.id).trim();
-        // Se editado localmente, usa versão local inteira
-        if(_editadosLocalMap[k]) return _editadosLocalMap[k];
-        // Usa versão do Sheets mas restaura campos que Sheets não preserva
-        var loc = _localFullMap[k];
-        if(loc){
-          // Classificação de módulo — SEMPRE preferir local (Sheets não tem coluna para isso)
-          if(loc.classificacao) o.classificacao = loc.classificacao;
-          // Campos do módulo escolar — SEMPRE preferir local
-          if(loc.escolaNome) o.escolaNome = loc.escolaNome;
-          if(loc.escolaId)   o.escolaId   = loc.escolaId;
-          if(loc.tipoOcEscola) o.tipoOcEscola = loc.tipoOcEscola;
-          if(loc.tipoViolenciaEscola) o.tipoViolenciaEscola = loc.tipoViolenciaEscola;
-          // Complementos — preferir local se Sheets não retornou
-          if((!o.esc_registros||!o.esc_registros.length) && loc.esc_registros && loc.esc_registros.length) o.esc_registros = loc.esc_registros;
-          if((!o.ps_registros ||!o.ps_registros.length)  && loc.ps_registros  && loc.ps_registros.length)  o.ps_registros  = loc.ps_registros;
-          // Outros campos que Sheets pode não devolver
-          if(!o.texto_original && loc.texto_original) o.texto_original = loc.texto_original;
-          if(!o.criadoEm && loc.criadoEm) o.criadoEm = loc.criadoEm;
-        }
-        return o;
-      });
+    // Ocorrências locais válidas (não-SIGESPOL, não-arquivadas) — preservadas integralmente
+    var ocLocaisValidas = ocNaoSigespol.filter(function(o){
+      return !idsArquivadas.has(String(o.id).trim());
+    });
 
-    // Se há dados SIGESPOL E modo protegido ativo → não adicionar registros do Sheets
+    // Resultado: SIGESPOL + tudo local válido + novas do Sheets
     if(sigespolLocais.length>0 && localStorage.getItem("bcs_import_lock")){
-      state.db.ocorrencias = sigespolLocais.concat(ocApenas);
+      state.db.ocorrencias = sigespolLocais.concat(ocLocaisValidas);
     } else {
-      state.db.ocorrencias = sigespolLocais.concat(sheetsNaoSigespol).concat(ocApenas);
+      state.db.ocorrencias = sigespolLocais.concat(ocLocaisValidas).concat(sheetsNovas);
     }
 
     // Segurança extra: restaurar campos de módulo do mapa dedicado (imune ao sync)
