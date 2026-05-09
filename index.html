@@ -745,11 +745,8 @@ async function carregarDoSheets() {
     }).length;
 
     // Resultado: SIGESPOL + merge(Sheets∪local) + apenas-local
-    if(sigespolLocais.length>0 && localStorage.getItem("bcs_import_lock")){
-      state.db.ocorrencias = sigespolLocais.concat(ocApenasLocais);
-    } else {
-      state.db.ocorrencias = sigespolLocais.concat(ocMescladas).concat(ocApenasLocais);
-    }
+    // O merge já protege dados locais (campos locais têm prioridade)
+    state.db.ocorrencias = sigespolLocais.concat(ocMescladas).concat(ocApenasLocais);
 
     // 🛡 SAFETY: merge NUNCA deve reduzir o total de registros locais
     var _minEsperado = ocLocais.filter(function(o){ return !idsArquivadas.has(String(o.id).trim()); }).length;
