@@ -670,22 +670,24 @@ async function carregarDoSheets() {
     const totalPaginas = totalReal > 0 ? Math.ceil(totalReal / 1500) : 10;
     const temMaisFlag = rj0.temMais !== undefined ? rj0.temMais : (todasOcs.length >= 1500);
 
-    if(temMaisFlag || (totalReal > todasOcs.length)) {
-      for(let p = 1; p < Math.min(totalPaginas, 20); p++) {
-        setS("<span style='color:#6a5a30'>Carregando página "+(p+1)+(totalReal?"/"+totalPaginas:"")+"...</span>");
-        let rjP = null;
-        for(let t = 0; t < 3; t++) {
-          rjP = await carregarPagina(p);
-          if(rjP && rjP.ok && rjP.dados && (rjP.dados.ocorrencias||[]).length > 0) break;
-          await new Promise(function(r){ setTimeout(r, 1500); });
-        }
-        if(!rjP || !rjP.ok || !(rjP.dados||{}).ocorrencias || !rjP.dados.ocorrencias.length) {
-          break;
-        }
-        todasOcs = todasOcs.concat(rjP.dados.ocorrencias);
-        setS("<span style='color:#6a5a30'>"+todasOcs.length+(totalReal?"/"+totalReal:"")+" carregadas...</span>");
-        await new Promise(function(r){ setTimeout(r, 800); });
+    // Sempre tenta ao menos uma página extra para capturar registros adicionados
+    // após o último total ser calculado pelo script do Sheets
+    const paginasATentar = Math.min(Math.max(totalPaginas, 2), 20);
+
+    for(let p = 1; p < paginasATentar; p++) {
+      setS("<span style='color:#6a5a30'>Carregando página "+(p+1)+(totalReal?"/"+totalPaginas:"")+"...</span>");
+      let rjP = null;
+      for(let t = 0; t < 3; t++) {
+        rjP = await carregarPagina(p);
+        if(rjP && rjP.ok && rjP.dados && (rjP.dados.ocorrencias||[]).length > 0) break;
+        await new Promise(function(r){ setTimeout(r, 1500); });
       }
+      if(!rjP || !rjP.ok || !(rjP.dados||{}).ocorrencias || !rjP.dados.ocorrencias.length) {
+        break; // página vazia → não há mais dados
+      }
+      todasOcs = todasOcs.concat(rjP.dados.ocorrencias);
+      setS("<span style='color:#6a5a30'>"+todasOcs.length+(totalReal?"/"+totalReal:"")+" carregadas...</span>");
+      await new Promise(function(r){ setTimeout(r, 800); });
     }
 
     // IDs arquivadas (não devem voltar)
@@ -734,6 +736,13 @@ async function carregarDoSheets() {
       state.db.ocorrencias = sigespolLocais.concat(ocLocaisValidas).concat(sheetsNovas);
     }
 
+    // 🛡 SAFETY: merge NUNCA deve reduzir o total — se reduzir, algo errou → manter local
+    var _minEsperado = sigespolLocais.length + ocLocaisValidas.length;
+    if(state.db.ocorrencias.length < _minEsperado){
+      console.warn("[BCS] ⚠ Merge reduziu "+ocLocais.length+"→"+state.db.ocorrencias.length+", revertendo para local");
+      state.db.ocorrencias = sigespolLocais.concat(ocLocaisValidas);
+    }
+
     // Segurança extra: restaurar campos de módulo do mapa dedicado (imune ao sync)
     _restaurarModulos(state.db.ocorrencias);
 
@@ -751,8 +760,9 @@ async function carregarDoSheets() {
 
     salvarLocal();
     const n = state.db.ocorrencias.length;
-    showToast(n+" ocorrência(s) carregadas!");
-    setS("<span style='color:#6b8c42'>✓ "+n+" ocorrências · "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</span>");
+    const _nNovas = sheetsNovas.length;
+    showToast(n+" oc · "+(_nNovas>0?"+"+_nNovas+" novas do Sheets":"sem novas do Sheets"));
+    setS("<span style='color:#6b8c42'>✓ "+n+" ocorrências"+(_nNovas?" ("+_nNovas+" novas)":"")+" · "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</span>");
     _carregando = false;
 
     // Carregar projetos / calendário / alertas do Sheets
