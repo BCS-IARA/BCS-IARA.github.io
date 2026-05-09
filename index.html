@@ -10229,11 +10229,7 @@ render();
 _carregando = false;
 if(SHEETS_URL){
   setTimeout(function(){
-    if(!localStorage.getItem("bcs_import_lock")){
-      carregarDoSheets(); // sempre sincroniza ocorrências do Sheets (modo protegido usa apenas local)
-    } else {
-      carregarDadosAppDoSheets(); // modo protegido: só app data (agendamentos, eventos…)
-    }
+    carregarDoSheets(); // sempre busca tudo do Sheets
   }, 300);
 }
 </script>
