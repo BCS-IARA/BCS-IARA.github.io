@@ -190,7 +190,7 @@ button{cursor:pointer;}
 // ══════════════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════════════
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwRPzCd-iijxusSEGvNnLomz6zj_Yw1BDf4_oslG9YqAuykMhaTONU_pKQgFSKik8-smg/exec";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbwMTA3z7Yva7ccjvv0laIIsKKiKePYLPLrAi5Ss3ZV1JhzxKv-UECROdWuD4mkCYQTW5w/exec";
 // Token compartilhado com o Apps Script (defina o mesmo valor lá)
 const BCS_TOKEN = "bcs-token-secreto-2025"; // TROQUE antes de publicar
 // PINs validados pelo servidor (Apps Script PropertiesService) — não ficam no HTML
@@ -940,24 +940,460 @@ function tag(label, color) {
 // ══════════════════════════════════════════════════
 // SHEETS
 // ══════════════════════════════════════════════════
+// ── Envio via POST text/plain (sem limite de parâmetro URL) ─────────────────
+// URLSearchParams passa dados em e.parameter que tem limite ~8KB no Apps Script.
+// text/plain vai para e.postData.contents — sem limite prático (até 50MB).
 function enviarSheets(tipo, registro) {
   if (!SHEETS_URL) return;
   try {
-    const {criadoEm, ...reg} = registro; // texto_original agora persiste no Sheets
-    const cb = "bcs_send_" + Date.now();
-    const s = document.createElement("script");
-    const t = setTimeout(function(){ delete window[cb]; s.remove(); }, 30000);
-    window[cb] = function(){ clearTimeout(t); delete window[cb]; s.remove(); };
-    s.onerror = function(){
-      clearTimeout(t); delete window[cb]; s.remove();
-      if(!state.filaPendente) state.filaPendente = [];
-      state.filaPendente.push({tipo, registro: reg});
-      localStorage.setItem("bcs_fila_pendente", JSON.stringify(state.filaPendente));
+    // Excluir apenas arrays/objetos internos que o Apps Script não processa
+    var _excluir = {vitimas:1, autores:1, solicitante:1};
+    var reg = {};
+    Object.keys(registro).forEach(function(k){
+      if(_excluir[k]) return;
+      var v = registro[k];
+      if(v === null || v === undefined) return;
+      reg[k] = v;
+    });
+
+    // Converter sexo para formato da planilha ("F"→"Feminino", "M"→"Masculino")
+    var _sexoMap = {F:"Feminino", M:"Masculino"};
+    if(reg.vitima_sexo)   reg.vitima_sexo   = _sexoMap[reg.vitima_sexo]   || reg.vitima_sexo;
+    if(reg.suspeito_sexo) reg.suspeito_sexo = _sexoMap[reg.suspeito_sexo] || reg.suspeito_sexo;
+
+    // Payload como JSON puro — token incluído no body para autenticação no Apps Script
+    var payload = JSON.stringify({token: BCS_TOKEN, tipo: tipo, registro: reg});
+
+    // Método principal: fetch POST text/plain (sem truncamento, sem limite de URL)
+    if(window.fetch){
+      fetch(SHEETS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'text/plain'},
+        body: payload
+      }).catch(function(){ _enviarSheetsJSONP(tipo, reg); });
+      return;
+    }
+
+    // Fallback: JSONP GET (navegadores muito antigos)
+    _enviarSheetsJSONP(tipo, reg);
+  } catch(e){ console.log("[BCS] Sheets:", e); }
+}
+
+// ── Fallback JSONP GET (trunca campos longos para caber na URL) ─────────────
+function _enviarSheetsJSONP(tipo, reg){
+  var regT = {};
+  Object.keys(reg).forEach(function(k){
+    var v = reg[k];
+    if(k==='texto_original')    { regT[k]=String(v).slice(0,400); return; }
+    if(k==='descricao_dinamica'){ regT[k]=String(v).slice(0,400); return; }
+    if(k==='descricao')         { regT[k]=String(v).slice(0,150); return; }
+    regT[k]=v;
+  });
+  var cb = "bcs_send_" + Date.now();
+  var s = document.createElement("script");
+  var t = setTimeout(function(){ delete window[cb]; s.remove(); }, 30000);
+  window[cb] = function(){ clearTimeout(t); delete window[cb]; s.remove(); };
+  s.onerror = function(){
+    clearTimeout(t); delete window[cb]; s.remove();
+    if(!state.filaPendente) state.filaPendente=[];
+    state.filaPendente.push({tipo:tipo, registro:regT});
+    localStorage.setItem("bcs_fila_pendente", JSON.stringify(state.filaPendente));
+  };
+  var dados = encodeURIComponent(JSON.stringify({tipo:tipo, registro:regT}));
+  s.src = SHEETS_URL+"?token="+encodeURIComponent(BCS_TOKEN)+"&dados="+dados+"&callback="+cb;
+  document.head.appendChild(s);
+}
+
+// Reimportar apenas ocorrências criadas pelo BCS (id começa com "oc_")
+// NUNCA reescreve registros do SIGESPOL (IDs em formato UUID) para preservar dados originais
+function reimportarParaSheets(){
+  if(!SHEETS_URL){ showToast("URL do Sheets não configurada","error"); return; }
+  // Filtra SOMENTE registros criados pelo BCS (oc_TIMESTAMP)
+  // Registros SIGESPOL têm UUID (ex: "b1b013c6-0fa2-...") e NÃO são enviados
+  var ocs=(state.db.ocorrencias||[]).filter(function(o){
+    return o && o.id && String(o.id).indexOf("oc_")===0;
+  });
+  if(!ocs.length){ showToast("Nenhum registro BCS local para reimportar (registros SIGESPOL são preservados na planilha)","error"); return; }
+  if(!confirm("Reimportar "+ocs.length+" ocorrências criadas pelo BCS?\n\nRegistros importados do SIGESPOL NÃO serão alterados.")) return;
+  var total=ocs.length, idx=0;
+  showToast("Reimportando "+total+" ocorrências BCS...");
+  function _enviarProxima(){
+    if(idx>=total){ showToast("✓ Reimportação concluída: "+total+" registros BCS enviados"); return; }
+    enviarSheets("ocorrencias", ocs[idx]);
+    idx++;
+    if(idx%10===0) showToast("Reimportando... "+idx+"/"+total);
+    setTimeout(_enviarProxima, 1200);
+  }
+  _enviarProxima();
+}
+
+// ══════════════════════════════════════════════════
+// IMPORTAR WHATSAPP
+// ══════════════════════════════════════════════════
+function _parsearWhatsApp(texto) {
+  var blocos = texto.split(/\n(?=\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} - )/);
+  var registros = [];
+
+  function extrairCampo(bloco, nome) {
+    var re = new RegExp('\\*' + nome + ':\\*\\s*(.*?)(?=\\n\\s*\\*|$)', 'is');
+    var m = bloco.match(re);
+    return m ? m[1].trim() : '';
+  }
+
+  function extrairDescricao(bloco) {
+    var m = bloco.match(/\*DESCRI[^\*]*:\*\s*([\s\S]*?)(?=\n\s*\*FONTE|\n\s*\*Instagram|$)/i);
+    return m ? m[1].trim() : '';
+  }
+
+  function dividir(texto) {
+    var rDin = /din[âa]mica dos fatos\s*:?\s*/i;
+    var rMed = /medidas?\s+adotadas?\s*:?\s*/i;
+    var mD = texto.match(rDin), mM = texto.match(rMed);
+    var iD = mD ? texto.search(rDin) : -1;
+    var iM = mM ? texto.search(rMed) : -1;
+    if (iD > -1 && iM > -1 && iD < iM) {
+      return {
+        resumo:   texto.slice(0, iD).trim(),
+        dinamica: texto.slice(iD + mD[0].length, iM).trim(),
+        medidas:  texto.slice(iM + mM[0].length).trim()
+      };
+    } else if (iD > -1) {
+      return { resumo: texto.slice(0, iD).trim(), dinamica: texto.slice(iD + mD[0].length).trim(), medidas: '' };
+    } else if (iM > -1) {
+      return { resumo: texto.slice(0, iM).trim(), dinamica: '', medidas: texto.slice(iM + mM[0].length).trim() };
+    }
+    return { resumo: texto, dinamica: '', medidas: '' };
+  }
+
+  function bairroDe(local) {
+    var partes = local.split(',').map(function(p){ return p.trim(); }).filter(Boolean);
+    return partes.length >= 2 ? partes[partes.length - 1] : local;
+  }
+
+  function gerarId(data, hora, tipo, resumo) {
+    var s = (data + hora + tipo.slice(0,15) + resumo.slice(0,20)).replace(/\s/g,'');
+    var h = 0;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+    return 'zap_' + Math.abs(h).toString(36);
+  }
+
+  blocos.forEach(function(bloco) {
+    if (bloco.indexOf('CIPM') < 0) return;
+    if (bloco.indexOf('*TIPO:*') < 0) return;
+    if (bloco.indexOf('DESCRI') < 0) return;
+
+    var ts = bloco.match(/^(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2})/);
+    var tsData = ts ? ts[1] : '';
+    var tsHora = ts ? ts[2] : '';
+
+    var tipo     = extrairCampo(bloco, 'TIPO').replace(/\*/g,'').trim();
+    var dataOc   = extrairCampo(bloco, 'DATA').replace(/\*/g,'').trim() || tsData;
+    var horaOc   = extrairCampo(bloco, 'HORA').replace(/\*/g,'').trim() || tsHora;
+    var local    = extrairCampo(bloco, 'LOCAL').replace(/\*/g,'').trim();
+    var resp     = extrairCampo(bloco, 'RESPONS').replace(/\*/g,'').trim();
+    var descRaw  = extrairDescricao(bloco);
+
+    if (!tipo || !descRaw) return;
+
+    var p = dividir(descRaw);
+    var vd = /maria da penha|viol[eê]ncia dom[eé]stica|medida protetiva/i.test(tipo + ' ' + p.resumo);
+
+    registros.push({
+      id:                   gerarId(dataOc, horaOc, tipo, p.resumo),
+      numero:               '',
+      data:                 dataOc,
+      hora:                 horaOc,
+      tipo:                 tipo,
+      bairro:               bairroDe(local),
+      municipio:            'Vitória da Conquista',
+      vitima_nome:          '',
+      vitima_sexo:          '',
+      vitima_idade:         '',
+      vitima_telefone:      '',
+      vitima_cpf:           '',
+      vitima_endereco:      local,
+      suspeito_nome:        '',
+      suspeito_apelido:     '',
+      suspeito_caracteristicas: '',
+      veiculo:              '',
+      medida_protetiva:     vd ? 'Sim' : 'Não',
+      violencia_domestica:  vd,
+      requer_visita:        vd,
+      reincidente:          false,
+      descricao:            p.resumo.slice(0, 150),
+      descricao_dinamica:   p.dinamica,
+      medidas:              p.medidas,
+      texto_original:       p.dinamica,
+      policiais:            resp,
+      fonte:                'WhatsApp'
+    });
+  });
+
+  return registros;
+}
+
+function renderImportarZap(main) {
+  main.innerHTML = `
+  <div style="max-width:860px;margin:0 auto">
+    <div style="margin-bottom:24px">
+      <h2 style="color:#c8a84b;font-size:20px;font-weight:700;margin-bottom:4px">📥 Importar Dados</h2>
+      <p style="color:#7a7050;font-size:13px">Importe ocorrências do WhatsApp ou do SIGESPOL (JSON) diretamente pelo sistema.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+      <div id="zap-dropzone" style="border:2px dashed #4a4530;border-radius:14px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;background:#1a1808"
+        onclick="document.getElementById('zap-file-input').click()"
+        ondragover="event.preventDefault();this.style.borderColor='#c8a84b'"
+        ondragleave="this.style.borderColor='#4a4530'"
+        ondrop="event.preventDefault();this.style.borderColor='#4a4530';_zapHandleFile(event.dataTransfer.files[0])">
+        <div style="font-size:36px;margin-bottom:10px">💬</div>
+        <div style="color:#c8a84b;font-size:14px;font-weight:700;margin-bottom:4px">WhatsApp</div>
+        <div style="color:#5a5535;font-size:11px">Arquivo exportado do grupo (.txt)</div>
+        <input type="file" id="zap-file-input" accept=".txt" style="display:none" onchange="_zapHandleFile(this.files[0])">
+      </div>
+
+      <div id="json-dropzone" style="border:2px dashed #4a4530;border-radius:14px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;background:#1a1808"
+        onclick="document.getElementById('json-file-input').click()"
+        ondragover="event.preventDefault();this.style.borderColor='#38bdf8'"
+        ondragleave="this.style.borderColor='#4a4530'"
+        ondrop="event.preventDefault();this.style.borderColor='#4a4530';_jsonHandleFile(event.dataTransfer.files[0])">
+        <div style="font-size:36px;margin-bottom:10px">📋</div>
+        <div style="color:#38bdf8;font-size:14px;font-weight:700;margin-bottom:4px">SIGESPOL / JSON</div>
+        <div style="color:#5a5535;font-size:11px">Arquivo de exportação BCS (.json)</div>
+        <input type="file" id="json-file-input" accept=".json" style="display:none" onchange="_jsonHandleFile(this.files[0])">
+      </div>
+    </div>
+
+    <div id="zap-preview" style="display:none;margin-top:8px"></div>
+  </div>`;
+
+  window._zapHandleFile = function(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var registros = _parsearWhatsApp(e.target.result);
+      var prev = document.getElementById('zap-preview');
+
+      if (!registros.length) {
+        prev.style.display = 'block';
+        prev.innerHTML = `<div style="background:#1a0a0a;border:1px solid #b03030;border-radius:12px;padding:20px;text-align:center;color:#ff6060">
+          <div style="font-size:28px;margin-bottom:8px">⚠️</div>
+          <div style="font-weight:700">Nenhuma ocorrência encontrada</div>
+          <div style="color:#7a3030;font-size:12px;margin-top:6px">Certifique-se de que é o arquivo de exportação correto do grupo BCS.</div>
+        </div>`;
+        return;
+      }
+
+      // Filtra duplicatas já existentes
+      var idsExistentes = {};
+      (state.db.ocorrencias||[]).forEach(function(o){ if(o.id) idsExistentes[o.id]=true; });
+      var novos = registros.filter(function(r){ return !idsExistentes[r.id]; });
+      var duplicatas = registros.length - novos.length;
+
+      var html = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div>
+          <span style="color:#c8a84b;font-weight:700;font-size:16px">${registros.length} ocorrência${registros.length!==1?'s':''} encontrada${registros.length!==1?'s':''}</span>
+          ${duplicatas>0?`<span style="color:#7a7050;font-size:12px;margin-left:10px">(${duplicatas} já existem — serão ignoradas)</span>`:''}
+        </div>
+        ${novos.length>0?`<button onclick="_zapImportar()" class="btn btn-gold" id="btn-zap-import">
+          📥 Importar ${novos.length} ocorrência${novos.length!==1?'s':''}
+        </button>`:`<div style="color:#5a5535;font-size:13px">Todas já importadas anteriormente.</div>`}
+      </div>
+      <div style="border:1px solid #3a3820;border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:#1a1808">
+              <th style="padding:10px 12px;text-align:left;color:#7a7050;font-weight:600">Data</th>
+              <th style="padding:10px 12px;text-align:left;color:#7a7050;font-weight:600">Tipo</th>
+              <th style="padding:10px 12px;text-align:left;color:#7a7050;font-weight:600">Bairro</th>
+              <th style="padding:10px 12px;text-align:left;color:#7a7050;font-weight:600">Dinâmica</th>
+              <th style="padding:10px 12px;text-align:center;color:#7a7050;font-weight:600">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${registros.map(function(r){
+              var jaTem = idsExistentes[r.id];
+              return `<tr style="border-top:1px solid #2a2818;${jaTem?'opacity:0.4':''}">
+                <td style="padding:9px 12px;color:#a0906a">${r.data}</td>
+                <td style="padding:9px 12px;color:#e8e0cc;max-width:180px">${esc(r.tipo.slice(0,60))}</td>
+                <td style="padding:9px 12px;color:#7a7050">${esc(r.bairro)}</td>
+                <td style="padding:9px 12px;color:#7a7050;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc((r.descricao_dinamica||r.descricao||'').slice(0,80))}</td>
+                <td style="padding:9px 12px;text-align:center">${jaTem?'<span style="color:#5a5535;font-size:10px">já existe</span>':'<span style="color:#2d7a5a;font-size:10px;font-weight:700">novo</span>'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+      prev.style.display = 'block';
+      prev.innerHTML = html;
+
+      // Armazena para importação
+      window._zapRegistrosPendentes = novos;
     };
-    const dados = encodeURIComponent(JSON.stringify({tipo, registro: reg}));
-    s.src = SHEETS_URL + "?token=" + encodeURIComponent(BCS_TOKEN) + "&dados=" + dados + "&callback=" + cb;
-    document.head.appendChild(s);
-  } catch(e) { console.log("[BCS] Sheets:", e); }
+    reader.readAsText(file, 'utf-8');
+  };
+
+  // ── Importar JSON (SIGESPOL / BCS) ───────────────────────────
+  window._jsonHandleFile = function(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var dados;
+      try { dados = JSON.parse(e.target.result); } catch(ex) {
+        document.getElementById('zap-preview').style.display='block';
+        document.getElementById('zap-preview').innerHTML='<div style="background:#1a0a0a;border:1px solid #b03030;border-radius:12px;padding:20px;text-align:center;color:#ff6060">JSON inválido — verifique o arquivo.</div>';
+        return;
+      }
+      var db  = dados.db || dados;
+      var ocs = db.ocorrencias || [];
+
+      // Normaliza campos
+      var registros = ocs.map(function(reg) {
+        // Converte data ISO → BR
+        var data = String(reg.data||'');
+        if (/^\d{4}-\d{2}-\d{2}/.test(data)) {
+          var p = data.slice(0,10).split('-');
+          data = p[2]+'/'+p[1]+'/'+p[0];
+        }
+        var vd = !!(reg.violencia_domestica === true || String(reg.violencia_domestica).toLowerCase()==='true' ||
+                    /maria da penha|viol[êe]ncia dom[eé]stica/i.test(String(reg.tipo||'')+' '+String(reg.descricao||'')));
+        return {
+          id:                     reg.id || ('sig_'+Date.now()+'_'+Math.random().toString(36).slice(2)),
+          numero:                 reg.numero||'',
+          data:                   data,
+          hora:                   reg.hora||'',
+          tipo:                   reg.tipo||'',
+          bairro:                 reg.bairro||'',
+          municipio:              (reg.municipio||'Vitória da Conquista').replace(/\s*\/[A-Z]{2}$/,''),
+          vitima_nome:            reg.vitima_nome||'',
+          vitima_sexo:            reg.vitima_sexo||'',
+          vitima_idade:           reg.vitima_idade||'',
+          vitima_telefone:        reg.vitima_telefone||'',
+          vitima_cpf:             reg.vitima_cpf||'',
+          vitima_endereco:        reg.vitima_endereco||reg.local||'',
+          suspeito_nome:          reg.suspeito_nome||'',
+          suspeito_apelido:       reg.suspeito_apelido||'',
+          suspeito_caracteristicas: reg.suspeito_caracteristicas||'',
+          veiculo:                reg.veiculo||'',
+          medida_protetiva:       vd?'Sim':(reg.medida_protetiva||'Não'),
+          violencia_domestica:    vd,
+          requer_visita:          vd||(reg.requer_visita===true||String(reg.requer_visita).toLowerCase()==='true'),
+          reincidente:            reg.reincidente===true||String(reg.reincidente).toLowerCase()==='true',
+          descricao:              String(reg.descricao||'').slice(0,150),
+          descricao_dinamica:     reg.descricao_dinamica||reg.descricao||'',
+          medidas:                reg.medidas||'',
+          texto_original:         reg.descricao_dinamica||reg.descricao||'',
+          policiais:              reg.policiais||'',
+          fonte:                  reg.fonte||'SIGESPOL'
+        };
+      });
+
+      var idsExistentes = {};
+      (state.db.ocorrencias||[]).forEach(function(o){ if(o.id) idsExistentes[o.id]=true; });
+      var novos = registros.filter(function(r){ return !idsExistentes[r.id]; });
+      var duplicatas = registros.length - novos.length;
+
+      var prev = document.getElementById('zap-preview');
+      prev.style.display = 'block';
+      prev.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div>
+          <span style="color:#38bdf8;font-weight:700;font-size:16px">${registros.length} ocorrência${registros.length!==1?'s':''} no arquivo</span>
+          ${duplicatas>0?`<span style="color:#7a7050;font-size:12px;margin-left:10px">(${duplicatas} já existem — serão ignoradas)</span>`:''}
+        </div>
+        ${novos.length>0?`<button onclick="_jsonImportar()" class="btn" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;font-weight:700" id="btn-json-import">
+          📋 Importar ${novos.length} registros novos
+        </button>`:`<div style="color:#5a5535;font-size:13px">Todos já importados anteriormente.</div>`}
+      </div>
+      <div style="border:1px solid #3a3820;border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:#1a1808">
+            <th style="padding:10px 12px;text-align:left;color:#7a7050">Data</th>
+            <th style="padding:10px 12px;text-align:left;color:#7a7050">Tipo</th>
+            <th style="padding:10px 12px;text-align:left;color:#7a7050">Bairro</th>
+            <th style="padding:10px 12px;text-align:left;color:#7a7050">Dinâmica</th>
+            <th style="padding:10px 12px;text-align:center;color:#7a7050">Status</th>
+          </tr></thead>
+          <tbody>
+            ${registros.slice(0,50).map(function(r){
+              var jaTem = idsExistentes[r.id];
+              return `<tr style="border-top:1px solid #2a2818;${jaTem?'opacity:0.35':''}">
+                <td style="padding:9px 12px;color:#a0906a">${r.data}</td>
+                <td style="padding:9px 12px;color:#e8e0cc;max-width:180px">${esc(r.tipo.slice(0,55))}</td>
+                <td style="padding:9px 12px;color:#7a7050">${esc(r.bairro)}</td>
+                <td style="padding:9px 12px;color:#7a7050;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc((r.descricao_dinamica||r.descricao||'').slice(0,70))}</td>
+                <td style="padding:9px 12px;text-align:center">${jaTem?'<span style="color:#5a5535;font-size:10px">já existe</span>':'<span style="color:#38bdf8;font-size:10px;font-weight:700">novo</span>'}</td>
+              </tr>`;
+            }).join('')}
+            ${registros.length>50?`<tr><td colspan="5" style="padding:10px;text-align:center;color:#5a5535;font-size:11px">... e mais ${registros.length-50} registros</td></tr>`:''}
+          </tbody>
+        </table>
+      </div>`;
+
+      window._jsonRegistrosPendentes = novos;
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  window._jsonImportar = function() {
+    var registros = window._jsonRegistrosPendentes || [];
+    if (!registros.length) return;
+    var btn = document.getElementById('btn-json-import');
+    if (btn) { btn.disabled=true; btn.textContent='Importando...'; }
+    var total=registros.length, idx=0, erros=0;
+    function _prox() {
+      if (idx>=total) {
+        showToast('Importação concluída: '+(total-erros)+'/'+total+' registros', erros?'error':'success');
+        registros.forEach(function(r){
+          if(!state.db.ocorrencias) state.db.ocorrencias=[];
+          state.db.ocorrencias.push(r);
+        });
+        salvarLocal();
+        if(btn){btn.disabled=false;btn.textContent='Concluído ✓';btn.style.background='#2d7a5a';}
+        return;
+      }
+      var r=registros[idx]; idx++;
+      if(idx%10===0) showToast('Importando '+idx+'/'+total+'...');
+      enviarSheets('ocorrencias', r);
+      setTimeout(_prox, 500);
+    }
+    _prox();
+  };
+
+  window._zapImportar = function() {
+    var registros = window._zapRegistrosPendentes || [];
+    if (!registros.length) return;
+
+    var btn = document.getElementById('btn-zap-import');
+    if (btn) { btn.disabled = true; btn.textContent = 'Importando...'; }
+
+    var total = registros.length, idx = 0, erros = 0;
+
+    function _proximo() {
+      if (idx >= total) {
+        var msg = 'Importação concluída: ' + (total - erros) + ' de ' + total + ' ocorrências importadas.';
+        if (erros) msg += ' (' + erros + ' erros)';
+        showToast(msg, erros ? 'error' : 'success');
+        // Salva localmente também
+        registros.forEach(function(r) {
+          if (!state.db.ocorrencias) state.db.ocorrencias = [];
+          state.db.ocorrencias.unshift(r);
+        });
+        salvarLocal();
+        if (btn) { btn.disabled = false; btn.textContent = 'Concluído ✓'; btn.style.background = '#2d7a5a'; }
+        return;
+      }
+      var r = registros[idx];
+      idx++;
+      if (idx % 5 === 0) showToast('Importando ' + idx + '/' + total + '...');
+      enviarSheets('ocorrencias', r);
+      setTimeout(_proximo, 600);
+    }
+    _proximo();
+  };
 }
 
 // Reenviar fila pendente quando voltar online
@@ -4179,6 +4615,52 @@ function _bannerImportacao(main){
 
 
 // ══════════════════════════════════════════════════════
+//  PARSER DE NARRATIVA (3 seções: Descrição / Dinâmica / Medidas)
+// ══════════════════════════════════════════════════════
+function _parsearNarrativa(texto){
+  var r={descricao:"", descricao_dinamica:"", medidas:""};
+  if(!texto) return r;
+  var t=texto.trim();
+
+  // Cabeçalhos reconhecidos (SIGESPOL e variantes)
+  var reDesc    = /descri[çc][aã]o\s*(?:dos?\s*fatos?)?\s*:/i;
+  var reDinam   = /din[aâ]mica\s*(?:dos?\s*fatos?)?\s*:/i;
+  var reMedidas = /medidas?\s*(?:adotadas?)?\s*:/i;
+
+  // Localiza posição de cada seção
+  var mDesc    = reDesc.exec(t);
+  var mDinam   = reDinam.exec(t);
+  var mMedidas = reMedidas.exec(t);
+
+  if(!mDesc && !mDinam && !mMedidas){
+    // Sem cabeçalhos — tudo vai para descricao_dinamica; descricao = primeiros 150 chars
+    r.descricao_dinamica = t;
+    r.descricao = t.slice(0,150);
+    return r;
+  }
+
+  // Monta array de seções ordenadas por posição
+  var secoes=[];
+  if(mDesc)    secoes.push({idx:mDesc.index,    fim:mDesc.index+mDesc[0].length,    campo:"descricao"});
+  if(mDinam)   secoes.push({idx:mDinam.index,   fim:mDinam.index+mDinam[0].length,  campo:"descricao_dinamica"});
+  if(mMedidas) secoes.push({idx:mMedidas.index, fim:mMedidas.index+mMedidas[0].length, campo:"medidas"});
+  secoes.sort(function(a,b){return a.idx-b.idx;});
+
+  // Extrai conteúdo entre cabeçalhos
+  for(var i=0;i<secoes.length;i++){
+    var inicio=secoes[i].fim;
+    var proxIdx=(i+1<secoes.length)?secoes[i+1].idx:t.length;
+    r[secoes[i].campo]=t.slice(inicio,proxIdx).trim();
+  }
+
+  // Fallback: se descricao ficou vazio, usa slice da dinâmica
+  if(!r.descricao && r.descricao_dinamica)
+    r.descricao=r.descricao_dinamica.slice(0,150);
+
+  return r;
+}
+
+// ══════════════════════════════════════════════════════
 //  DETECÇÃO AUTOMÁTICA DE OCORRÊNCIA ESCOLAR
 // ══════════════════════════════════════════════════════
 function _detectarEscolaNaOc(texto){
@@ -5849,9 +6331,13 @@ function renderTela() {
       h.push("<div><label style='"+LS+"'>Hora *</label><input id='oc-hora' type='time' value='"+new Date().toTimeString().slice(0,5)+"' style='"+IS+"'></div>");
       h.push("<div><label style='"+LS+"'>Zona</label><select id='oc-zona' style='"+IS+"'><option>Urbana</option><option>Rural</option></select></div>");
       h.push("</div>");
-      h.push("<div style='display:grid;grid-template-columns:3fr 1fr;gap:10px'>");
-      h.push("<div><label style='"+LS+"'>Local — Endereço Completo</label><input id='oc-local' type='text' placeholder='Rua / Av., nº, Bairro, Município' style='"+IS+"'></div>");
+      h.push("<div style='display:grid;grid-template-columns:3fr 1fr;gap:10px;margin-bottom:10px'>");
+      h.push("<div><label style='"+LS+"'>Local — Endereço Completo</label><input id='oc-local' type='text' placeholder='Rua / Av., nº' style='"+IS+"'></div>");
       h.push("<div><label style='"+LS+"'>Ponto de Referência</label><input id='oc-referencia' type='text' placeholder='Ex: Próximo ao mercado...' style='"+IS+"'></div>");
+      h.push("</div>");
+      h.push("<div style='display:grid;grid-template-columns:2fr 1fr;gap:10px'>");
+      h.push("<div><label style='"+LS+"'>Bairro *</label><input id='oc-bairro' type='text' list='bairros-list' placeholder='Bairro onde ocorreu' style='"+IS+"'><datalist id='bairros-list'><option>Primavera</option><option>Panorama</option><option>Pedrinhas</option><option>Alto Marom</option><option>Europa Unida</option><option>Cruzeiro</option><option>Guarani</option><option>Centro</option><option>Brasil</option><option>Recreio</option><option>Ibirapuera</option><option>Lagoa das Flores</option><option>Candeias</option><option>Zabelê</option></datalist></div>");
+      h.push("<div><label style='"+LS+"'>Município</label><input id='oc-municipio' type='text' value='Vitória da Conquista' style='"+IS+"'></div>");
       h.push("</div>");
       h.push("</div>");
 
@@ -5918,78 +6404,114 @@ function renderTela() {
       main.innerHTML=h.join("");
 
       // ── Listas dinâmicas: Vítimas ──
-      var _vitimas=[{nome:"",sexo:"F",idade:"",telefone:"",endereco:""}];
+      var _nVitimas=1, _nAutores=1, _nPoliciais=1;
+      var _autorNaoId=false;
+
+      // Lê vítimas diretamente do DOM (sem depender de oninput)
+      function _lerVitimas(){
+        var arr=[];
+        for(var i=0;i<_nVitimas;i++){
+          var nome=(document.getElementById("vit-nome-"+i)||{value:""}).value.trim();
+          var sexo=(document.getElementById("vit-sexo-"+i)||{value:"F"}).value;
+          var idade=(document.getElementById("vit-idade-"+i)||{value:""}).value.trim();
+          var tel=(document.getElementById("vit-tel-"+i)||{value:""}).value.trim();
+          var end=(document.getElementById("vit-end-"+i)||{value:""}).value.trim();
+          arr.push({nome:nome,sexo:sexo,idade:idade,telefone:tel,endereco:end});
+        }
+        return arr;
+      }
+      // Lê autores diretamente do DOM
+      function _lerAutores(){
+        if(_autorNaoId) return [];
+        var arr=[];
+        for(var i=0;i<_nAutores;i++){
+          var nome=(document.getElementById("aut-nome-"+i)||{value:""}).value.trim();
+          var apel=(document.getElementById("aut-apel-"+i)||{value:""}).value.trim();
+          var sexo=(document.getElementById("aut-sexo-"+i)||{value:"M"}).value;
+          var idade=(document.getElementById("aut-idade-"+i)||{value:""}).value.trim();
+          var end=(document.getElementById("aut-end-"+i)||{value:""}).value.trim();
+          var carac=(document.getElementById("aut-carac-"+i)||{value:""}).value.trim();
+          arr.push({nome:nome,apelido:apel,sexo:sexo,idade:idade,endereco:end,caracteristicas:carac});
+        }
+        return arr;
+      }
+      // Lê policiais diretamente do DOM
+      function _lerPoliciais(){
+        var arr=[];
+        for(var i=0;i<_nPoliciais;i++){
+          var grad=(document.getElementById("pol-grad-"+i)||{value:"Sd"}).value;
+          var nome=(document.getElementById("pol-nome-"+i)||{value:""}).value.trim();
+          var mat=(document.getElementById("pol-mat-"+i)||{value:""}).value.trim();
+          arr.push({grad:grad,nome:nome,matricula:mat});
+        }
+        return arr;
+      }
+
       function _renderVitimas(){
         var li=document.getElementById("lista-vitimas"); if(!li) return;
         var vh=[];
-        _vitimas.forEach(function(v,i){
+        for(var i=0;i<_nVitimas;i++){
           vh.push("<div style='border:1px solid #1a3358;border-radius:6px;padding:10px;margin-bottom:8px;background:#070e1c'>");
-          if(_vitimas.length>1) vh.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'><span style='color:#4a9fd4;font-size:10px;font-weight:700'>VÍTIMA "+(i+1)+"</span><button onclick='_remVitima("+i+")' style='background:#120808;border:1px solid #4a1515;color:#c05050;padding:2px 10px;border-radius:4px;font-size:11px;cursor:pointer'>× Remover</button></div>");
+          if(_nVitimas>1) vh.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'><span style='color:#4a9fd4;font-size:10px;font-weight:700'>VÍTIMA "+(i+1)+"</span><button onclick='_remVitima("+i+")' style='background:#120808;border:1px solid #4a1515;color:#c05050;padding:2px 10px;border-radius:4px;font-size:11px;cursor:pointer'>× Remover</button></div>");
           vh.push("<div style='display:grid;grid-template-columns:3fr 100px 80px 150px;gap:8px;margin-bottom:8px'>");
-          vh.push("<div><label style='"+LS+"'>Nome Completo</label><input type='text' value='"+esc(v.nome)+"' oninput='_vitimas["+i+"].nome=this.value' placeholder='Nome completo da vítima' style='"+IS+"'></div>");
-          vh.push("<div><label style='"+LS+"'>Sexo</label><select onchange='_vitimas["+i+"].sexo=this.value' style='"+IS+"'><option value='F'"+(v.sexo==="F"?" selected":"")+" >Feminino</option><option value='M'"+(v.sexo==="M"?" selected":"")+">Masculino</option><option value=''"+(v.sexo===''?" selected":"")+">N/I</option></select></div>");
-          vh.push("<div><label style='"+LS+"'>Idade</label><input type='number' min='0' max='120' value='"+esc(v.idade)+"' oninput='_vitimas["+i+"].idade=this.value' placeholder='--' style='"+IS+"'></div>");
-          vh.push("<div><label style='"+LS+"'>Telefone</label><input type='text' value='"+esc(v.telefone)+"' oninput='_vitimas["+i+"].telefone=this.value' placeholder='(77) 9 ____-____' style='"+IS+"'></div>");
+          vh.push("<div><label style='"+LS+"'>Nome Completo</label><input id='vit-nome-"+i+"' type='text' placeholder='Nome completo da vítima' style='"+IS+"'></div>");
+          vh.push("<div><label style='"+LS+"'>Sexo</label><select id='vit-sexo-"+i+"' style='"+IS+"'><option value='F'>Feminino</option><option value='M'>Masculino</option><option value=''>N/I</option></select></div>");
+          vh.push("<div><label style='"+LS+"'>Idade</label><input id='vit-idade-"+i+"' type='number' min='0' max='120' placeholder='--' style='"+IS+"'></div>");
+          vh.push("<div><label style='"+LS+"'>Telefone</label><input id='vit-tel-"+i+"' type='text' placeholder='(77) 9 ____-____' style='"+IS+"'></div>");
           vh.push("</div>");
-          vh.push("<div><label style='"+LS+"'>Endereço Residencial</label><input type='text' value='"+esc(v.endereco)+"' oninput='_vitimas["+i+"].endereco=this.value' placeholder='Endereço residencial' style='"+IS+"'></div>");
+          vh.push("<div><label style='"+LS+"'>Endereço Residencial</label><input id='vit-end-"+i+"' type='text' placeholder='Endereço residencial' style='"+IS+"'></div>");
           vh.push("</div>");
-        });
+        }
         li.innerHTML=vh.join("");
       }
-      window._addVitima=function(){ _vitimas.push({nome:"",sexo:"F",idade:"",telefone:"",endereco:""}); _renderVitimas(); };
-      window._remVitima=function(i){ if(_vitimas.length>1){ _vitimas.splice(i,1); _renderVitimas(); } };
-      _renderVitimas();
-
-      // ── Listas dinâmicas: Autores ──
-      var _autores=[{nome:"",sexo:"M",idade:"",endereco:""}];
-      var _autorNaoId=false;
       function _renderAutores(){
         var li=document.getElementById("lista-autores"); if(!li) return;
         if(_autorNaoId){ li.innerHTML="<div style='padding:10px;color:#7a6a4a;font-size:11px;font-style:italic'>Autor não identificado</div>"; return; }
         var ah=[];
-        _autores.forEach(function(a,i){
+        for(var i=0;i<_nAutores;i++){
           ah.push("<div style='border:1px solid #2a1a1a;border-radius:6px;padding:10px;margin-bottom:8px;background:#0d0a0a'>");
-          if(_autores.length>1) ah.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'><span style='color:#c05050;font-size:10px;font-weight:700'>AUTOR "+(i+1)+"</span><button onclick='_remAutor("+i+")' style='background:#120808;border:1px solid #4a1515;color:#c05050;padding:2px 10px;border-radius:4px;font-size:11px;cursor:pointer'>× Remover</button></div>");
-          ah.push("<div style='display:grid;grid-template-columns:3fr 100px 80px;gap:8px;margin-bottom:8px'>");
-          ah.push("<div><label style='"+LS+"'>Nome / Apelido</label><input type='text' value='"+esc(a.nome)+"' oninput='_autores["+i+"].nome=this.value' placeholder='Nome, apelido ou alcunha' style='"+IS+"'></div>");
-          ah.push("<div><label style='"+LS+"'>Sexo</label><select onchange='_autores["+i+"].sexo=this.value' style='"+IS+"'><option value='M'"+(a.sexo==="M"?" selected":"")+" >Masculino</option><option value='F'"+(a.sexo==="F"?" selected":"")+">Feminino</option><option value=''"+(a.sexo===''?" selected":"")+">N/I</option></select></div>");
-          ah.push("<div><label style='"+LS+"'>Idade aprox.</label><input type='number' min='0' max='120' value='"+esc(a.idade)+"' oninput='_autores["+i+"].idade=this.value' placeholder='--' style='"+IS+"'></div>");
+          if(_nAutores>1) ah.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'><span style='color:#c05050;font-size:10px;font-weight:700'>AUTOR "+(i+1)+"</span><button onclick='_remAutor("+i+")' style='background:#120808;border:1px solid #4a1515;color:#c05050;padding:2px 10px;border-radius:4px;font-size:11px;cursor:pointer'>× Remover</button></div>");
+          ah.push("<div style='display:grid;grid-template-columns:2fr 1fr 100px 80px;gap:8px;margin-bottom:8px'>");
+          ah.push("<div><label style='"+LS+"'>Nome</label><input id='aut-nome-"+i+"' type='text' placeholder='Nome completo' style='"+IS+"'></div>");
+          ah.push("<div><label style='"+LS+"'>Apelido / Alcunha</label><input id='aut-apel-"+i+"' type='text' placeholder='Apelido' style='"+IS+"'></div>");
+          ah.push("<div><label style='"+LS+"'>Sexo</label><select id='aut-sexo-"+i+"' style='"+IS+"'><option value='M'>Masculino</option><option value='F'>Feminino</option><option value=''>N/I</option></select></div>");
+          ah.push("<div><label style='"+LS+"'>Idade aprox.</label><input id='aut-idade-"+i+"' type='number' min='0' max='120' placeholder='--' style='"+IS+"'></div>");
           ah.push("</div>");
-          ah.push("<div><label style='"+LS+"'>Endereço / Localidade Conhecida</label><input type='text' value='"+esc(a.endereco)+"' oninput='_autores["+i+"].endereco=this.value' placeholder='Endereço ou localidade' style='"+IS+"'></div>");
+          ah.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px'>");
+          ah.push("<div><label style='"+LS+"'>Endereço / Localidade Conhecida</label><input id='aut-end-"+i+"' type='text' placeholder='Endereço ou localidade' style='"+IS+"'></div>");
+          ah.push("<div><label style='"+LS+"'>Características Físicas</label><input id='aut-carac-"+i+"' type='text' placeholder='Cor, altura, cabelo, tatuagens...' style='"+IS+"'></div>");
           ah.push("</div>");
-        });
+          ah.push("</div>");
+        }
         li.innerHTML=ah.join("");
       }
-      window._addAutor=function(){ _autores.push({nome:"",sexo:"M",idade:"",endereco:""}); _renderAutores(); };
-      window._remAutor=function(i){ if(_autores.length>1){ _autores.splice(i,1); _renderAutores(); } };
-      window._toggleNaoId=function(checked){ _autorNaoId=checked; _renderAutores(); };
-      _renderAutores();
-
-      // Gerenciar lista de policiais dinâmica
-      var _policiais=[{grad:"Sd",nome:"",matricula:""}];
       function _renderPoliciais(){
-        var li=document.getElementById("lista-policiais");
-        if(!li) return;
+        var li=document.getElementById("lista-policiais"); if(!li) return;
         var ph=[];
-        _policiais.forEach(function(p,i){
+        for(var i=0;i<_nPoliciais;i++){
           ph.push("<div style='display:grid;grid-template-columns:110px 1fr 140px 34px;gap:8px;margin-bottom:8px;align-items:end'>");
-          ph.push("<div><label style='"+LS+"'>Graduação</label><select onchange='_policiais["+i+"].grad=this.value' style='"+IS+"'>");
-          grads.forEach(function(g){ ph.push("<option"+(p.grad===g?" selected":"")+" value='"+g+"'>"+g+"</option>"); });
+          ph.push("<div><label style='"+LS+"'>Graduação</label><select id='pol-grad-"+i+"' style='"+IS+"'>");
+          grads.forEach(function(g){ ph.push("<option value='"+g+"'>"+g+"</option>"); });
           ph.push("</select></div>");
-          ph.push("<div><label style='"+LS+"'>Nome Completo</label><input type='text' value='"+esc(p.nome)+"' oninput='_policiais["+i+"].nome=this.value' placeholder='Nome do policial' style='"+IS+"'></div>");
-          ph.push("<div><label style='"+LS+"'>Matrícula</label><input type='text' value='"+esc(p.matricula)+"' oninput='_policiais["+i+"].matricula=this.value' placeholder='Nº Matrícula' style='"+IS+"'></div>");
-          if(_policiais.length>1){
+          ph.push("<div><label style='"+LS+"'>Nome Completo</label><input id='pol-nome-"+i+"' type='text' placeholder='Nome do policial' style='"+IS+"'></div>");
+          ph.push("<div><label style='"+LS+"'>Matrícula</label><input id='pol-mat-"+i+"' type='text' placeholder='Nº Matrícula' style='"+IS+"'></div>");
+          if(_nPoliciais>1){
             ph.push("<button onclick='_remPolicial("+i+")' style='background:#120808;border:1px solid #4a1515;color:#c05050;width:34px;height:34px;border-radius:5px;font-size:16px;cursor:pointer;line-height:1'>×</button>");
           } else {
             ph.push("<div></div>");
           }
           ph.push("</div>");
-        });
+        }
         li.innerHTML=ph.join("");
       }
-      window._addPolicial=function(){ _policiais.push({grad:"Sd",nome:"",matricula:""}); _renderPoliciais(); };
-      window._remPolicial=function(i){ if(_policiais.length>1){ _policiais.splice(i,1); _renderPoliciais(); } };
-      _renderPoliciais();
+      window._addVitima=function(){ _nVitimas++; _renderVitimas(); };
+      window._remVitima=function(i){ if(_nVitimas>1){ _nVitimas--; _renderVitimas(); } };
+      window._addAutor=function(){ _nAutores++; _renderAutores(); };
+      window._remAutor=function(i){ if(_nAutores>1){ _nAutores--; _renderAutores(); } };
+      window._toggleNaoId=function(checked){ _autorNaoId=checked; _renderAutores(); };
+      window._addPolicial=function(){ _nPoliciais++; _renderPoliciais(); };
+      window._remPolicial=function(i){ if(_nPoliciais>1){ _nPoliciais--; _renderPoliciais(); } };
+      _renderVitimas(); _renderAutores(); _renderPoliciais();
 
       // Seletor de classificação
       window._selecionarClassif=function(btn){
@@ -6016,14 +6538,17 @@ function renderTela() {
         if(!dinamica){ showToast("Preencha a Narrativa da Ocorrência","error"); return; }
         try {
           var localVal=(document.getElementById("oc-local")||{value:""}).value.trim();
-          var lPartes=localVal.split(",");
-          var bairro=lPartes.length>1?lPartes[lPartes.length-1].trim():localVal;
+          var bairro=(document.getElementById("oc-bairro")||{value:""}).value.trim()||"Não informado";
+          var municipio=(document.getElementById("oc-municipio")||{value:"Vitória da Conquista"}).value.trim()||"Vitória da Conquista";
           var dataVal=(document.getElementById("oc-data")||{value:hoje()}).value||hoje();
           var horaVal=(document.getElementById("oc-hora")||{value:""}).value||new Date().toTimeString().slice(0,5);
           var vd=/maria da penha|violência doméstica|violencia domestica|\bvd\b/i.test(dinamica);
-          var naoId=_autorNaoId;
           var _det=_detectarEscolaNaOc(dinamica);
-          var policiaisTexto=_policiais.filter(function(p){return p.nome.trim();})
+          // Lê diretamente do DOM — sem depender de oninput/arrays
+          var _vArr=_lerVitimas();
+          var _aArr=_lerAutores();
+          var _pArr=_lerPoliciais();
+          var policiaisTexto=_pArr.filter(function(p){return p.nome;})
             .map(function(p){return p.grad+" "+p.nome+(p.matricula?" ("+p.matricula+")":"");}).join("; ");
           var oc={
             id:"oc_"+Date.now(), criadoEm:new Date().toISOString(),
@@ -6033,21 +6558,23 @@ function renderTela() {
             posto:(document.getElementById("oc-posto")||{value:"BCS"}).value.trim()||"BCS",
             tipo:tipo,
             zona:(document.getElementById("oc-zona")||{value:"Urbana"}).value,
-            local:localVal, bairro:bairro, municipio:"Vitória da Conquista",
+            local:localVal, bairro:bairro, municipio:municipio,
             referencia:(document.getElementById("oc-referencia")||{value:""}).value.trim(),
             // Vítimas (múltiplas)
-            vitimas:_vitimas.filter(function(v){return v.nome.trim();}),
-            vitima_nome:(_vitimas[0]&&_vitimas[0].nome)||"",
-            vitima_sexo:(_vitimas[0]&&_vitimas[0].sexo)||"",
-            vitima_idade:(_vitimas[0]&&_vitimas[0].idade)||"",
-            vitima_telefone:(_vitimas[0]&&_vitimas[0].telefone)||"",
-            vitima_endereco:(_vitimas[0]&&_vitimas[0].endereco)||"",
+            vitimas:_vArr.filter(function(v){return v.nome;}),
+            vitima_nome:(_vArr[0]&&_vArr[0].nome)||"",
+            vitima_sexo:(_vArr[0]&&_vArr[0].sexo)||"",
+            vitima_idade:(_vArr[0]&&_vArr[0].idade)||"",
+            vitima_telefone:(_vArr[0]&&_vArr[0].telefone)||"",
+            vitima_endereco:(_vArr[0]&&_vArr[0].endereco)||"",
             // Autores (múltiplos)
-            autores:_autorNaoId?[]:(function(){return _autores.filter(function(a){return a.nome.trim();});}()),
-            suspeito_nome:_autorNaoId?"Não identificado":((_autores[0]&&_autores[0].nome)||""),
-            suspeito_sexo:(_autores[0]&&_autores[0].sexo)||"",
-            suspeito_idade:(_autores[0]&&_autores[0].idade)||"",
-            suspeito_endereco:(_autores[0]&&_autores[0].endereco)||"",
+            autores:_aArr.filter(function(a){return a.nome;}),
+            suspeito_nome:_autorNaoId?"Não identificado":((_aArr[0]&&_aArr[0].nome)||""),
+            suspeito_apelido:((_aArr[0]&&_aArr[0].apelido)||""),
+            suspeito_caracteristicas:((_aArr[0]&&_aArr[0].caracteristicas)||""),
+            suspeito_sexo:(_aArr[0]&&_aArr[0].sexo)||"",
+            suspeito_idade:(_aArr[0]&&_aArr[0].idade)||"",
+            suspeito_endereco:(_aArr[0]&&_aArr[0].endereco)||"",
             // Solicitante / Entendido
             solicitante:{
               nome:(document.getElementById("oc-sol-nome")||{value:""}).value.trim(),
@@ -6674,6 +7201,11 @@ function renderTela() {
     return;
   }
 
+  if(tela==="importar_zap"){
+    renderImportarZap(main);
+    return;
+  }
+
   // MÓDULO ESCOLAR
   if(tela==="escolas"){
     renderModuloEscolar(main);
@@ -6860,6 +7392,7 @@ function renderTela() {
     g.push("<span style='background:#6b8c4222;color:#6b8c42;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>✓ Sheets</span>");
     g.push("<span style='color:#3a4a28;font-size:11px;flex:1'>"+ocs.length+" ocorrências · "+ags.length+" agendamentos</span>");
     g.push("<button onclick=\"carregarDoSheets();carregarDadosAppDoSheets()\" style='background:#1e2a14;border:1px solid #3a4a28;color:#6b8c42;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>↻ Sincronizar</button>");
+    g.push("<button onclick=\"if(confirm('Reimportar TODAS as ocorrências locais para a planilha? Isso enviará "+ocs.length+" registros um por um (pode demorar).')) reimportarParaSheets();\" style='background:#0a1e2a;border:1px solid #1e5a8a;color:#4a9fd4;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>📤 Reimportar Planilha</button>");
     g.push("<button onclick=\"deduplicarPlanilha()\" style='background:#1a1808;border:1px solid #5a3a10;color:#c8601a;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>🧹 Duplicatas</button>");
     g.push("<button onclick=\"if(confirm('Remover registros antigos do Sheets (+ de 60 dias) mantendo SIGESPOL e lançamentos recentes?')){limparRegistrosAntigos();}\" style='background:#1a0808;border:1px solid #8b2020;color:#c05050;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600'>🗑️ Limpar Antigos</button>");
     var importLockAtivo=localStorage.getItem("bcs_import_lock");
@@ -7038,6 +7571,7 @@ function render(){
       })()}</button>
       <button class="nav-btn${state.tela==="avisos"?" active":""}" onclick="setTela('avisos')" style="${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0&&state.tela!=='avisos'?'animation:piscar 1s infinite;color:#c8a84b;':''}"">📣 Avisos${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0?` <span style="background:#c8a84b;color:#0e0c06;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length}</span>`:""}</button>
       <button class="nav-btn${state.tela==="filtro"?" active":""}" data-tela="filtro" onclick="setTela('filtro')">🔍 Super Filtro</button>
+      <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="color:${state.tela==='importar_zap'?'#c8a84b':'#c8a84b66'};border-color:${state.tela==='importar_zap'?'#c8a84b':'transparent'}">📥 Importar Dados</button>
     `:`
       <button class="nav-btn${state.tela==="dashboard"?" active":""}" data-tela="dashboard" onclick="setTela('dashboard')">📊 Painel</button>
       <button class="nav-btn${state.tela==="dashcomandante"?" active":""}" data-tela="dashcomandante" onclick="setTela('dashcomandante')" style="color:${state.tela==="dashcomandante"?"#c8a84b":"#c8a04b88"};border-color:${state.tela==="dashcomandante"?"#c8a84b":"transparent"}">${(function(){ var n=(state.alertasProjetos||[]).filter(function(a){return !a.lido;}).length; return n>0?"⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>"+n+"</span>":"⚔️ Painel do Comando"; })()}</button>
@@ -7050,6 +7584,7 @@ function render(){
       <button class="nav-btn${state.tela==="cadastrosvcm"?" active":""}" data-tela="cadastrosvcm" onclick="setTela('cadastrosvcm')" style="color:#ff69b4;border-color:${state.tela==="cadastrosvcm"?"#ff1493":"transparent"}">🌸 Cadastros VCM</button>
       <button class="nav-btn${state.tela==="escolas"?" active":""}" data-tela="escolas" onclick="setTela('escolas')" style="color:${state.tela==="escolas"?"#38bdf8":"#38bdf888"};border-color:${state.tela==="escolas"?"#38bdf8":"transparent"}">🏫 Módulo Escolar</button>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" data-tela="projetossociais" onclick="setTela('projetossociais')" style="color:${state.tela==='projetossociais'?'#a78bfa':'#a78bfa88'};border-color:${state.tela==='projetossociais'?'#a78bfa':'transparent'}">🌱 Projetos Sociais</button>
+      <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="color:${state.tela==='importar_zap'?'#c8a84b':'#c8a84b66'};border-color:${state.tela==='importar_zap'?'#c8a84b':'transparent'}">📥 Importar WhatsApp</button>
           `}
     <div style="margin-top:auto;border-top:1px solid #242214;padding-top:10px">
       <div style="padding:0 4px 8px">
@@ -8665,8 +9200,10 @@ function gerarJanelaPDF(oc){
     h+="<table style='width:100%;border-collapse:collapse;font-size:10px;margin-bottom:8px'>";
     // Linha 1: Local + Zona + Referência
     if(o.local||o.bairro){
+      var _localCompleto=(o.local||"")+(o.bairro&&o.bairro!=="Não informado"?" — "+o.bairro:"")+(o.municipio&&o.municipio!=="Vitória da Conquista"?" / "+o.municipio:"");
+      if(!_localCompleto.trim()) _localCompleto=o.bairro||"";
       h+="<tr><td style='width:80px;padding:4px 6px;background:#e8eef8;font-weight:700;border:1px solid #ccd;color:#1a3a6a'>LOCAL</td>";
-      h+="<td style='padding:4px 6px;border:1px solid #ccd' colspan='3'>"+esc(o.local||o.bairro||"")+(o.zona?" &nbsp;("+o.zona+")":"")+"</td></tr>";
+      h+="<td style='padding:4px 6px;border:1px solid #ccd' colspan='3'>"+esc(_localCompleto.trim())+(o.zona?" &nbsp;<em style='color:#555'>("+o.zona+")</em>":"")+"</td></tr>";
     }
     if(o.referencia){
       h+="<tr><td style='width:80px;padding:4px 6px;background:#e8eef8;font-weight:700;border:1px solid #ccd;color:#1a3a6a'>REFERÊNCIA</td>";
@@ -8683,7 +9220,7 @@ function gerarJanelaPDF(oc){
     // Linha 3: Autor
     if(o.suspeito_nome){
       h+="<tr><td style='padding:4px 6px;background:#fef3e8;font-weight:700;border:1px solid #ccd;color:#8b4000'>AUTOR</td>";
-      h+="<td style='padding:4px 6px;border:1px solid #ccd' colspan='3'>"+esc(o.suspeito_nome)+(o.suspeito_sexo?" · "+({F:"Feminino",M:"Masculino"}[o.suspeito_sexo]||o.suspeito_sexo):"")+(o.suspeito_idade?" · "+o.suspeito_idade+" anos":"")+(o.suspeito_endereco?" | "+o.suspeito_endereco:"")+"</td></tr>";
+      h+="<td style='padding:4px 6px;border:1px solid #ccd' colspan='3'>"+esc(o.suspeito_nome)+(o.suspeito_apelido?" <em style='color:#888'>("+o.suspeito_apelido+")</em>":"")+(o.suspeito_sexo?" · "+({F:"Feminino",M:"Masculino"}[o.suspeito_sexo]||o.suspeito_sexo):"")+(o.suspeito_idade?" · "+o.suspeito_idade+" anos":"")+(o.suspeito_caracteristicas?" | "+o.suspeito_caracteristicas:"")+(o.suspeito_endereco?" | "+o.suspeito_endereco:"")+"</td></tr>";
     }
     // Objetos
     if(o.objetos){
@@ -8961,6 +9498,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
         ocM.objetos  = document.getElementById("ed-objetos").value.trim();
         var narrativa = document.getElementById("ed-narrativa").value.trim();
         ocM.descricao_dinamica = narrativa;
+        ocM.texto_original     = narrativa;
         ocM.descricao = narrativa.slice(0,150);
         ocM.medidas  = "";
         ocM.policiais = document.getElementById("ed-policiais").value.trim();
@@ -8968,36 +9506,12 @@ function renderOcorrenciasGestor(el, perfil_atual){
         if(vd){ ocM.violencia_domestica=true; ocM.requer_visita=true; ocM.medida_protetiva=ocM.medida_protetiva||"Sim"; }
         ocM._editadoLocal = true;
         salvarLocal();
-        // Enviar edição ao servidor
+        // Enviar edição ao servidor via fetch POST (sem limite de URL)
         if(SHEETS_URL){
           var btn = document.getElementById("btn-salvar-editar");
-          var textOriginal = btn.textContent;
           btn.textContent = "Salvando...";
           btn.disabled = true;
-          var cbE = "bcs_edit_" + Date.now();
-          var sE = document.createElement("script");
-          window[cbE] = function(data){
-            clearTimeout(tE); delete window[cbE]; sE.remove();
-            if(data && data.ok){
-              ocM._editadoLocal = false;
-              salvarLocal();
-              showToast("✓ Ocorrência atualizada!");
-              state.popEditarOc = null;
-              renderOcorrenciasGestor(el);
-            } else {
-              showToast("⚠ Erro: " + (data&&data.erro||"desconhecido"), "error");
-              btn.textContent = textOriginal;
-              btn.disabled = false;
-            }
-          };
-          sE.onerror = function(){
-            clearTimeout(tE); delete window[cbE]; sE.remove();
-            showToast("⚠ Falha na sincronização", "error");
-            btn.textContent = textOriginal;
-            btn.disabled = false;
-          };
-          var tE = setTimeout(function(){ delete window[cbE]; sE.remove(); btn.textContent=textOriginal; btn.disabled=false; }, 30000);
-          var campos = encodeURIComponent(JSON.stringify({
+          var camposObj = {
             numero:ocM.numero, relatorio:ocM.relatorio, posto:ocM.posto,
             tipo:ocM.tipo, data:ocM.data, hora:ocM.hora, zona:ocM.zona,
             local:ocM.local, bairro:ocM.bairro, referencia:ocM.referencia,
@@ -9006,12 +9520,26 @@ function renderOcorrenciasGestor(el, perfil_atual){
             vitima_endereco:ocM.vitima_endereco,
             suspeito_nome:ocM.suspeito_nome, suspeito_sexo:ocM.suspeito_sexo,
             suspeito_idade:ocM.suspeito_idade, suspeito_endereco:ocM.suspeito_endereco,
-            objetos:ocM.objetos, descricao:ocM.descricao,
-            descricao_dinamica:ocM.descricao_dinamica, medidas:ocM.medidas,
+            objetos:ocM.objetos,
+            descricao:ocM.descricao,
+            descricao_dinamica:ocM.descricao_dinamica,
+            medidas:ocM.medidas,
             policiais:ocM.policiais
-          }));
-          sE.src = SHEETS_URL + "?token=" + encodeURIComponent(BCS_TOKEN) + "&acao=editar&id=" + encodeURIComponent(ocM.id) + "&campos=" + campos + "&callback=" + cbE;
-          document.head.appendChild(sE);
+          };
+          var payloadEdit = JSON.stringify({token:BCS_TOKEN, tipo:"ocorrencias", registro:Object.assign({id:ocM.id}, camposObj)});
+          fetch(SHEETS_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body:payloadEdit})
+            .then(function(){
+              ocM._editadoLocal = false;
+              salvarLocal();
+              showToast("✓ Ocorrência atualizada!");
+              state.popEditarOc = null;
+              renderOcorrenciasGestor(el);
+            })
+            .catch(function(){
+              showToast("⚠ Falha na sincronização", "error");
+              btn.textContent = "💾 Salvar Alterações";
+              btn.disabled = false;
+            });
         } else {
           showToast("Ocorrência atualizada!");
           state.popEditarOc = null;
