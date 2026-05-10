@@ -781,6 +781,8 @@ async function carregarDoSheets() {
     // Re-renderizar telas que dependem dos dados carregados
     var mRe=document.getElementById("main");
     if(mRe&&(state.tela==="projetos"||state.tela==="dashprojetos"||state.tela==="calendario"||state.tela==="escolas"||state.tela==="dashvcm")) renderTela();
+    // Atualizar calendário diretamente se estiver visível
+    if(state.tela==="calendario" && document.getElementById("cal-container")) renderCalendar();
 
   } catch(e) {
     _carregando = false;
@@ -7186,10 +7188,13 @@ function renderTela() {
     <div style="margin-bottom:18px"><h2 style="font-size:24px;font-weight:700;color:#e8ddd0">Calendário de Visitas</h2><p style="color:#4a4530;font-size:13px">Clique em um dia para ver detalhes.</p></div>
     <div id="cal-container"></div>`;
     renderCalendar();
-    // Se não tem eventos locais, tenta carregar do Sheets
-    if(!(state.eventosAvulsos||[]).length && SHEETS_URL){
-      carregarDadosAppDoSheets().then(function(){
-        renderCalendar();
+    // Sempre atualiza dados do Sheets ao abrir o calendário
+    if(SHEETS_URL){
+      Promise.all([
+        carregarDadosAppDoSheets(),
+        carregarDoSheets()
+      ]).then(function(){
+        if(document.getElementById("cal-container")) renderCalendar();
       });
     }
     return;
