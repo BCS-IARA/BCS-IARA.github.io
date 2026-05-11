@@ -6101,18 +6101,29 @@ async function enviarMensagemIA(pergunta){
     var ctx=_buildIAContext();
     var sys=_buildIASystem(ctx);
     var msgs=state.iaChat.slice(-12);
-    var headers={"Content-Type":"application/json","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"};
-    if(chave) headers["x-api-key"]=chave;
+    if(!chave){
+      state.iaChat.push({role:"assistant",content:"🔑 Insira sua chave de API Anthropic no campo abaixo para usar o assistente."});
+      _renderChatIA();
+      var sec=document.getElementById("ia-key-section");
+      if(sec){sec.style.display="block";}
+      return;
+    }
     var res=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
-      headers:headers,
-      body:JSON.stringify({model:"claude-opus-4-5",max_tokens:2000,system:sys,messages:msgs})
+      headers:{"Content-Type":"application/json","x-api-key":chave,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-3-5-haiku-20241022",max_tokens:2000,system:sys,messages:msgs})
     });
     var data=await res.json();
     console.log("[IA] resposta API:",JSON.stringify(data).substring(0,300));
     if(data.error){
       var emsg=data.error.message||JSON.stringify(data.error);
-      state.iaChat.push({role:"assistant",content:"❌ Erro da API: "+emsg});
+      if(data.error.type==="authentication_error"){
+        localStorage.removeItem("bcs_anthropic_key");
+        emsg="Chave inválida ou expirada. Cole a chave completa do console.anthropic.com → API Keys.";
+        var sec2=document.getElementById("ia-key-section");
+        if(sec2){sec2.style.display="block";}
+      }
+      state.iaChat.push({role:"assistant",content:"❌ "+emsg});
     } else {
       var resposta=(data.content&&data.content[0])?data.content[0].text:"Resposta vazia da IA.";
       state.iaChat.push({role:"assistant",content:resposta});
@@ -6148,8 +6159,9 @@ function renderAssistenteIA(main){
     h+="<button onclick=\"enviarMensagemIA("+JSON.stringify(c.q)+")\" style='background:#1a1808;border:1px solid #3a3820;color:#9a9070;padding:6px 13px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s' onmouseover=\"this.style.borderColor='#8b5cf6';this.style.color='#a78bfa'\" onmouseout=\"this.style.borderColor='#3a3820';this.style.color='#9a9070'\">"+c.icon+" "+c.icon.length>1?c.q.split(" ").slice(0,4).join(" ")+"…":c.q+"</button>";
   });
   h+="</div>";
-  // Campo de chave (opcional — oculto por padrão, funciona via login Claude.ai)
-  h+="<div id='ia-key-section' style='display:none;background:#1a0e00;border:1px solid #c8a84b44;border-radius:10px;padding:14px 16px;flex-shrink:0'>";
+  // Campo de chave
+  var temChave2=!!_getIAKey();
+  h+="<div id='ia-key-section' style='display:"+(temChave2?"none":"block")+";background:#1a0e00;border:1px solid #c8a84b44;border-radius:10px;padding:14px 16px;flex-shrink:0'>";
   h+="<p style='color:#c8a84b;font-size:12px;font-weight:700;margin:0 0 8px'>🔑 Chave de API Anthropic (opcional)</p>";
   h+="<div style='display:flex;gap:8px'>";
   h+="<input id='ia-key-input' type='password' placeholder='sk-ant-api03-...' style='flex:1;background:#0e0c06;border:1px solid #3a3820;color:#e8e0cc;padding:9px 12px;border-radius:8px;font-size:12px;font-family:monospace' onkeydown=\"if(event.key==='Enter')_salvarIAKey()\">";
