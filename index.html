@@ -485,12 +485,29 @@ async function sincronizarSheets(){
     await salvarDadoAppSheets("bcs_atendimentos",     state.db.atendimentos||[]);
     await salvarDadoAppSheets("bcs_escolas",          state.escolas||[]);
     await salvarDadoAppSheets("bcs_atividades_esc",   state.atividadesEscolares||[]);
-    // 🏫 Módulo Escolar — sincronizar mapa de campos (classificacao, escolaNome…) entre dispositivos
     try{ var _mods=JSON.parse(localStorage.getItem("bcs_oc_modulos")||"{}"); if(Object.keys(_mods).length>0) await salvarDadoAppSheets("bcs_oc_modulos",_mods); }catch(e2){}
     console.log("[BCS] Sync Sheets OK — projetos:"+(state.projetos||[]).length+" agendamentos:"+(state.db.agendamentos||[]).length);
   } catch(e){
     console.log("[BCS] Sync Sheets erro:", e);
   }
+}
+
+// Reenvia todos os registros locais para as abas da planilha atual
+async function reenviarTudoParaPlanilha(){
+  var total=0, tipos=[
+    {chave:"agendamentos",lista:state.db.agendamentos||[]},
+    {chave:"visitas",     lista:state.db.visitas||[]},
+    {chave:"atendimentos",lista:state.db.atendimentos||[]}
+  ];
+  for(var t=0;t<tipos.length;t++){
+    var lista=tipos[t].lista;
+    for(var i=0;i<lista.length;i++){
+      enviarSheets(tipos[t].chave, lista[i]);
+      total++;
+      await new Promise(function(r){setTimeout(r,200);});
+    }
+  }
+  showToast("✓ "+total+" registros reenviados para a planilha");
 }
 
 function agendarSyncSheets(){
@@ -7612,6 +7629,7 @@ function render(){
           <label title="Importar backup de outro navegador" style="flex:1;background:#0a1a0a;border:1px solid #1a4a1a;color:#3a8a5a;padding:7px 4px;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer;text-align:center;display:block">⬆ Importar<input type="file" accept=".json" onchange="importarDadosBCS(this)" style="display:none"/></label>
         </div>
       </div>
+      <button onclick="if(confirm('Reenviar agendamentos, visitas e atendimentos para a planilha atual?')){reenviarTudoParaPlanilha();}" style="background:transparent;border:none;color:#2a5a3a;font-size:11px;width:100%;text-align:left;padding:6px 10px;cursor:pointer">🔄 Sincronizar com planilha</button>
       <button onclick="if(confirm('Limpar todos os dados locais e recarregar do Sheets? Use apenas se os dados estiverem desatualizados.')){localStorage.clear();location.reload();}" style="background:transparent;border:none;color:#5a2020;font-size:11px;width:100%;text-align:left;padding:6px 10px;cursor:pointer">🗑 Limpar cache local</button>
       <button onclick="state.perfil=null;state.tela='dashboard';render()" style="background:transparent;border:none;color:#3a3820;font-size:12px;width:100%;text-align:left;padding:8px 10px;cursor:pointer">⏏ Sair</button>
     </div>
