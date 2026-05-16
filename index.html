@@ -6089,10 +6089,12 @@ function _renderCamposEscolarOc(ocId){
   var TIPOS_VIO=["Física","Verbal","Psicológica","Sexual","Patrimonial"];
   var h="<div style='background:#0a1e2a;border:1px solid #1a3a4a;border-radius:8px;padding:12px;margin-bottom:12px'>";
   h+="<p style='color:#38bdf8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 10px'>🏫 Classificação Escolar — "+esc(oc.escolaNome||"")+"</p>";
-  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'>";
   h+="<div><label style='color:#4a6a8a;font-size:9px;display:block;margin-bottom:4px'>Tipo Ocorrência Escolar</label><select id='oc-tipo-esc-"+ocId+"' onchange=\"_salvarTipoEscolar('"+ocId+"')\" style='width:100%;background:#0e0c06;border:1px solid #1a3a4a;color:#e8ddd0;padding:7px 8px;border-radius:6px;font-size:11px;outline:none'><option value=''>-- Selecione --</option>"+TIPOS_OC.map(function(t){return "<option value='"+t+"'"+(oc.tipoOcEscola===t?" selected":"")+">"+t+"</option>";}).join("")+"</select></div>";
   h+="<div><label style='color:#4a6a8a;font-size:9px;display:block;margin-bottom:4px'>Tipo de Violência</label><select id='oc-vio-esc-"+ocId+"' onchange=\"_salvarTipoEscolar('"+ocId+"')\" style='width:100%;background:#0e0c06;border:1px solid #1a3a4a;color:#e8ddd0;padding:7px 8px;border-radius:6px;font-size:11px;outline:none'><option value=''>-- N/A --</option>"+TIPOS_VIO.map(function(t){return "<option value='"+t+"'"+(oc.tipoViolenciaEscola===t?" selected":"")+">"+t+"</option>";}).join("")+"</select></div>";
-  h+="</div></div>";
+  h+="</div>";
+  h+="<button onclick=\"gerarPDFEscola('"+oc.escolaId+"')\" style='background:#0a1e2a;border:1px solid #38bdf8;color:#38bdf8;padding:6px 14px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;width:100%'>📄 PDF Escolar — "+esc(oc.escolaNome||"Escola")+"</button>";
+  h+="</div>";
   return h;
 }
 
