@@ -24,6 +24,9 @@ input,select,textarea,button{font-family:inherit;outline:none;}
 button{cursor:pointer;}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
+@keyframes piscar{0%,50%{opacity:1}51%,100%{opacity:0.35}}
+@keyframes piscar-verde{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0);}50%{box-shadow:0 0 8px 3px rgba(16,185,129,0.5);}}
+@keyframes piscar-rosa{0%,100%{box-shadow:0 0 0 0 rgba(255,20,147,0);}50%{box-shadow:0 0 8px 3px rgba(255,20,147,0.5);}}
 @keyframes piscar-suave{0%,100%{border-color:#c8a84b;box-shadow:0 0 0 0 rgba(200,168,75,0);}50%{border-color:#c8a84b;box-shadow:0 0 8px 2px rgba(200,168,75,0.25);}}
 @keyframes piscar-lento{0%,100%{border-color:#5a3a10;}50%{border-color:#f97316;box-shadow:0 0 8px 2px rgba(249,115,22,0.2);}}
 ::-webkit-scrollbar{width:5px;}
@@ -7969,7 +7972,7 @@ function render(){
       <button class="nav-btn${state.tela==="lancar"?" active":""}" data-tela="lancar" onclick="setTela('lancar')">🛡 Painel de Situação</button>
       <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" data-tela="ocorrencias" onclick="setTela('ocorrencias')">🔍 Analisar Ocorrências</button>
       <button class="nav-btn${state.tela==="calendario"?" active":""}" data-tela="calendario" onclick="setTela('calendario')">🗓 Calendário</button>
-      <button class="nav-btn${state.tela==="dashvcm"?" active":""}" data-tela="dashvcm" onclick="setTela('dashvcm')" style="color:#ff69b4;border-color:${state.tela==="dashvcm"?"#ff1493":"transparent"}">🌸 Dashboard VCM</button>
+      <button class="nav-btn${state.tela==="dashvcm"?" active":""}" data-tela="dashvcm" onclick="setTela('dashvcm')" style="${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0&&state.tela!=="dashvcm"?"animation:piscar-rosa 1.4s infinite;color:#ff69b4;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";";})()}">🌸 Dashboard VCM${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0?` <span style="background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${_n}</span>`:"";})()}</button>
       <button class="nav-btn${state.tela==="cadastrosvcm"?" active":""}" data-tela="cadastrosvcm" onclick="setTela('cadastrosvcm')" style="color:#ff69b4;border-color:${state.tela==="cadastrosvcm"?"#ff1493":"transparent"}">🌸 Cadastros VCM</button>
       <button class="nav-btn${state.tela==="assistente"?" active":""}" data-tela="assistente" onclick="setTela('assistente')" style="color:${state.tela==="assistente"?"#a78bfa":"#a78bfa88"};border-color:${state.tela==="assistente"?"#a78bfa":"transparent"}">🤖 Assistente IA</button>
       <button class="nav-btn${state.tela==="escolas"?" active":""}" data-tela="escolas" onclick="setTela('escolas')" style="color:${state.tela==="escolas"?"#38bdf8":"#38bdf888"};border-color:${state.tela==="escolas"?"#38bdf8":"transparent"}">🏫 Módulo Escolar</button>
@@ -10224,9 +10227,26 @@ function renderOcorrenciasGestor(el, perfil_atual){
     h.push("</div>");
     // Botões de ação
     h.push("<div style='display:flex;gap:6px;flex-wrap:wrap'>");
-    if(!isOperador) h.push("<button data-oc='"+o.id+"' data-act='visita' style='background:#1a2810;border:1px solid #6a8a50;color:#a8d890;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer'>Visita Solidaria</button>");
+    if(!isOperador){
+      // Visita Solidária: pisca se requer_visita=true E sem visita registrada
+      var _semVisita=o.requer_visita&&!(state.db.visitas||[]).find(function(v){return v.ocorrenciaId===o.id;});
+      h.push("<button data-oc='"+o.id+"' data-act='visita' style='background:#1a2810;border:1px solid "+(_semVisita?"#10b981":"#6a8a50")+";color:#a8d890;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;"+(_semVisita?"animation:piscar-verde 1.2s infinite;":"")+"'>🤝 Visita Solidária</button>");
+    }
     h.push("<button data-oc='"+o.id+"' data-act='editar' style='background:#1a1a2a;border:1px solid #4a5a7a;color:#8a9aba;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer'>✏ Editar</button>");
-    if(!isOperador) h.push("<button data-oc='"+o.id+"' data-act='vcm' style='background:#1a1810;border:1px solid #5a5535;color:#8a7a5a;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer'>Monitor VCM</button>");
+    if(!isOperador){
+      // Monitor VCM: pisca se VD e sem FRIDA, ou FRIDA elevado, ou médio>30d, ou MP ativa sem visita recente
+      var _vcmFridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id;});
+      var _vcmUltimaFrida=_vcmFridas.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];
+      var _isVD=o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica|vcm/i.test(o.tipo||"");
+      var _piscarVCM=false;
+      if(_isVD){
+        if(!_vcmUltimaFrida) _piscarVCM=true; // sem avaliação FRIDA
+        else if(_vcmUltimaFrida.nivel==="E") _piscarVCM=true; // risco elevado
+        else if(_vcmUltimaFrida.nivel==="M"&&(Date.now()-new Date(_vcmUltimaFrida.data).getTime())>30*864e5) _piscarVCM=true; // médio + 30d
+        else if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_vcmUltimaFrida.data).getTime())>15*864e5) _piscarVCM=true; // MP ativa + 15d
+      }
+      h.push("<button data-oc='"+o.id+"' data-act='vcm' style='background:#1a1810;border:1px solid "+(_piscarVCM?"#ff1493":"#5a5535")+";color:"+(_piscarVCM?"#ff69b4":"#8a7a5a")+";padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;"+(_piscarVCM?"animation:piscar-rosa 1.2s infinite;":"")+"'>💜 Monitor VCM</button>");
+    }
     if(!isOperador) h.push("<button data-oc='"+o.id+"' data-act='arq' style='background:#1a0800;border:1px solid #2a1808;color:#5a4530;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer'>Arquivar</button>");
     h.push("</div></div>");
     // ── Campos estruturados SIGESPOL (novo) ou texto legado
