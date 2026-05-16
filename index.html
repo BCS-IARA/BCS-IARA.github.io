@@ -1784,14 +1784,15 @@ ${state.db.ocorrencias.slice(0,20).map(o=>`[${o.data} ${o.hora}] ${o.tipo}|${o.b
     let startIdx=0; while(startIdx<history.length&&history[startIdx].role==="assistant")startIdx++;
     const msgs=[...history.slice(startIdx)];
 
-    const res = await fetch(SHEETS_URL,{
+    const iaKey=localStorage.getItem("bcs_anthropic_key")||"";
+    if(!iaKey){state.chatMsgs.push({role:"assistant",text:"🔑 Configure a chave da Anthropic no assistente IA."});state.chatLoading=false;renderChat();return;}
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
-      mode:"cors",
-      headers:{"Content-Type":"text/plain"},
-      body:JSON.stringify({token:BCS_TOKEN, acao:"ia", system, messages:msgs})
+      headers:{"Content-Type":"application/json","x-api-key":iaKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-3-5-haiku-20241022",max_tokens:600,system,messages:msgs})
     });
     const rj = await res.json();
-    const txt = rj.ok ? (rj.resposta||"Resposta vazia.") : ("❌ "+(rj.erro||"Erro desconhecido"));
+    const txt = rj.error ? ("❌ "+rj.error.message) : ((rj.content||[]).map(c=>c.text||"").join("")||"Resposta vazia.");
     state.chatMsgs.push({role:"assistant",text:txt});
   } catch(e) {
     state.chatMsgs.push({role:"assistant",text:"❌ Erro de conexão: "+e.message});
@@ -1826,9 +1827,11 @@ async function gerarRelatorio(tipo) {
     prompt=`Especialista violência doméstica. Redija RELATÓRIO DE VÍTIMAS DE VIOLÊNCIA em português.\nVD: ${ocs.filter(o=>o.violencia_domestica).length} | Atend: ${ats.length} | Visitas: ${vis.length}\nVÍTIMAS:\n${vd||"Nenhum"}\nEstruture: 1.PANORAMA 2.ANÁLISE DE RISCO 3.ATENDIMENTOS 4.ENCAMINHAMENTOS 5.PRÓXIMAS AÇÕES`;
   }
   try {
-    const res=await fetch(SHEETS_URL,{method:"POST",mode:"cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({token:BCS_TOKEN,acao:"ia",system:"Você é analista de segurança pública. Responda em português formal.",messages:[{role:"user",content:prompt}]})});
+    const iaKey=localStorage.getItem("bcs_anthropic_key")||"";
+    if(!iaKey){div.innerHTML=`<p style="color:#ef4444">🔑 Configure a chave da Anthropic no assistente IA.</p>`;return;}
+    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":iaKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-3-5-haiku-20241022",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
     const rj=await res.json();
-    const texto=rj.ok?(rj.resposta||"Resposta vazia."):("❌ "+(rj.erro||"Erro desconhecido"));
+    const texto=rj.error?("❌ "+rj.error.message):((rj.content||[]).map(c=>c.text||"").join("")||"Resposta vazia.");
     div.innerHTML=`<div style="white-space:pre-wrap;line-height:1.9;color:#a89860;font-size:15px">${texto}</div>`;
   } catch(e){
     div.innerHTML=`<p style="color:#ef4444">❌ Erro de conexão: ${e.message}</p>`;
@@ -6100,26 +6103,27 @@ async function enviarMensagemIA(pergunta){
     chatEl.appendChild(tp);
     chatEl.scrollTop=chatEl.scrollHeight;
   }
+  var iaKey=_getIAKey();
+  if(!iaKey){
+    state.iaChat.push({role:"assistant",content:"🔑 Cole sua chave da Anthropic abaixo para ativar o assistente."});
+    _renderChatIA();
+    var sec=document.getElementById("ia-key-section");
+    if(sec) sec.style.display="block";
+    return;
+  }
   try {
     var ctx=_buildIAContext();
     var sys=_buildIASystem(ctx);
     var msgs=state.iaChat.slice(-12);
-    // Chama Claude via Apps Script (proxy seguro — chave nas Script Properties)
-    var res=await fetch(SHEETS_URL,{
+    var res=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
-      mode:"cors",
-      headers:{"Content-Type":"text/plain"},
-      body:JSON.stringify({token:BCS_TOKEN, acao:"ia", system:sys, messages:msgs})
+      headers:{"Content-Type":"application/json","x-api-key":iaKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-3-5-haiku-20241022",max_tokens:2000,system:sys,messages:msgs})
     });
     var data=await res.json();
-    console.log("[IA] proxy:",JSON.stringify(data).substring(0,300));
-    if(!data.ok){
-      state.iaChat.push({role:"assistant",content:"❌ "+( data.erro||"Erro desconhecido")});
-    } else {
-      state.iaChat.push({role:"assistant",content:data.resposta||"Resposta vazia."});
-    }
+    if(data.error) state.iaChat.push({role:"assistant",content:"❌ "+data.error.message});
+    else state.iaChat.push({role:"assistant",content:data.content&&data.content[0]?data.content[0].text:"Resposta vazia."});
   } catch(err){
-    console.log("[IA] erro fetch:",err);
     state.iaChat.push({role:"assistant",content:"❌ Erro de conexão: "+err.message});
   }
   _renderChatIA();
