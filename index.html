@@ -10357,6 +10357,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
   if(!isOperador){
     var comTexto = state.db.ocorrencias.filter(function(o){return o.texto_original&&o.texto_original.length>20;}).length;
     h.push("<button id='btn-reextrai' style='background:#0e1808;border:1px solid #3a5a28;color:#6a9a50;padding:6px 14px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px'>🔧 Corrigir Dados Antigos <span style='background:#1a3818;padding:2px 6px;border-radius:4px'>"+comTexto+"</span></button>");
+    h.push("<button onclick='restaurarDatasOriginais()' style='background:#1a0808;border:1px solid #c05050;color:#e08070;padding:6px 14px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer'>🗓 Restaurar Datas</button>");
   }
   h.push("</div>");
 
