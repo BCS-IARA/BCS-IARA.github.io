@@ -1810,13 +1810,64 @@ function reextrairOcorrencias() {
 }
 
 // ══════════════════════════════════════════════════
+// RESTAURAR DATAS ORIGINAIS (via arquivo JSON backup)
+// ══════════════════════════════════════════════════
+function restaurarDatasOriginais() {
+  var input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
+  input.multiple = true;
+  input.style.display = "none";
+  document.body.appendChild(input);
+  input.onchange = function() {
+    var files = Array.from(this.files);
+    if(!files.length) return;
+    var MAP = {};
+    var done = 0;
+    files.forEach(function(file) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var json = JSON.parse(e.target.result);
+          var ocs = (json.db && json.db.ocorrencias) ? json.db.ocorrencias : (Array.isArray(json) ? json : []);
+          ocs.forEach(function(o) {
+            if(!o.id || !o.data) return;
+            var d = String(o.data).trim();
+            if(/^\d{2}\/\d{2}\/\d{4}$/.test(d)) { var p=d.split("/"); d=p[2]+"-"+p[1]+"-"+p[0]; }
+            MAP[o.id] = d;
+          });
+        } catch(err) { console.warn("[IARA] Erro ao ler JSON:", err); }
+        done++;
+        if(done >= files.length) {
+          var restauradas = 0;
+          (state.db.ocorrencias||[]).forEach(function(o) {
+            if(MAP[o.id]) { o.data = MAP[o.id]; restauradas++; }
+          });
+          salvarLocal();
+          render();
+          showToast("✓ " + restauradas + " datas restauradas de " + Object.keys(MAP).length + " mapeadas");
+        }
+      };
+      reader.readAsText(file, "UTF-8");
+    });
+    setTimeout(function(){ try{ document.body.removeChild(input); }catch(e){} }, 15000);
+  };
+  input.click();
+}
+
+// ══════════════════════════════════════════════════
 // REVISÃO EM LOTE POR IA
 // ══════════════════════════════════════════════════
 var _iaLote = { ativo:false, total:0, atual:0, corrigidas:0, erros:0, cancelar:false, log:[] };
 
 function iniciarRevisaoIALote() {
   var iaKey = localStorage.getItem("bcs_anthropic_key")||"";
-  if(!iaKey){ showToast("Configure a chave da IA nas configurações antes de usar este recurso","error"); return; }
+  if(!iaKey){
+    if(confirm("A chave da API Anthropic não está configurada.\n\nDeseja ir para as Configurações agora para configurá-la?")){
+      setTela("config");
+    }
+    return;
+  }
 
   var mesAtual = hoje().slice(0,7);
   var ocs = (state.db.ocorrencias||[]).filter(function(o){
@@ -10495,10 +10546,8 @@ function renderOcorrenciasGestor(el, perfil_atual){
     var comTexto = state.db.ocorrencias.filter(function(o){return o.texto_original&&o.texto_original.length>20;}).length;
     h.push("<button id='btn-reextrai' style='background:#0e1808;border:1px solid #3a5a28;color:#6a9a50;padding:6px 14px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px'>🔧 Corrigir Dados Antigos <span style='background:#1a3818;padding:2px 6px;border-radius:4px'>"+comTexto+"</span></button>");
     h.push("<button onclick='restaurarDatasOriginais()' style='background:#1a0808;border:1px solid #c05050;color:#e08070;padding:6px 14px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer'>🗓 Restaurar Datas</button>");
-    if(localStorage.getItem("bcs_anthropic_key")){
-      var _naoRevisadas = (state.db.ocorrencias||[]).filter(function(o){ return (o.data||"").slice(0,7)===hoje().slice(0,7) && !o._revisadoIA; }).length;
-      if(_naoRevisadas > 0) h.push("<button onclick='iniciarRevisaoIALote()' style='background:#0a0a1a;border:1px solid #6a5af5;color:#a09af8;padding:6px 14px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer'>🤖 Revisar com IA <span style='background:#1a1a3a;padding:2px 6px;border-radius:4px'>"+_naoRevisadas+"</span></button>");
-    }
+    var _naoRevisadas = (state.db.ocorrencias||[]).filter(function(o){ return (o.data||"").slice(0,7)===hoje().slice(0,7) && !o._revisadoIA; }).length;
+    if(_naoRevisadas > 0) h.push("<button onclick='iniciarRevisaoIALote()' style='background:#0a0a1a;border:1px solid #6a5af5;color:#a09af8;padding:6px 14px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer'>🤖 Revisar com IA <span style='background:#1a1a3a;padding:2px 6px;border-radius:4px'>"+_naoRevisadas+"</span></button>");
   }
   h.push("</div>");
 
