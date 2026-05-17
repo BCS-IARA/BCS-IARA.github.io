@@ -9648,17 +9648,22 @@ function visualizarAgendamentoComOcorrencia(agId){
 }
 
 // Toggle para expandir/recolher narrativa nos cards de ocorrência
+// Usa ocid para buscar o texto no state — evita atributos HTML com texto longo
 window._ocToggleDin = function(btn){
   var p = document.getElementById(btn.dataset.target);
   if(!p) return;
+  var oc = (state.db.ocorrencias||[]).find(function(o){ return o.id === btn.dataset.ocid; });
+  if(!oc) return;
+  var full = (oc.descricao_dinamica||oc.texto_original||oc.descricao||"").trim();
+  var MAX = 220;
   if(btn.dataset.exp === "1"){
     btn.dataset.exp = "0";
-    btn.textContent = "▼ ver narrativa completa";
-    p.textContent = btn.dataset.prev + "…";
+    btn.textContent = "▼ ver narrativa completa (" + full.length + " chars)";
+    p.textContent = full.slice(0, MAX) + "…";
   } else {
     btn.dataset.exp = "1";
     btn.textContent = "▲ recolher";
-    p.textContent = btn.dataset.full;
+    p.textContent = full;
   }
 };
 
@@ -10474,7 +10479,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
         h.push("<div style='background:#060d1c;border:1px solid #1a3358;border-radius:6px;padding:10px;margin-bottom:8px'>");
         h.push("<span style='"+fcS+"'>Dinâmica dos Fatos</span>");
         h.push("<p id='"+_escId+"' style='color:#c8d8f0;font-size:11px;line-height:1.7;margin:4px 0 0;white-space:pre-wrap'>"+esc(_prevTxt)+(_prevD?"…":"")+"</p>");
-        if(_prevD) h.push("<button data-full='"+esc(dinamica)+"' data-prev='"+esc(_prevTxt)+"' data-target='"+_escId+"' data-exp='0' onclick='_ocToggleDin(this)' style='background:none;border:none;color:#4a9fd4;font-size:10px;cursor:pointer;padding:3px 0 0;display:block'>▼ ver narrativa completa ("+(dinamica.length)+" chars)</button>");
+        if(_prevD) h.push("<button data-ocid='"+o.id+"' data-target='"+_escId+"' data-exp='0' onclick='_ocToggleDin(this)' style='background:none;border:none;color:#4a9fd4;font-size:10px;cursor:pointer;padding:3px 0 0;display:block'>▼ ver narrativa completa ("+(dinamica.length)+" chars)</button>");
         h.push("</div>");
       }
       if(o.medidas) h.push("<div style='margin-bottom:8px'><span style='"+fcS+"'>Medidas Adotadas</span><p style='"+fcV+";margin:0;white-space:pre-wrap'>"+esc(o.medidas)+"</p></div>");
@@ -10486,7 +10491,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
         var _prevTxtR=_prevR?relatoExib.slice(0,_MAXR):relatoExib;
         h.push("<div style='background:#2a1c10;border-radius:8px;padding:12px;margin-bottom:10px'>");
         h.push("<p id='"+_escIdR+"' style='white-space:pre-wrap;word-break:break-word;color:#c8c0a8;font-size:11px;line-height:1.8;font-family:inherit;margin:0'>"+esc(_prevTxtR)+(_prevR?"…":"")+"</p>");
-        if(_prevR) h.push("<button data-full='"+esc(relatoExib)+"' data-prev='"+esc(_prevTxtR)+"' data-target='"+_escIdR+"' data-exp='0' onclick='_ocToggleDin(this)' style='background:none;border:none;color:#8a6a4a;font-size:10px;cursor:pointer;padding:3px 0 0;display:block'>▼ ver narrativa completa ("+(relatoExib.length)+" chars)</button>");
+        if(_prevR) h.push("<button data-ocid='"+o.id+"' data-target='"+_escIdR+"' data-exp='0' onclick='_ocToggleDin(this)' style='background:none;border:none;color:#8a6a4a;font-size:10px;cursor:pointer;padding:3px 0 0;display:block'>▼ ver narrativa completa ("+(relatoExib.length)+" chars)</button>");
         h.push("</div>");
       }
     }
