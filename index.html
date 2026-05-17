@@ -3099,8 +3099,8 @@ function renderDashComandante(main){
     var ags = state.db.agendamentos || [];
     var agsVisita = ags.filter(function(a){ return /visita/i.test(a.tipo||""); })
                        .slice().sort(function(a,b){ return (a.data||"")>(b.data||"")?1:-1; });
-    var agsPend  = agsVisita.filter(function(a){ return (a.status||"Agendado")==="Agendado" && (a.data||"")>=hoje(); });
-    var agsConc  = agsVisita.filter(function(a){ return (a.status||"Agendado")!=="Agendado" || (a.data||"")<hoje(); });
+    var agsPend  = agsVisita.filter(function(a){ return (a.status||"Agendado")==="Agendado"; });
+    var agsConc  = agsVisita.filter(function(a){ return (a.status||"Agendado")!=="Agendado"; });
     var proxima  = agsPend[0] || null;
 
     // KPIs
@@ -3143,16 +3143,20 @@ function renderDashComandante(main){
       h.push("<th style='text-align:center;color:#8a6a4a;font-size:10px;padding:6px 8px;font-weight:700;border-bottom:1px solid #4a3224'>Status</th>");
       h.push("</tr></thead><tbody>");
       agsVisita.forEach(function(a){
-        var isPend=(a.status||"Agendado")==="Agendado"&&(a.data||"")>=hoje();
-        var statusCor=isPend?"#22c55e":"#8a6a4a";
-        var statusTxt=isPend?"⏳ Agendada":"✅ Realizada";
+        var stAg=(a.status||"Agendado")==="Agendado";
+        var vencida=stAg&&(a.data||"")<hoje();
+        var statusCor=stAg?(vencida?"#f59e0b":"#22c55e"):"#8a6a4a";
+        var statusTxt=stAg?(vencida?"⚠ Vencida":"⏳ Agendada"):"✅ Realizada";
         h.push("<tr style='border-bottom:1px solid #3c2818'>");
         h.push("<td style='padding:8px;color:#a07c58;font-size:11px;white-space:nowrap'>"+fmtData(a.data||"")+"</td>");
         h.push("<td style='padding:8px;color:#8a6a4a;font-size:11px'>"+esc(a.hora||"—")+"</td>");
         h.push("<td style='padding:8px;color:#ddd2c0;font-size:11px'>"+esc(a.tipo||"—")+"</td>");
         h.push("<td style='padding:8px;color:#f5ede0;font-size:12px;font-weight:600'>"+esc(a.vitima_nome||a.objetivo||"—")+"</td>");
         h.push("<td style='padding:8px;color:#8a6a4a;font-size:11px'>"+esc(a.responsavel||"—")+"</td>");
-        h.push("<td style='padding:8px;text-align:center'><span style='background:"+statusCor+"22;color:"+statusCor+";padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+statusTxt+"</span></td>");
+        h.push("<td style='padding:8px;text-align:center;white-space:nowrap'>");
+        h.push("<span style='background:"+statusCor+"22;color:"+statusCor+";padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+statusTxt+"</span>");
+        if(stAg) h.push(" <button onclick=\"marcarVisitaRealizada('"+a.id+"')\" title='Marcar como realizada' style='background:#0a2a0a;border:1px solid #22c55e;color:#22c55e;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;margin-left:4px'>✓ OK</button>");
+        h.push("</td>");
         h.push("</tr>");
       });
       h.push("</tbody></table></div>");
@@ -4395,6 +4399,14 @@ function salvarRelatorioAvanco(projId, tarefaIdx){
   if(main&&state.tela==="projetos") renderGestaoProjectos(main);
 }
 
+function marcarVisitaRealizada(agId){
+  var ag=(state.db.agendamentos||[]).find(function(a){return a.id===agId;});
+  if(!ag) return;
+  ag.status="Realizada";
+  salvarLocal();
+  if(typeof enviarSheets==="function") enviarSheets("agendamentos",ag);
+  renderDashComandante(document.getElementById("main"));
+}
 function marcarAlertaProjetoLido(alertId){
   var a=(state.alertasProjetos||[]).find(function(x){return x.id===alertId;});
   if(a) a.lido=true;
