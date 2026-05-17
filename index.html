@@ -573,21 +573,15 @@ async function carregarDadosAppDoSheets(){
     }
 
     if(projetos && Array.isArray(projetos) && projetos.length > 0){
-      if(localProj.length > 0){
-        // Local é autoritário: adiciona do remoto apenas IDs nunca vistos localmente.
-        // IDs que existiam localmente e foram deletados NÃO voltam do remoto.
-        var _localIds = new Set(localProj.map(function(p){ return String(p.id); }));
-        var _novosRemoto = projetos.filter(function(p){ return !_localIds.has(String(p.id)); });
-        state.projetos = localProj.concat(_novosRemoto);
-      } else {
-        state.projetos = projetos;
-      }
+      state.projetos = localProj.length > 0 ? localProj : projetos;
     } else if(projetos === null){
       if(localProj.length > 0) sincronizarSheets();
     }
 
     if(eventos && Array.isArray(eventos) && eventos.length > 0){
-      state.eventosAvulsos = _mergeById(localEv, eventos);
+      // Local é autoritário: se há dados locais, usar somente local.
+      // Sheets serve como backup/restauração (importar), não como fonte de merge.
+      state.eventosAvulsos = localEv.length > 0 ? localEv : eventos;
     } else if(eventos === null && localEv.length > 0){
       sincronizarSheets();
     }
@@ -597,8 +591,10 @@ async function carregarDadosAppDoSheets(){
     }
 
     // 📅 Calendário
-    var agFiltrados = (agendamentos||[]).filter(function(a){ return !state.agExcluidos||!state.agExcluidos.has(String(a.id)); });
-    state.db.agendamentos     = _mergeById(state.db.agendamentos,     agFiltrados);
+    var _localAgs = state.db.agendamentos || [];
+    if(agendamentos && Array.isArray(agendamentos) && agendamentos.length > 0){
+      state.db.agendamentos = _localAgs.length > 0 ? _localAgs : agendamentos;
+    }
     state.db.visitas          = _mergeById(state.db.visitas,          visitas);
     state.db.atendimentos     = _mergeById(state.db.atendimentos,     atendimentos);
     // 🏫 Módulo Escolar
@@ -2233,6 +2229,7 @@ function verEventoAvulso(evId){
     if(!confirm("Excluir este evento?")) return;
     state.eventosAvulsos = state.eventosAvulsos.filter(function(e){return e.id!==evId;});
     salvarLocal();
+    salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos||[]).catch(function(){});
     modal.remove();
     renderCalendar();
   };
