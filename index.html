@@ -197,6 +197,7 @@ const SHEETS_URL = "https://script.google.com/macros/s/AKfycbxKZVJcjgBSVUK7MXcH1
 // Token compartilhado com o Apps Script (defina o mesmo valor lá)
 const BCS_TOKEN = "bcs-token-secreto-2025"; // TROQUE antes de publicar
 const CONSELHO_PIN = "conselho77"; // PIN de acesso ao módulo do Conselho Comunitário
+const CRAV_BASE_URL = "https://bcs-iara.github.io/"; // URL base para links externos CRAV
 // PINs validados pelo servidor (Apps Script PropertiesService) — não ficam no HTML
 const ANTHROPIC_KEY = localStorage.getItem("bcs_anthropic_key")||"";
 
@@ -11535,10 +11536,6 @@ function renderOcorrenciasGestor(el, perfil_atual){
 // ══════════════════════════════════════════════════════════════════
 // DEVOLUTIVAS CRAV
 // ══════════════════════════════════════════════════════════════════
-
-// URL base onde os arquivos estão hospedados (configure antes de compartilhar)
-// Exemplo: "https://seuprojeto.github.io/bcs/" ou "https://sua-url.com/"
-var CRAV_BASE_URL = "https://bcs-iara.github.io/";
 
 function gerarLinkCrav(ocId){
   var oc = (state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
