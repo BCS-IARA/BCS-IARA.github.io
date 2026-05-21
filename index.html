@@ -11537,27 +11537,34 @@ function renderOcorrenciasGestor(el, perfil_atual){
 }
 
 // ══════════════════════════════════════════════════════════════════
-// DEVOLUTIVAS CRAV
+// DEVOLUTIVAS — ENCAMINHAMENTOS EXTERNOS
 // ══════════════════════════════════════════════════════════════════
 
-function gerarLinkCrav(ocId){
+var _orgaoNomes = {
+  crav:"CRAV", conselho_tutelar:"Conselho Tutelar",
+  delegacia:"Delegacia", dean:"DEAN", outros:"Órgão"
+};
+
+function gerarLinkEncaminhamento(ocId, servico){
   var oc = (state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
   if(!oc) return;
   var url = CRAV_BASE_URL + "crav-devolutiva.html"
-    + "?oc="     + encodeURIComponent(oc.id)
-    + "&nome="   + encodeURIComponent(oc.vitima_nome||"")
-    + "&bairro=" + encodeURIComponent(oc.bairro||"")
-    + "&ref="    + encodeURIComponent(oc.numero_bo||oc.id||"");
+    + "?servico=" + encodeURIComponent(servico||"crav")
+    + "&oc="      + encodeURIComponent(oc.id)
+    + "&nome="    + encodeURIComponent(oc.vitima_nome||"")
+    + "&bairro="  + encodeURIComponent(oc.bairro||"")
+    + "&ref="     + encodeURIComponent(oc.numero_bo||oc.id||"");
+  var orgNome = _orgaoNomes[servico] || "Órgão";
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url).then(function(){
-      showToast("✓ Link CRAV copiado! Cole no WhatsApp para o CRAV.");
-    }).catch(function(){
-      prompt("Copie o link e envie ao CRAV:", url);
-    });
+      showToast("✓ Link "+orgNome+" copiado! Cole no WhatsApp.");
+    }).catch(function(){ prompt("Copie e envie ao "+orgNome+":", url); });
   } else {
-    prompt("Copie o link e envie ao CRAV:", url);
+    prompt("Copie e envie ao "+orgNome+":", url);
   }
 }
+// Alias retrocompatível
+function gerarLinkCrav(ocId){ gerarLinkEncaminhamento(ocId,"crav"); }
 
 function imprimirFichaCrav(ocId){
   var oc = (state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
@@ -12188,8 +12195,15 @@ function abrirMonitorVCM(ocId){
   hf.push("<div style='padding:18px 20px;border-bottom:1px solid #5e4636;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#3c2818;z-index:1;border-radius:16px 16px 0 0'>");
   hf.push("<div><p style='color:#ff1493;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0 0 2px'>Monitor VCM</p>");
   hf.push("<p style='color:#f2eada;font-size:14px;font-weight:700;margin:0'>"+(ocVcm.vitima_nome||"Vítima")+"</p></div>");
-  hf.push("<div style='display:flex;gap:8px;align-items:center'>");
-  hf.push("<button onclick='gerarLinkCrav(\""+ocVcm.id+"\")' title='Gerar link para CRAV preencher devolutiva' style='background:#2d0a4a;border:1px solid #a855f7;color:#c084fc;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap'>🔗 Link CRAV</button>");
+  hf.push("<div style='display:flex;gap:6px;align-items:center'>");
+  hf.push("<select onchange='if(this.value)gerarLinkEncaminhamento(\""+ocVcm.id+"\",this.value);this.value=\"\"' style='background:#2a1c10;border:1px solid #a855f777;color:#c084fc;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;outline:none'>");
+  hf.push("<option value=''>🔗 Encaminhar...</option>");
+  hf.push("<option value='crav'>💜 CRAV</option>");
+  hf.push("<option value='conselho_tutelar'>👶 Conselho Tutelar</option>");
+  hf.push("<option value='delegacia'>🚔 Delegacia</option>");
+  hf.push("<option value='dean'>🧒 DEAN</option>");
+  hf.push("<option value='outros'>🏛 Outros</option>");
+  hf.push("</select>");
   hf.push("<button onclick='document.getElementById(\"modal-frida\").remove()' style='background:#42301e;border:1px solid #5e4636;color:#a07c58;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer'>✕</button>");
   hf.push("</div>");
   hf.push("</div><div style='padding:20px'>");
