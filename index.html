@@ -10981,6 +10981,23 @@ function gerarJanelaPDF(oc){
     h+="</div>";
   }
 
+  // ── Link CRAV (apenas casos VCM)
+  if(temVd || temMp){
+    var _cUrl = CRAV_BASE_URL + "crav-devolutiva.html"
+      + "?oc="     + encodeURIComponent(oc.id)
+      + "&nome="   + encodeURIComponent(oc.vitima_nome||"")
+      + "&bairro=" + encodeURIComponent(oc.bairro||"")
+      + "&ref="    + encodeURIComponent(oc.numero_bo||oc.id||"");
+    var _qUrl = "https://api.qrserver.com/v1/create-qr-code/?size=110x110&margin=4&data=" + encodeURIComponent(_cUrl);
+    h+="<div style='margin-top:18px;border:1.5px solid #c4b5fd;border-radius:6px;padding:12px 14px;background:#f5f0ff;display:flex;gap:14px;align-items:flex-start;page-break-inside:avoid'>";
+    h+="<img src='"+_qUrl+"' width='100' height='100' style='border-radius:4px;flex-shrink:0' alt='QR Code'/>";
+    h+="<div style='flex:1'>";
+    h+="<p style='font-size:10px;font-weight:700;color:#6d28d9;text-transform:uppercase;letter-spacing:.5px;margin:0 0 4px'>💜 Encaminhamento ao CRAV — Devolutiva Digital</p>";
+    h+="<p style='font-size:10px;color:#4c1d95;margin:0 0 6px;line-height:1.5'>Após o atendimento, a técnica do CRAV deve escanear o QR Code ou acessar o link para registrar a devolutiva diretamente na ficha desta assistida.</p>";
+    h+="<div style='background:#ede9fe;border:1px solid #c4b5fd;border-radius:3px;padding:4px 7px;font-family:monospace;font-size:9px;color:#6d28d9;word-break:break-all'>"+_cUrl+"</div>";
+    h+="</div></div>";
+  }
+
   // ── Rodapé
   h+="<div style='margin-top:20px;border-top:1px solid #ccc;padding-top:8px;display:flex;justify-content:space-between;align-items:flex-end'>";
   h+="<p style='font-size:8px;color:#aaa'>CONFIDENCIAL — USO RESTRITO À 77ª CIPM</p>";
