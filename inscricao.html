@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inscrição — 77ª CIPM BCS</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ background:#0f0a06; color:#f5ede0; font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; }
+  .topo{ background:linear-gradient(135deg,#1a1000,#2a1c10); border-bottom:2px solid #d4a87a44; padding:18px 20px; text-align:center; }
+  .topo-logo{ font-size:28px; margin-bottom:4px; }
+  .topo-titulo{ color:#d4a87a; font-size:13px; font-weight:700; letter-spacing:2px; text-transform:uppercase; }
+  .topo-sub{ color:#5e4636; font-size:11px; margin-top:2px; }
+  .card{ background:#1a1000; border:2px solid var(--cor,#d4a87a); border-radius:16px; max-width:480px; margin:24px auto; padding:24px; }
+  .proj-header{ border-bottom:1px solid #2a1c10; padding-bottom:16px; margin-bottom:20px; }
+  .proj-nome{ color:#f5ede0; font-size:20px; font-weight:800; margin-bottom:6px; }
+  .proj-meta{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .proj-tag{ background:#2a1c10; border:1px solid #3a2818; color:#8a6a4a; padding:4px 10px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:4px; }
+  label.campo{ display:block; margin-bottom:14px; }
+  label.campo span{ color:#8a6a4a; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; display:block; margin-bottom:5px; }
+  label.campo span em{ color:#ef4444; font-style:normal; }
+  input[type=text], input[type=tel], textarea{
+    width:100%; background:#2a1c10; border:1px solid #3a2818; color:#f5ede0;
+    padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; outline:none;
+    transition:border-color .2s;
+  }
+  input[type=text]:focus, input[type=tel]:focus, textarea:focus{ border-color:var(--cor,#d4a87a); }
+  .cursos-lista{ display:flex; flex-direction:column; gap:8px; }
+  .curso-item{ display:flex; align-items:center; gap:10px; background:#2a1c10; border:1px solid #3a2818; border-radius:8px; padding:10px 12px; cursor:pointer; transition:border-color .2s; }
+  .curso-item:has(input:checked){ border-color:var(--cor,#d4a87a); background:#36221a; }
+  .curso-item input[type=checkbox]{ width:16px; height:16px; accent-color:var(--cor,#d4a87a); flex-shrink:0; cursor:pointer; }
+  .curso-item label{ color:#f5ede0; font-size:13px; cursor:pointer; flex:1; }
+  .btn-enviar{ width:100%; background:linear-gradient(135deg,var(--cor,#d4a87a),var(--cor2,#a8882b)); border:none; color:#1a0d00; padding:14px; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer; margin-top:6px; letter-spacing:.5px; }
+  .btn-enviar:disabled{ opacity:.5; cursor:not-allowed; }
+  .sucesso{ text-align:center; padding:32px 16px; display:none; }
+  .sucesso .icon{ font-size:56px; margin-bottom:12px; }
+  .sucesso h2{ color:var(--cor,#d4a87a); font-size:20px; margin-bottom:8px; }
+  .sucesso p{ color:#8a6a4a; font-size:13px; line-height:1.6; }
+  .erro-msg{ color:#ef4444; font-size:11px; margin-top:4px; display:none; }
+  @media(max-width:520px){ .card{ margin:12px; padding:18px; } }
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <div class="topo-logo">⚔️</div>
+  <div class="topo-titulo">77ª CIPM — BCS</div>
+  <div class="topo-sub">Polícia Militar da Bahia · Vitória da Conquista</div>
+</div>
+
+<div class="card" id="card-form">
+  <div class="proj-header" id="proj-info">
+    <div class="proj-nome" id="proj-nome">Carregando...</div>
+    <div class="proj-meta" id="proj-meta"></div>
+  </div>
+
+  <form id="form-inscricao" onsubmit="enviarInscricao(event)">
+
+    <!-- Nome -->
+    <label class="campo">
+      <span>Nome completo <em>*</em></span>
+      <input type="text" id="f-nome" placeholder="Seu nome completo" required autocomplete="name"/>
+    </label>
+
+    <!-- Telefone -->
+    <label class="campo">
+      <span>WhatsApp / Telefone <em>*</em></span>
+      <input type="tel" id="f-tel" placeholder="(77) 99999-9999" required autocomplete="tel"/>
+    </label>
+
+    <!-- Cursos -->
+    <div class="campo" id="bloco-cursos" style="display:none">
+      <span>Cursos de interesse <em>*</em></span>
+      <div class="cursos-lista" id="lista-cursos"></div>
+      <div class="erro-msg" id="erro-cursos">Selecione pelo menos um curso</div>
+    </div>
+
+    <!-- Sugestão -->
+    <label class="campo">
+      <span>Sugira um novo curso ou atividade</span>
+      <textarea id="f-sugestao" rows="2" placeholder="Se quiser ver outro curso ou atividade, escreva aqui..."></textarea>
+    </label>
+
+    <button type="submit" class="btn-enviar" id="btn-enviar">✅ Confirmar Inscrição</button>
+  </form>
+
+  <div class="sucesso" id="bloco-sucesso">
+    <div class="icon">🎉</div>
+    <h2>Inscrição confirmada!</h2>
+    <p id="msg-sucesso">Sua inscrição foi registrada com sucesso.<br>Aguarde mais informações pelo WhatsApp.</p>
+  </div>
+</div>
+
+<script>
+// ── Lê parâmetros da URL ────────────────────────────
+var params = new URLSearchParams(location.search);
+var PROJ_ID     = params.get("projeto") || "";
+var PROJ_NOME   = params.get("nome")    || "Projeto";
+var PROJ_LOCAL  = params.get("local")   || "";
+var PROJ_DATA   = params.get("data")    || "";
+var PROJ_HOR    = params.get("horario") || "";
+var PROJ_CURSOS = params.get("cursos")  || "";
+var SHEETS_URL  = params.get("sheets")  || "";
+var TOKEN       = params.get("token")   || "";
+var COR         = params.get("cor")     || "#d4a87a";
+var COR2        = params.get("cor2")    || "#a8882b";
+
+// Aplicar cor do projeto
+document.documentElement.style.setProperty("--cor",  COR);
+document.documentElement.style.setProperty("--cor2", COR2);
+
+// Preencher cabeçalho do projeto
+document.getElementById("proj-nome").textContent = PROJ_NOME;
+document.title = "Inscrição — " + PROJ_NOME;
+
+var meta = document.getElementById("proj-meta");
+if(PROJ_DATA){
+  var dtFmt = new Date(PROJ_DATA+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+  meta.innerHTML += "<span class='proj-tag'>📅 " + dtFmt + "</span>";
+}
+if(PROJ_HOR)   meta.innerHTML += "<span class='proj-tag'>🕘 " + PROJ_HOR + "</span>";
+if(PROJ_LOCAL) meta.innerHTML += "<span class='proj-tag'>📍 " + PROJ_LOCAL + "</span>";
+
+// Preencher lista de cursos
+var cursosArr = PROJ_CURSOS ? PROJ_CURSOS.split("|").map(function(c){ return c.trim(); }).filter(Boolean) : [];
+var listaCursos = document.getElementById("lista-cursos");
+var blocoCursos = document.getElementById("bloco-cursos");
+
+if(cursosArr.length > 0){
+  blocoCursos.style.display = "block";
+  cursosArr.forEach(function(c, i){
+    var item = document.createElement("div");
+    item.className = "curso-item";
+    item.innerHTML = "<input type='checkbox' id='c" + i + "' name='curso' value='" + c.replace(/'/g,"&#39;") + "'>" +
+                     "<label for='c" + i + "'>" + c + "</label>";
+    item.querySelector("label").addEventListener("click", function(){
+      item.querySelector("input").click();
+    });
+    listaCursos.appendChild(item);
+  });
+}
+
+// ── Enviar inscrição ────────────────────────────────
+function enviarInscricao(e){
+  e.preventDefault();
+  var nome = document.getElementById("f-nome").value.trim();
+  var tel  = document.getElementById("f-tel").value.trim();
+  var sug  = document.getElementById("f-sugestao").value.trim();
+
+  // Cursos selecionados
+  var selecionados = Array.from(document.querySelectorAll("input[name=curso]:checked")).map(function(el){ return el.value; });
+  if(cursosArr.length > 0 && selecionados.length === 0){
+    document.getElementById("erro-cursos").style.display = "block";
+    return;
+  }
+  document.getElementById("erro-cursos").style.display = "none";
+
+  var btn = document.getElementById("btn-enviar");
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
+  var dados = {
+    projeto_id:   PROJ_ID,
+    projeto_nome: PROJ_NOME,
+    nome:         nome,
+    telefone:     tel,
+    cursos:       selecionados.join(", "),
+    sugestao:     sug,
+    data_inscricao: new Date().toISOString(),
+    origem:       "qr_card"
+  };
+
+  // Envio via JSONP (mesmo padrão do CRAV)
+  if(SHEETS_URL && TOKEN){
+    var cbName = "cb_insc_" + Date.now();
+    window[cbName] = function(resp){
+      delete window[cbName];
+      clearTimeout(tmout);
+      mostrarSucesso(nome, selecionados);
+    };
+    var tmout = setTimeout(function(){
+      // Timeout — mostrar sucesso mesmo assim (offline resiliente)
+      mostrarSucesso(nome, selecionados);
+    }, 8000);
+    var script = document.createElement("script");
+    script.src = SHEETS_URL + "?acao=salvar&tipo=inscricoes_projetos&dados=" +
+      encodeURIComponent(JSON.stringify(dados)) +
+      "&token=" + encodeURIComponent(TOKEN) +
+      "&callback=" + cbName;
+    script.onerror = function(){ clearTimeout(tmout); mostrarSucesso(nome, selecionados); };
+    document.head.appendChild(script);
+  } else {
+    // Sem URL do Sheets configurada (preview local)
+    setTimeout(function(){ mostrarSucesso(nome, selecionados); }, 800);
+  }
+}
+
+function mostrarSucesso(nome, cursos){
+  document.getElementById("form-inscricao").style.display = "none";
+  var bloco = document.getElementById("bloco-sucesso");
+  bloco.style.display = "block";
+  var msg = nome.split(" ")[0] + ", sua inscrição foi registrada com sucesso!";
+  if(cursos.length) msg += "<br><br>Curso(s) selecionado(s):<br><strong>" + cursos.join(", ") + "</strong>";
+  msg += "<br><br>Em breve entraremos em contato pelo WhatsApp.";
+  document.getElementById("msg-sucesso").innerHTML = msg;
+}
+</script>
+</body>
+</html>

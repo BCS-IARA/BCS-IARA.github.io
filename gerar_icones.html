@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Gerar Ícones IARA PWA</title>
+<style>
+  body{background:#0f0a06;color:#f5ede0;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;margin:0}
+  h2{color:#d4a87a;margin:0}
+  .btns{display:flex;gap:12px}
+  button{background:linear-gradient(135deg,#8a5a1a,#6a3a0a);border:none;color:#f5ede0;padding:12px 28px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer}
+  canvas{border:2px solid #d4a87a44;border-radius:12px}
+  #status{color:#8a6a4a;font-size:13px}
+</style>
+</head>
+<body>
+<h2>⚔️ Gerador de Ícones — IARA BCS PWA</h2>
+<canvas id="c192" width="192" height="192"></canvas>
+<div id="status">Gerando ícones...</div>
+<div class="btns">
+  <button onclick="baixar(192)">⬇ Baixar icon-192.png</button>
+  <button onclick="baixar(512)">⬇ Baixar icon-512.png</button>
+</div>
+<p style="color:#5e4636;font-size:11px;max-width:400px;text-align:center">
+  Baixe os dois arquivos e salve na pasta <strong style="color:#d4a87a">BCS</strong> (mesma pasta do index.html).
+  Depois pode fechar esta página.
+</p>
+
+<script>
+function desenharIcone(canvas, size){
+  canvas.width = size;
+  canvas.height = size;
+  var ctx = canvas.getContext('2d');
+  var cx = size/2, cy = size/2, r = size/2;
+
+  // Fundo círculo com gradiente
+  var grad = ctx.createRadialGradient(cx, cy*0.7, 0, cx, cy, r);
+  grad.addColorStop(0, '#3a2010');
+  grad.addColorStop(1, '#1a1000');
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Borda dourada
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - size*0.015, 0, Math.PI*2);
+  ctx.strokeStyle = '#d4a87a';
+  ctx.lineWidth = size * 0.03;
+  ctx.stroke();
+
+  // Borda interna sutil
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - size*0.055, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(212,168,122,0.25)';
+  ctx.lineWidth = size * 0.008;
+  ctx.stroke();
+
+  // Espada — lâmina
+  var sw  = size * 0.07;   // largura
+  var sh  = size * 0.62;   // comprimento total
+  var tip = cy - sh*0.58;  // ponta (cima)
+  var bot = cy + sh*0.42;  // cabo (baixo)
+
+  ctx.save();
+  // Lâmina gradiente (brilho central)
+  var bladeGrad = ctx.createLinearGradient(cx - sw/2, 0, cx + sw/2, 0);
+  bladeGrad.addColorStop(0,   'rgba(180,130,60,0.8)');
+  bladeGrad.addColorStop(0.35,'rgba(240,200,120,1)');
+  bladeGrad.addColorStop(0.5, 'rgba(255,235,180,1)');
+  bladeGrad.addColorStop(0.65,'rgba(240,200,120,1)');
+  bladeGrad.addColorStop(1,   'rgba(180,130,60,0.8)');
+
+  // Forma da lâmina (afunila até a ponta)
+  ctx.beginPath();
+  ctx.moveTo(cx - sw/2, bot - sh*0.05);   // base esquerda
+  ctx.lineTo(cx + sw/2, bot - sh*0.05);   // base direita
+  ctx.lineTo(cx + sw*0.08, tip);           // ponta direita
+  ctx.lineTo(cx - sw*0.08, tip);           // ponta esquerda
+  ctx.closePath();
+  ctx.fillStyle = bladeGrad;
+  ctx.fill();
+
+  // Guarda (crossguard)
+  var gw = size * 0.38;
+  var gh = size * 0.065;
+  var gy = cy - sh*0.04;
+  var guardGrad = ctx.createLinearGradient(0, gy, 0, gy+gh);
+  guardGrad.addColorStop(0, '#e8c070');
+  guardGrad.addColorStop(0.5, '#d4a87a');
+  guardGrad.addColorStop(1, '#a07840');
+
+  ctx.beginPath();
+  // Forma arredondada da guarda
+  var gr = gh/2;
+  ctx.moveTo(cx - gw/2 + gr, gy);
+  ctx.lineTo(cx + gw/2 - gr, gy);
+  ctx.quadraticCurveTo(cx + gw/2, gy, cx + gw/2, gy + gr);
+  ctx.lineTo(cx + gw/2, gy + gh - gr);
+  ctx.quadraticCurveTo(cx + gw/2, gy+gh, cx + gw/2 - gr, gy+gh);
+  ctx.lineTo(cx - gw/2 + gr, gy+gh);
+  ctx.quadraticCurveTo(cx - gw/2, gy+gh, cx - gw/2, gy+gh-gr);
+  ctx.lineTo(cx - gw/2, gy+gr);
+  ctx.quadraticCurveTo(cx - gw/2, gy, cx - gw/2+gr, gy);
+  ctx.closePath();
+  ctx.fillStyle = guardGrad;
+  ctx.fill();
+
+  // Cabo (grip)
+  var pw = sw * 0.75;
+  var ph = sh * 0.22;
+  var py = bot - ph - sh*0.05;
+  ctx.beginPath();
+  ctx.roundRect(cx - pw/2, py, pw, ph, pw*0.3);
+  ctx.fillStyle = '#3a2010';
+  ctx.fill();
+  ctx.strokeStyle = '#8a5a2a';
+  ctx.lineWidth = size * 0.01;
+  ctx.stroke();
+
+  // Linhas decorativas no cabo
+  for(var i=1; i<4; i++){
+    ctx.beginPath();
+    ctx.moveTo(cx - pw/2 + size*0.005, py + ph*i/4);
+    ctx.lineTo(cx + pw/2 - size*0.005, py + ph*i/4);
+    ctx.strokeStyle = 'rgba(212,168,122,0.35)';
+    ctx.lineWidth = size*0.008;
+    ctx.stroke();
+  }
+
+  // Pomo (pommel) — bolinha na base
+  var pomR = sw * 0.8;
+  var pomY = bot;
+  var pomGrad = ctx.createRadialGradient(cx - pomR*0.2, pomY - pomR*0.3, 0, cx, pomY, pomR);
+  pomGrad.addColorStop(0, '#f0d080');
+  pomGrad.addColorStop(1, '#8a5820');
+  ctx.beginPath();
+  ctx.arc(cx, pomY, pomR, 0, Math.PI*2);
+  ctx.fillStyle = pomGrad;
+  ctx.fill();
+
+  ctx.restore();
+
+  // Texto "77" pequeno abaixo da guarda
+  var fontSize = size * 0.11;
+  ctx.font = 'bold ' + fontSize + 'px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(212,168,122,0.6)';
+  ctx.fillText('77', cx, cy + sh*0.14);
+}
+
+// Gerar preview 192
+var c = document.getElementById('c192');
+desenharIcone(c, 192);
+document.getElementById('status').textContent = '✅ Ícone gerado! Baixe os dois tamanhos abaixo.';
+
+// Gerar 512 em canvas oculto
+var c512 = document.createElement('canvas');
+desenharIcone(c512, 512);
+
+function baixar(size){
+  var canvas = size === 192 ? document.getElementById('c192') : c512;
+  var a = document.createElement('a');
+  a.download = 'icon-' + size + '.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+// Download automático ao carregar
+window.onload = function(){
+  setTimeout(function(){ baixar(192); }, 500);
+  setTimeout(function(){ baixar(512); }, 1000);
+};
+</script>
+</body>
+</html>
