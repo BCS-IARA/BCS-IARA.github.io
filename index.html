@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
@@ -312,6 +312,9 @@ function salvarLocal() {
     if(state.inscricoesProjetos) localStorage.setItem("bcs_inscricoes_projetos",JSON.stringify(state.inscricoesProjetos));
     if(state.chamadas) localStorage.setItem("bcs_chamadas",JSON.stringify(state.chamadas));
     if(state.cargasArmamento) localStorage.setItem("bcs_cargas_armamento",JSON.stringify(state.cargasArmamento));
+    if(state.materiaisPatrimonio) localStorage.setItem("bcs_materiais_patrimonio",JSON.stringify(state.materiaisPatrimonio));
+    if(state.policiais) localStorage.setItem("bcs_policiais",JSON.stringify(state.policiais));
+    if(state.solicitacoes) localStorage.setItem("bcs_solicitacoes",JSON.stringify(state.solicitacoes));
     if(state.escolas) localStorage.setItem("bcs_escolas",JSON.stringify(state.escolas));
     if(state.visitasEscolares) localStorage.setItem("bcs_visitas_escolares",JSON.stringify(state.visitasEscolares));
     if(state.atividadesEscolares) localStorage.setItem("bcs_atividades_escolares",JSON.stringify(state.atividadesEscolares));
@@ -904,6 +907,9 @@ let state = {
   inscricoesProjetos: JSON.parse(localStorage.getItem("bcs_inscricoes_projetos")||"[]"),
   chamadas: JSON.parse(localStorage.getItem("bcs_chamadas")||"[]"),
   cargasArmamento: JSON.parse(localStorage.getItem("bcs_cargas_armamento")||"[]"),
+  materiaisPatrimonio: JSON.parse(localStorage.getItem("bcs_materiais_patrimonio")||"[]"),
+  policiais: JSON.parse(localStorage.getItem("bcs_policiais")||"[]"),
+  solicitacoes: JSON.parse(localStorage.getItem("bcs_solicitacoes")||"[]"),
   instrutorNome: "",  // preenchido no login, não persistido
   alertasCrescimento: JSON.parse(localStorage.getItem("bcs_alertas_crescimento")||"[]"),
   escolas: JSON.parse(localStorage.getItem("bcs_escolas")||"[]"),
@@ -7692,15 +7698,578 @@ function verAlertaCrescimento(id){
         "<p style='color:#c8c0a8;font-size:12px;line-height:1.8;margin:0;white-space:pre-wrap'>"+alerta.relatorio+"</p>" +
       "</div>" +
       // Botões
-      "<div style='display:flex;gap:8px'>" +
-        "<button onclick='document.getElementById(\"modal-alerta-crime\").remove();state._cmdTab=\"crime\";renderDashComandante(document.getElementById(\"main\"))' style='flex:1;background:#2a1c10;border:1px solid #d4a87a;color:#d4a87a;padding:10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>📊 Ver Painel de Criminalidade</button>" +
-        "<button onclick='document.getElementById(\"modal-alerta-crime\").remove()' style='background:#0a0a0a;border:1px solid #3a2a1a;color:#5e4636;padding:10px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>Fechar</button>" +
+      "<div style='display:flex;gap:8px;flex-wrap:wrap'>" +
+        "<button onclick='_verOcsAlerta(\""+alerta.id+"\")' style='flex:2;background:#1a0808;border:2px solid #ef4444;color:#fca5a5;padding:10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>📋 Ver Ocorrências ("+alerta.atual+")</button>" +
+        "<button onclick='document.getElementById(\"modal-alerta-crime\").remove();state._cmdTab=\"crime\";renderDashComandante(document.getElementById(\"main\"))' style='flex:1;background:#2a1c10;border:1px solid #d4a87a;color:#d4a87a;padding:10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>📊 Painel</button>" +
+        "<button onclick='document.getElementById(\"modal-alerta-crime\").remove()' style='background:#0a0a0a;border:1px solid #3a2a1a;color:#5e4636;padding:10px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>×</button>" +
       "</div>" +
     "</div>";
   document.body.appendChild(modal);
 
   // Atualizar badge do nav
   if(state.tela==="dashcomandante") renderDashComandante(document.getElementById("main"));
+}
+
+function _verOcsAlerta(id){
+  var alerta = (state.alertasCrescimento||[]).find(function(a){ return a.id===id; });
+  if(!alerta){ alert("Alerta não encontrado."); return; }
+
+  // Calcular janela de tempo do período do alerta
+  var hoje = new Date(); hoje.setHours(23,59,59,999);
+  var corte = new Date();
+  if(alerta.periodo==="semana"){
+    corte.setDate(corte.getDate()-7);
+  } else {
+    // mês atual
+    corte = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  }
+  corte.setHours(0,0,0,0);
+
+  var tipoCrime = norm(alerta.tipo_crime||"");
+  var ocs = (state.db && state.db.ocorrencias ? state.db.ocorrencias : []).filter(function(o){
+    var dt = _pdLocal(o.data);
+    if(!dt || dt < corte || dt > hoje) return false;
+    return norm(o.tipo||"") === tipoCrime ||
+           norm(o.tipo||"").indexOf(tipoCrime) !== -1 ||
+           tipoCrime.indexOf(norm(o.tipo||"")) !== -1;
+  }).sort(function(a,b){
+    var da=_pdLocal(a.data), db=_pdLocal(b.data);
+    return (db||0)-(da||0);
+  });
+
+  // Remover modal anterior se existir
+  var antigo = document.getElementById("modal-ver-ocs-alerta");
+  if(antigo) antigo.remove();
+
+  var modal = document.createElement("div");
+  modal.id = "modal-ver-ocs-alerta";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto";
+
+  var h = [];
+  h.push("<div style='background:#111;border:1px solid #ef444455;border-radius:14px;max-width:680px;width:100%;padding:24px;position:relative'>");
+
+  // Cabeçalho
+  h.push("<div style='display:flex;align-items:center;gap:12px;margin-bottom:18px'>");
+  h.push("<span style='font-size:26px'>🚨</span>");
+  h.push("<div style='flex:1'>");
+  h.push("<h3 style='color:#fca5a5;font-size:17px;font-weight:800;margin:0'>Ocorrências — "+esc(alerta.tipo_crime)+"</h3>");
+  var perLabel = alerta.periodo==="semana" ? "últimos 7 dias" : "mês atual";
+  h.push("<p style='color:#5e3030;font-size:12px;margin:2px 0 0'>"+perLabel+" · "+ocs.length+" registro"+(ocs.length!==1?"s":"")+" encontrado"+(ocs.length!==1?"s":"")+"</p>");
+  h.push("</div>");
+  h.push("<button onclick='document.getElementById(\"modal-ver-ocs-alerta\").remove()' style='background:none;border:none;color:#5e3030;font-size:22px;cursor:pointer;padding:4px 8px'>×</button>");
+  h.push("</div>");
+
+  if(ocs.length===0){
+    h.push("<div style='text-align:center;padding:40px 0;color:#5e3030;font-size:14px'>Nenhuma ocorrência encontrada para este período.</div>");
+  } else {
+    ocs.forEach(function(o){
+      var vitima  = esc(o.vitima_nome||"—");
+      var susp    = esc(o.suspeito_nome||o.suspeito||"—");
+      var bairro  = esc(o.bairro||o.local||"—");
+      var data    = esc(o.data||"—");
+      var hora    = esc(o.hora||"");
+      var tipo    = esc(o.tipo||"—");
+      h.push("<div style='background:#1a0808;border:1px solid #7f1d1d55;border-radius:9px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:background .15s' onmouseover=\"this.style.background='#2a0d0d'\" onmouseout=\"this.style.background='#1a0808'\" onclick='_abrirOcDoAlerta(\""+esc(o.id||"")+"\")'>"+
+        "<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px'>"+
+          "<span style='background:#7f1d1d;color:#fca5a5;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700'>"+tipo+"</span>"+
+          "<span style='color:#5e3030;font-size:11px'>"+data+(hora?" às "+hora:"")+"</span>"+
+        "</div>"+
+        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px'>"+
+          "<div style='font-size:12px;color:#c8a0a0'><span style='color:#5e3030'>📍</span> "+bairro+"</div>"+
+          "<div style='font-size:12px;color:#c8a0a0'><span style='color:#5e3030'>👤 Vítima: </span>"+vitima+"</div>"+
+          "<div style='font-size:12px;color:#c8a0a0'><span style='color:#5e3030'>🔍 Suspeito: </span>"+susp+"</div>"+
+        "</div>"+
+        "<div style='margin-top:6px;text-align:right'>"+
+            "<span style='color:#ef4444;font-size:11px;font-weight:700'>Ver detalhes →</span>"+
+        "</div>"+
+      "</div>");
+    });
+  }
+
+  h.push("</div>");
+  modal.innerHTML = h.join("");
+
+  // Fechar ao clicar no fundo
+  modal.addEventListener("click", function(e){
+    if(e.target===modal) modal.remove();
+  });
+
+  document.body.appendChild(modal);
+}
+
+function _abrirOcDoAlerta(ocId){
+  // Fecha os modais de alerta abertos
+  var m1 = document.getElementById("modal-alerta-crime");
+  var m2 = document.getElementById("modal-ver-ocs-alerta");
+  if(m1) m1.remove();
+  if(m2) m2.remove();
+  // Abre o detalhe da ocorrência
+  state.popEditarOc = ocId;
+  state.tela = "ocorrencias";
+  var main = document.getElementById("main");
+  renderOcorrenciasGestor(main);
+}
+
+// ═══════════════════════════════════════════════════════
+//  MÓDULO SOLICITAÇÕES — Gestor
+// ═══════════════════════════════════════════════════════
+
+function renderSolicitacoesGestor(main){
+  var IS = "background:#070d1a;border:1px solid #2a1c10;color:#e8d8c0;padding:8px 11px;border-radius:7px;font-size:12px;outline:none;font-family:inherit";
+  var sols = (state.solicitacoes||[]).slice().sort(function(a,b){
+    return (b.data_registro||"") > (a.data_registro||"") ? 1 : -1;
+  });
+
+  // Filtro ativo
+  var f = state._solF || (state._solF = {busca:"",status:"",assunto:""});
+
+  // Estatísticas
+  var nPend   = sols.filter(function(s){ return s.status==="pendente"; }).length;
+  var nDefer  = sols.filter(function(s){ return s.status==="deferido"; }).length;
+  var nIndefer= sols.filter(function(s){ return s.status==="indeferido"; }).length;
+
+  var h = [];
+  h.push("<div style='max-width:900px;margin:0 auto;padding:20px 16px'>");
+
+  // Cabeçalho
+  h.push("<div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px'>");
+  h.push("<div style='display:flex;align-items:center;gap:12px'>");
+  h.push("<span style='font-size:28px'>📄</span>");
+  h.push("<div><h2 style='color:#d4a87a;font-size:18px;font-weight:800;margin:0'>Termos de Solicitação</h2>");
+  h.push("<p style='color:#5e4636;font-size:11px;margin:2px 0 0'>Gerenciamento de solicitações dos PMs</p></div>");
+  h.push("</div>");
+  h.push("<button onclick='_solGerarQR()' style='background:linear-gradient(135deg,#1a0e00,#2a1808);border:1px solid #d4a87a;color:#d4a87a;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>🔗 Link / QR</button>");
+  h.push("</div>");
+
+  // Cards KPI
+  h.push("<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px'>");
+  var kpis=[["🟡","Pendentes",nPend,"#d4a87a"],["✅","Deferidos",nDefer,"#22c55e"],["❌","Indeferidos",nIndefer,"#ef4444"]];
+  kpis.forEach(function(k){
+    h.push("<div style='background:#0f1a2e;border:1px solid "+k[3]+"33;border-radius:10px;padding:12px;text-align:center'>");
+    h.push("<div style='font-size:22px'>"+k[0]+"</div>");
+    h.push("<div style='color:"+k[3]+";font-size:20px;font-weight:800'>"+k[2]+"</div>");
+    h.push("<div style='color:#5e4636;font-size:10px;font-weight:700;text-transform:uppercase'>"+k[1]+"</div>");
+    h.push("</div>");
+  });
+  h.push("</div>");
+
+  // Filtros
+  h.push("<div style='display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px'>");
+  h.push("<input type='text' placeholder='🔍  Nome, matrícula, assunto…' value='"+esc(f.busca||"")+"' oninput=\"state._solF.busca=this.value;renderSolicitacoesGestor(document.getElementById('main'))\" style='"+IS+";flex:2;min-width:180px'/>");
+  h.push("<select onchange=\"state._solF.status=this.value;renderSolicitacoesGestor(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:130px'>");
+  h.push("<option value=''"+(f.status===""?" selected":"")+" >Todos os status</option>");
+  h.push("<option value='pendente'"+(f.status==="pendente"?" selected":"")+">🟡 Pendentes</option>");
+  h.push("<option value='deferido'"+(f.status==="deferido"?" selected":"")+">✅ Deferidos</option>");
+  h.push("<option value='indeferido'"+(f.status==="indeferido"?" selected":"")+">❌ Indeferidos</option>");
+  h.push("</select>");
+  if(f.busca||f.status) h.push("<button onclick=\"state._solF={busca:'',status:''};renderSolicitacoesGestor(document.getElementById('main'))\" style='background:none;border:1px solid #3a1a1a;color:#6a3a3a;padding:8px 12px;border-radius:7px;font-size:11px;cursor:pointer'>✕ Limpar</button>");
+  h.push("</div>");
+
+  // Aplicar filtros
+  var lista = sols.filter(function(s){
+    if(f.status && s.status!==f.status) return false;
+    if(f.busca){
+      var b = f.busca.toLowerCase();
+      if((s.nome||"").toLowerCase().indexOf(b)<0 &&
+         (s.matricula||"").toLowerCase().indexOf(b)<0 &&
+         (s.assunto||"").toLowerCase().indexOf(b)<0 &&
+         (s.protocolo||"").toLowerCase().indexOf(b)<0) return false;
+    }
+    return true;
+  });
+
+  if(lista.length===0){
+    h.push("<div style='text-align:center;padding:60px 20px;color:#3a2a1a'>");
+    h.push("<div style='font-size:40px;margin-bottom:10px'>📭</div>");
+    h.push("<div style='font-size:14px'>Nenhuma solicitação encontrada.</div>");
+    h.push("</div>");
+  } else {
+    lista.forEach(function(s){
+      var corStatus = s.status==="deferido"?"#22c55e":s.status==="indeferido"?"#ef4444":"#d4a87a";
+      var icStatus  = s.status==="deferido"?"✅":s.status==="indeferido"?"❌":"🟡";
+      var labelStatus = s.status==="deferido"?"DEFERIDO":s.status==="indeferido"?"INDEFERIDO":"PENDENTE";
+      h.push("<div onclick='_solAbrirDetalhe(\""+esc(s.protocolo)+"\")' style='background:#0f1a2e;border:1px solid "+corStatus+"44;border-left:4px solid "+corStatus+";border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:background .15s' onmouseover=\"this.style.background='#162040'\" onmouseout=\"this.style.background='#0f1a2e'\">");
+      h.push("<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px'>");
+      h.push("<div style='flex:1'>");
+      h.push("<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap'>");
+      h.push("<span style='color:#d4a87a;font-size:13px;font-weight:800'>"+esc(s.assunto||"—")+"</span>");
+      h.push("<span style='background:"+corStatus+"22;border:1px solid "+corStatus+"55;color:"+corStatus+";padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700'>"+icStatus+" "+labelStatus+"</span>");
+      h.push("</div>");
+      h.push("<div style='color:#8a6848;font-size:11px;margin-top:3px'>"+esc(s.nome||"—")+"  ·  Mat. "+esc(s.matricula||"—")+"</div>");
+      h.push("</div>");
+      h.push("<div style='text-align:right;color:#5e4636;font-size:11px;white-space:nowrap'>");
+      h.push("<div>"+esc(s.data||"—")+"</div>");
+      h.push("<div style='font-family:monospace;font-size:10px;margin-top:2px'>"+esc(s.protocolo||"")+"</div>");
+      h.push("</div>");
+      h.push("</div>");
+      h.push("<div style='color:#5e4636;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:550px'>"+esc((s.texto||"").substring(0,120))+"…</div>");
+      h.push("<div style='margin-top:6px;text-align:right;color:#d4a87a;font-size:11px;font-weight:700'>Ver / Deferir →</div>");
+      h.push("</div>");
+    });
+  }
+
+  h.push("</div>");
+  main.innerHTML = h.join("");
+}
+
+// ── Abrir detalhe / deferir ───────────────────────────
+function _solAbrirDetalhe(protocolo){
+  var s = (state.solicitacoes||[]).find(function(x){ return x.protocolo===protocolo; });
+  if(!s){ alert("Solicitação não encontrada."); return; }
+
+  var antigo = document.getElementById("modal-sol-detalhe");
+  if(antigo) antigo.remove();
+
+  var corStatus = s.status==="deferido"?"#22c55e":s.status==="indeferido"?"#ef4444":"#d4a87a";
+
+  var modal = document.createElement("div");
+  modal.id = "modal-sol-detalhe";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:20px 12px;overflow-y:auto";
+
+  var h = [];
+  h.push("<div style='background:#0f1a2e;border:1px solid "+corStatus+"44;border-radius:14px;max-width:640px;width:100%;padding:24px;position:relative'>");
+
+  // Fechar
+  h.push("<button onclick='document.getElementById(\"modal-sol-detalhe\").remove()' style='position:absolute;top:14px;right:14px;background:none;border:none;color:#5e3030;font-size:22px;cursor:pointer;padding:2px 8px'>×</button>");
+
+  // Cabeçalho do documento (estilo PM)
+  h.push("<div style='text-align:center;margin-bottom:20px;border-bottom:1px solid #2a1c10;padding-bottom:16px'>");
+  h.push("<div style='color:#5e4636;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase'>Polícia Militar da Bahia</div>");
+  h.push("<div style='color:#5e4636;font-size:9px;letter-spacing:.8px;text-transform:uppercase'>77ª Companhia Independente de Polícia Militar — BCS</div>");
+  h.push("<div style='color:#d4a87a;font-size:15px;font-weight:800;margin-top:8px;letter-spacing:1px'>TERMO DE SOLICITAÇÃO</div>");
+  h.push("<div style='font-family:monospace;color:#5e4636;font-size:10px;margin-top:4px'>Protocolo: "+esc(s.protocolo)+"</div>");
+  h.push("</div>");
+
+  // Campos do documento
+  var IS2 = "background:#070d1a;border:1px solid #2a1c10;color:#e8d8c0;padding:8px 11px;border-radius:7px;font-size:13px;outline:none;font-family:inherit;width:100%";
+  h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'>");
+  h.push("<div><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Data</div><div style='"+IS2.replace("width:100%","")+"'>"+esc(s.data||"—")+"</div></div>");
+  h.push("<div><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Para (Do:)</div><div style='"+IS2.replace("width:100%","")+"'>"+esc(s.destinatario||"—")+"</div></div>");
+  h.push("</div>");
+  h.push("<div style='margin-bottom:10px'><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Assunto</div><div style='"+IS2+"'>"+esc(s.assunto||"—")+"</div></div>");
+  h.push("<div style='margin-bottom:14px'><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Texto da Solicitação</div><div style='"+IS2+";white-space:pre-wrap;line-height:1.7;min-height:80px'>"+esc(s.texto||"—")+"</div></div>");
+
+  // Assinatura do solicitante
+  h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px'>");
+  h.push("<div><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Assinatura do Solicitante</div>");
+  if(s.assinatura){
+    h.push("<div style='background:#070d1a;border:1px solid #2a1c10;border-radius:8px;padding:6px;text-align:center'><img src='"+s.assinatura+"' style='max-height:70px;max-width:100%'/></div>");
+    h.push("<div style='color:#5e4636;font-size:10px;margin-top:4px;text-align:center'>"+esc(s.nome||"")+"  ·  Mat. "+esc(s.matricula||"")+"</div>");
+  } else {
+    h.push("<div style='background:#070d1a;border:1px dashed #2a1c10;border-radius:8px;padding:20px;text-align:center;color:#3a2a1a;font-size:11px'>Sem assinatura</div>");
+  }
+  h.push("</div>");
+
+  // Coluna assinatura do Comandante (preenchida após deferimento)
+  h.push("<div><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Assinatura do Comandante</div>");
+  if(s.assinatura_cmt){
+    h.push("<div style='background:#070d1a;border:1px solid #2a1c10;border-radius:8px;padding:6px;text-align:center'><img src='"+s.assinatura_cmt+"' style='max-height:70px;max-width:100%'/></div>");
+    h.push("<div style='color:#5e4636;font-size:10px;margin-top:4px;text-align:center'>"+esc(s.nome_cmt||"Comandante")+"</div>");
+  } else {
+    h.push("<div id='sol-assin-cmt-box' style='background:#070d1a;border:2px dashed #2a1c10;border-radius:8px;overflow:hidden;height:86px;position:relative'>");
+    h.push("<canvas id='sol-assin-canvas' style='width:100%;height:100%;touch-action:none;cursor:crosshair;display:block'></canvas>");
+    h.push("<div id='sol-assin-label' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#2a1c10;font-size:11px;pointer-events:none;text-align:center;white-space:nowrap'>Assine aqui</div>");
+    h.push("</div>");
+    h.push("<button type='button' onclick='_solLimparCanvas()' style='margin-top:4px;width:100%;background:none;border:1px solid #2a1c10;color:#5e4636;padding:5px;border-radius:6px;font-size:11px;cursor:pointer'>🗑 Limpar</button>");
+  }
+  h.push("</div>");
+  h.push("</div>"); // grid
+
+  // Área do gestor (se não deferido/indeferido)
+  if(s.status==="pendente"){
+    h.push("<div style='background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:14px;margin-bottom:14px'>");
+    h.push("<div style='color:#4a8a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px'>⚙️ Ação do Gestor</div>");
+
+    // Obs do gestor
+    h.push("<div style='margin-bottom:10px'><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Observação / Despacho</div>");
+    h.push("<textarea id='sol-obs-cmt' placeholder='Despacho, fundamentação…' style='background:#070d1a;border:1px solid #2a3a2a;color:#e8d8c0;padding:9px;border-radius:7px;font-size:12px;width:100%;min-height:60px;font-family:inherit;outline:none;resize:vertical'>"+(s.obs_cmt||"")+"</textarea>");
+    h.push("</div>");
+
+    // Nome do Comandante
+    h.push("<div style='margin-bottom:12px'><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Nome do Comandante (para o PDF)</div>");
+    h.push("<input type='text' id='sol-nome-cmt' placeholder='Ex: Maj PM Fulano de Tal' value='"+(s.nome_cmt||"")+"' style='background:#070d1a;border:1px solid #2a3a2a;color:#e8d8c0;padding:9px;border-radius:7px;font-size:12px;width:100%;font-family:inherit;outline:none'/>");
+    h.push("</div>");
+
+    h.push("<div style='display:flex;gap:8px;flex-wrap:wrap'>");
+    h.push("<button onclick='_solDecisao(\""+esc(protocolo)+"\",\"deferido\")' style='flex:1;background:linear-gradient(135deg,#0a2a0a,#0f1a0f);border:2px solid #22c55e;color:#4ade80;padding:11px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer'>✅ Deferir</button>");
+    h.push("<button onclick='_solDecisao(\""+esc(protocolo)+"\",\"indeferido\")' style='flex:1;background:linear-gradient(135deg,#1a0808,#0f0505);border:2px solid #ef4444;color:#fca5a5;padding:11px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer'>❌ Indeferir</button>");
+    h.push("</div>");
+    h.push("</div>");
+  } else {
+    // Mostrar decisão
+    h.push("<div style='background:"+(s.status==="deferido"?"#0a2a0a":"#1a0808")+";border:1px solid "+(s.status==="deferido"?"#22c55e":"#ef4444")+"55;border-radius:10px;padding:12px;margin-bottom:14px;text-align:center'>");
+    h.push("<div style='color:"+(s.status==="deferido"?"#4ade80":"#fca5a5")+";font-size:16px;font-weight:800'>"+(s.status==="deferido"?"✅ DEFERIDO":"❌ INDEFERIDO")+"</div>");
+    if(s.obs_cmt) h.push("<div style='color:#5e4636;font-size:12px;margin-top:6px'>"+esc(s.obs_cmt)+"</div>");
+    h.push("<div style='color:#3a2a1a;font-size:10px;margin-top:4px'>"+esc(s.data_decisao||"")+"</div>");
+    h.push("</div>");
+    // Botão para reverter
+    h.push("<button onclick='_solReverter(\""+esc(protocolo)+"\")' style='background:none;border:1px solid #2a1c10;color:#5e4636;padding:7px 14px;border-radius:7px;font-size:11px;cursor:pointer;margin-bottom:10px'>↩ Reverter para Pendente</button>");
+  }
+
+  // Botões finais
+  h.push("<div style='display:flex;gap:8px;flex-wrap:wrap'>");
+  h.push("<button onclick='_solGerarPDF(\""+esc(protocolo)+"\")' style='flex:2;background:linear-gradient(135deg,#1a0e00,#0f0900);border:2px solid #d4a87a;color:#d4a87a;padding:11px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer'>🖨 Gerar PDF</button>");
+  h.push("<button onclick='document.getElementById(\"modal-sol-detalhe\").remove()' style='background:#070d1a;border:1px solid #2a1c10;color:#5e4636;padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>Fechar</button>");
+  h.push("</div>");
+
+  h.push("</div>"); // modal-inner
+  modal.innerHTML = h.join("");
+  modal.addEventListener("click", function(e){ if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+
+  // Inicializar canvas de assinatura do CMT
+  setTimeout(function(){
+    var canvas = document.getElementById("sol-assin-canvas");
+    if(!canvas) return;
+    var box   = document.getElementById("sol-assin-cmt-box");
+    var label = document.getElementById("sol-assin-label");
+    canvas.width  = box.offsetWidth  || 260;
+    canvas.height = box.offsetHeight || 86;
+    var ctx = canvas.getContext("2d");
+    var drawing = false;
+    var temAssin = false;
+
+    function posC(e){
+      var r = canvas.getBoundingClientRect();
+      var src = e.touches ? e.touches[0] : e;
+      return { x:(src.clientX-r.left)*(canvas.width/r.width),
+               y:(src.clientY-r.top)*(canvas.height/r.height) };
+    }
+    function startC(e){ e.preventDefault(); drawing=true; var p=posC(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+    function drawC(e){ e.preventDefault(); if(!drawing) return; var p=posC(e); ctx.lineTo(p.x,p.y); ctx.strokeStyle="#d4a87a"; ctx.lineWidth=2; ctx.lineCap="round"; ctx.stroke(); temAssin=true; label.style.opacity="0"; }
+    function stopC(){ drawing=false; }
+
+    canvas.addEventListener("mousedown",  startC);
+    canvas.addEventListener("mousemove",  drawC);
+    canvas.addEventListener("mouseup",    stopC);
+    canvas.addEventListener("mouseleave", stopC);
+    canvas.addEventListener("touchstart", startC, {passive:false});
+    canvas.addEventListener("touchmove",  drawC,  {passive:false});
+    canvas.addEventListener("touchend",   stopC);
+
+    window._solCmtCanvas    = canvas;
+    window._solCmtTemAssin  = function(){ return temAssin; };
+    window._solCmtDataURL   = function(){ return temAssin ? canvas.toDataURL("image/png") : ""; };
+  }, 80);
+}
+
+function _solLimparCanvas(){
+  var canvas = window._solCmtCanvas;
+  var label  = document.getElementById("sol-assin-label");
+  if(!canvas) return;
+  canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);
+  window._solCmtTemAssin = function(){ return false; };
+  if(label) label.style.opacity="1";
+}
+
+function _solDecisao(protocolo, decisao){
+  var obs      = (document.getElementById("sol-obs-cmt")||{}).value||"";
+  var nomeCmt  = (document.getElementById("sol-nome-cmt")||{}).value||"";
+  var assinCmt = (window._solCmtDataURL && window._solCmtDataURL()) || "";
+
+  var idx = (state.solicitacoes||[]).findIndex(function(s){ return s.protocolo===protocolo; });
+  if(idx<0){ alert("Não encontrado."); return; }
+
+  var hoje = new Date();
+  var dataFmt = String(hoje.getDate()).padStart(2,"0")+"/"+String(hoje.getMonth()+1).padStart(2,"0")+"/"+hoje.getFullYear();
+
+  state.solicitacoes[idx].status       = decisao;
+  state.solicitacoes[idx].obs_cmt      = obs;
+  state.solicitacoes[idx].nome_cmt     = nomeCmt;
+  state.solicitacoes[idx].assinatura_cmt= assinCmt;
+  state.solicitacoes[idx].data_decisao  = dataFmt;
+  salvarLocal();
+
+  // Sincronizar com Sheets se disponível
+  _solSincronizar(state.solicitacoes[idx]);
+
+  showToast(decisao==="deferido"?"✅ Deferido com sucesso!":"❌ Indeferido.");
+  document.getElementById("modal-sol-detalhe").remove();
+  renderSolicitacoesGestor(document.getElementById("main"));
+}
+
+function _solReverter(protocolo){
+  var idx = (state.solicitacoes||[]).findIndex(function(s){ return s.protocolo===protocolo; });
+  if(idx<0) return;
+  state.solicitacoes[idx].status = "pendente";
+  state.solicitacoes[idx].assinatura_cmt = "";
+  state.solicitacoes[idx].data_decisao   = "";
+  salvarLocal();
+  showToast("↩ Revertido para pendente.");
+  document.getElementById("modal-sol-detalhe").remove();
+  renderSolicitacoesGestor(document.getElementById("main"));
+}
+
+function _solSincronizar(s){
+  var su = typeof SHEETS_URL!=="undefined" ? SHEETS_URL : "";
+  var tk = typeof BCS_TOKEN!=="undefined" ? BCS_TOKEN : "";
+  if(!su||!tk) return;
+  var cbName = "cb_sol_sync_"+Date.now();
+  window[cbName] = function(){ delete window[cbName]; var sc=document.getElementById("sc_sol_sync"); if(sc) sc.remove(); };
+  var payload = encodeURIComponent(JSON.stringify(s));
+  var sc = document.createElement("script");
+  sc.id  = "sc_sol_sync";
+  sc.src = su+"?acao=atualizarSolicitacao&token="+encodeURIComponent(tk)+"&dados="+payload+"&callback="+cbName;
+  sc.onerror = function(){ delete window[cbName]; sc.remove(); };
+  document.head.appendChild(sc);
+}
+
+// ── QR / Link público ─────────────────────────────────
+function _solGerarQR(){
+  var su = typeof SHEETS_URL!=="undefined" ? SHEETS_URL : "";
+  var tk = typeof BCS_TOKEN!=="undefined" ? BCS_TOKEN : "";
+  var base = typeof CRAV_BASE_URL!=="undefined" ? CRAV_BASE_URL : "";
+  var url  = base + "solicitacao.html" + (su?"?sheets="+encodeURIComponent(su)+"&token="+encodeURIComponent(tk):"");
+
+  var m = document.createElement("div");
+  m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px";
+  m.innerHTML =
+    "<div style='background:#0f1a2e;border:1px solid #d4a87a44;border-radius:14px;max-width:420px;width:100%;padding:24px;text-align:center'>" +
+      "<div style='font-size:24px;margin-bottom:8px'>🔗</div>" +
+      "<h3 style='color:#d4a87a;font-size:16px;font-weight:800;margin-bottom:6px'>Link de Solicitação</h3>" +
+      "<p style='color:#5e4636;font-size:11px;margin-bottom:14px'>Compartilhe com os policiais para que façam suas solicitações.</p>" +
+      "<div style='background:#070d1a;border:1px solid #2a1c10;border-radius:8px;padding:10px;word-break:break-all;font-size:10px;font-family:monospace;color:#d4a87a;margin-bottom:14px'>"+esc(url)+"</div>" +
+      "<button onclick='navigator.clipboard.writeText(\""+esc(url)+"\");showToast(\"Link copiado!\")' style='background:linear-gradient(135deg,#1a0e00,#2a1808);border:2px solid #d4a87a;color:#d4a87a;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-bottom:8px'>📋 Copiar Link</button>" +
+      "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:none;border:1px solid #2a1c10;color:#5e4636;padding:9px 20px;border-radius:8px;font-size:12px;cursor:pointer;width:100%'>Fechar</button>" +
+    "</div>";
+  m.addEventListener("click", function(e){ if(e.target===m) m.remove(); });
+  document.body.appendChild(m);
+}
+
+// ── Gerar PDF ─────────────────────────────────────────
+function _solGerarPDF(protocolo){
+  var s = (state.solicitacoes||[]).find(function(x){ return x.protocolo===protocolo; });
+  if(!s){ alert("Solicitação não encontrada."); return; }
+
+  // Coletar assinatura do comandante se ainda não salva (canvas aberto)
+  if(!s.assinatura_cmt && window._solCmtDataURL && window._solCmtDataURL()){
+    var idx=(state.solicitacoes||[]).findIndex(function(x){return x.protocolo===protocolo;});
+    if(idx>=0){ state.solicitacoes[idx].assinatura_cmt=window._solCmtDataURL(); s=state.solicitacoes[idx]; salvarLocal(); }
+  }
+
+  var w = window.open("","_blank","width=800,height=900");
+  if(!w){ alert("Permita pop-ups para gerar o PDF."); return; }
+
+  var decisaoBlock = "";
+  if(s.status==="deferido"||s.status==="indeferido"){
+    var cor = s.status==="deferido"?"#1a5c1a":"#5c1a1a";
+    decisaoBlock = "<div style='border:2px solid "+cor+";border-radius:6px;padding:8px;text-align:center;margin-top:6px'>" +
+      "<div style='font-size:13px;font-weight:800;color:"+cor+";letter-spacing:2px'>"+(s.status==="deferido"?"DEFERIDO":"INDEFERIDO")+"</div>"+
+      (s.obs_cmt?"<div style='font-size:11px;color:#333;margin-top:4px'>"+s.obs_cmt.replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</div>":"") +
+      (s.data_decisao?"<div style='font-size:10px;color:#666;margin-top:2px'>"+s.data_decisao+"</div>":"") +
+    "</div>";
+  }
+
+  var assinPolHtml  = s.assinatura  ? "<img src='"+s.assinatura +"' style='max-height:60px;max-width:200px'/>" : "<div style='height:50px'></div>";
+  var assinCmtHtml  = s.assinatura_cmt ? "<img src='"+s.assinatura_cmt+"' style='max-height:60px;max-width:200px'/>" : "<div style='height:50px'></div>";
+
+  var textoEsc = (s.texto||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Termo de Solicitação — ${(s.protocolo||"").replace(/</g,"&lt;")}</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Times New Roman',serif; font-size:12pt; background:#fff; color:#000; padding:30px 40px; max-width:800px; margin:0 auto; }
+  .cabecalho{ text-align:center; margin-bottom:20px; border-bottom:2px solid #000; padding-bottom:12px; }
+  .cab-pm{ font-size:10pt; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; }
+  .cab-titulo{ font-size:14pt; font-weight:bold; text-transform:uppercase; letter-spacing:2px; margin-top:10px; }
+  .linha{ margin-bottom:10px; }
+  .linha label{ font-size:9pt; font-weight:bold; text-transform:uppercase; letter-spacing:.3px; color:#444; display:block; margin-bottom:2px; }
+  .linha .valor{ border-bottom:1px solid #999; padding:2px 4px; min-height:22px; font-size:11pt; }
+  .texto-sol{ border:1px solid #aaa; border-radius:3px; padding:10px; min-height:100px; font-size:11pt; line-height:1.8; white-space:pre-wrap; margin-bottom:16px; }
+  .assinatura-bloco{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0; }
+  .assin-item{ text-align:center; }
+  .assin-nome{ border-top:1px solid #000; padding-top:4px; font-size:10pt; margin-top:6px; font-weight:bold; }
+  .assin-subtitulo{ font-size:9pt; color:#444; }
+  .rodape{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; border-top:2px solid #000; padding-top:10px; margin-top:10px; }
+  .rodape-col{ border:1px solid #999; border-radius:3px; padding:8px; }
+  .rodape-titulo{ font-size:8pt; font-weight:bold; text-transform:uppercase; text-align:center; border-bottom:1px solid #ccc; padding-bottom:4px; margin-bottom:6px; }
+  .rodape-item{ font-size:8.5pt; margin-bottom:3px; }
+  .rodape-assin{ text-align:center; margin-top:8px; border-top:1px solid #999; padding-top:4px; font-size:8pt; font-weight:bold; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media print{ body{ padding:10px 15px; } .no-print{ display:none; } }
+</style>
+</head><body>
+
+<div class="no-print" style="background:#f5e8d0;padding:10px;border-radius:6px;margin-bottom:16px;text-align:center">
+  <button onclick="window.print()" style="background:#8b6914;color:#fff;border:none;padding:9px 24px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px">🖨 Imprimir / Salvar PDF</button>
+  <button onclick="window.close()" style="background:none;border:1px solid #8b6914;color:#8b6914;padding:9px 16px;border-radius:6px;font-size:13px;cursor:pointer">Fechar</button>
+</div>
+
+<div class="cabecalho">
+  <div class="cab-pm">Polícia Militar da Bahia</div>
+  <div class="cab-pm">Comando de Policiamento da Região Sudoeste</div>
+  <div class="cab-pm">77ª Companhia Independente de Polícia Militar</div>
+  <div class="cab-pm">Vitória da Conquista — Área Leste</div>
+  <div class="cab-titulo">Termo de Solicitação</div>
+</div>
+
+<div class="row2" style="margin-bottom:10px">
+  <div class="linha"><label>Data</label><div class="valor">Vitória da Conquista — BA, ${s.data||"___/___/______"}</div></div>
+  <div class="linha"><label>Para (Do:)</label><div class="valor">${(s.destinatario||"").replace(/</g,"&lt;")}</div></div>
+</div>
+<div class="linha" style="margin-bottom:12px"><label>Assunto</label><div class="valor">${(s.assunto||"").replace(/</g,"&lt;")}</div></div>
+
+<div class="texto-sol">${textoEsc}</div>
+
+<div style="margin-bottom:6px;font-size:10pt;color:#444">Respeitosamente,</div>
+
+<div class="assinatura-bloco">
+  <div class="assin-item">
+    ${assinPolHtml}
+    <div class="assin-nome">${(s.nome||"").replace(/</g,"&lt;")}</div>
+    <div class="assin-subtitulo">${(s.posto?s.posto+" — ":"")+"Mat. "+(s.matricula||"").replace(/</g,"&lt;")}</div>
+  </div>
+  <div class="assin-item">
+    ${assinCmtHtml}
+    <div class="assin-nome">${(s.nome_cmt||"_____________________________").replace(/</g,"&lt;")}</div>
+    <div class="assin-subtitulo">Cmt 77ª CIPM BCS</div>
+    ${decisaoBlock}
+  </div>
+</div>
+
+<div style="border-top:2px solid #000;padding-top:6px;font-size:9pt;color:#555;margin-bottom:10px">Protocolo: ${(s.protocolo||"").replace(/</g,"&lt;")}</div>
+
+<div class="rodape">
+  <div class="rodape-col">
+    <div class="rodape-titulo">77ª CIPM — CMT BCS</div>
+    <div class="rodape-item">EM RAZÃO DE:</div>
+    <div style="min-height:30px;border-bottom:1px solid #ccc;margin:4px 0;font-size:8pt">${(s.obs_cmt||"").replace(/</g,"&lt;")}</div>
+    <div class="rodape-item"><b>OPINO PELO:</b></div>
+    <div class="rodape-item">( ${s.status==="deferido"?"X":"&nbsp;"} ) DEFERIMENTO</div>
+    <div class="rodape-item">( ${s.status==="indeferido"?"X":"&nbsp;"} ) INDEFERIMENTO</div>
+    <div style="margin-top:12px;font-size:8pt">Vit. Conq.: ${s.data_decisao||"___/___/___"}</div>
+    <div class="rodape-assin">CMT BCS</div>
+  </div>
+  <div class="rodape-col">
+    <div class="rodape-titulo">77ª CIPM — SSO</div>
+    <div class="rodape-item">( &nbsp; ) PREENCHE REQUISITOS</div>
+    <div class="rodape-item">( &nbsp; ) NÃO PREENCHE REQUISITOS</div>
+    <div class="rodape-item">( &nbsp; ) DISPONÍVEL</div>
+    <div class="rodape-item">( &nbsp; ) INDISPONÍVEL</div>
+    <div class="rodape-item">( &nbsp; ) RESTRIÇÃO ADMINISTRATIVA</div>
+    <div class="rodape-item" style="margin-top:6px"><b>OPINO PELO:</b></div>
+    <div class="rodape-item">( &nbsp; ) DEFERIMENTO</div>
+    <div class="rodape-item">( &nbsp; ) INDEFERIMENTO</div>
+    <div style="margin-top:6px;font-size:8pt">Vit. Conq.: ___/___/___</div>
+    <div class="rodape-assin">CHEFE SSO</div>
+  </div>
+  <div class="rodape-col">
+    <div class="rodape-titulo">77ª CIPM — CMT</div>
+    <div class="rodape-item">( &nbsp; ) PROVIDENCIAR</div>
+    <div class="rodape-item">( ${s.status==="deferido"?"X":"&nbsp;"} ) DEFERIDO</div>
+    <div class="rodape-item">( ${s.status==="indeferido"?"X":"&nbsp;"} ) INDEFERIDO</div>
+    <div class="rodape-item">( &nbsp; ) PUBLIQUE-SE</div>
+    <div class="rodape-item">( &nbsp; ) ARQUIVE-SE</div>
+    <div class="rodape-item">( &nbsp; ) INFORMAR</div>
+    <div class="rodape-item">( &nbsp; ) OUTRO</div>
+    <div style="margin-top:6px;font-size:8pt">Vit. Conq.: ${s.data_decisao||"___/___/___"}</div>
+    <div class="rodape-assin">CMT 77ª CIPM</div>
+  </div>
+</div>
+
+</body></html>`);
+  w.document.close();
 }
 
 function renderConfiguracoes(main){
@@ -9999,6 +10568,10 @@ function renderTela() {
     renderLivroParteArmamento(main);
     return;
   }
+  if(tela==="solicitacoes"){
+    renderSolicitacoesGestor(main);
+    return;
+  }
 
   if(tela==="importar_zap"){
     renderImportarZap(main);
@@ -10453,6 +11026,7 @@ function render(){
       <button class="nav-btn${state.tela==="escolas"?" active":""}" data-tela="escolas" onclick="setTela('escolas')" style="color:${state.tela==="escolas"?"#38bdf8":"#38bdf888"};border-color:${state.tela==="escolas"?"#38bdf8":"transparent"}">🏫 Módulo Escolar</button>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" data-tela="projetossociais" onclick="setTela('projetossociais')" style="color:${state.tela==='projetossociais'?'#a78bfa':'#a78bfa88'};border-color:${state.tela==='projetossociais'?'#a78bfa':'transparent'}">🌱 Projetos Sociais</button>
       <button class="nav-btn${state.tela==="armamento"?" active":""}" data-tela="armamento" onclick="setTela('armamento')" style="color:${state.tela==='armamento'?'#60a5fa':'#60a5fa66'};border-color:${state.tela==='armamento'?'#60a5fa':'transparent'}">🔫 Livro de Parte</button>
+      <button class="nav-btn${state.tela==="solicitacoes"?" active":""}" data-tela="solicitacoes" onclick="setTela('solicitacoes')" style="color:${state.tela==='solicitacoes'?'#d4a87a':'#d4a87a66'};border-color:${state.tela==='solicitacoes'?'#d4a87a':'transparent'}">${(function(){ var n=(state.solicitacoes||[]).filter(function(s){return s.status==="pendente";}).length; return "📄 Solicitações"+(n>0?" <span style='background:#d4a87a;color:#1a0e00;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+n+"</span>":""); })()}</button>
           `}
     <div style="margin-top:auto;border-top:1px solid #42301e;padding-top:10px">
       <button onclick="setTela('config')" style="background:${state.tela==='config'?'rgba(100,120,140,0.15)':'transparent'};border:none;border-left:2px solid ${state.tela==='config'?'#6a9aba':'transparent'};color:${state.tela==='config'?'#a0bcd0':'#6a7a8a'};font-size:11px;width:100%;text-align:left;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;border-radius:0 6px 6px 0">⚙️ <span>Configurações</span></button>
@@ -10889,55 +11463,71 @@ function _expandirInstrutor(id){
 // MÓDULO LIVRO DE PARTE — ARMAMENTO
 // ══════════════════════════════════════════════════
 function renderLivroParteArmamento(main){
-  var isLocal=(location.protocol==="file:"||location.hostname==="localhost"||location.hostname==="127.0.0.1");
-  var linkBase=isLocal
-    ? location.href.replace(/\/[^/]*$/,"/"+"carga-armamento.html")
-    : (typeof CRAV_BASE_URL!=="undefined"?CRAV_BASE_URL:"https://bcs-iara.github.io/")+"carga-armamento.html";
-  var linkQR=linkBase+"?sheets="+encodeURIComponent(typeof SHEETS_URL!=="undefined"?SHEETS_URL:"")+"&token="+encodeURIComponent(typeof BCS_TOKEN!=="undefined"?BCS_TOKEN:"");
-  var qrUrl="https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=ffffff&bgcolor=0a0f1a&data="+encodeURIComponent(linkQR);
+  if(!state._armTab) state._armTab="registros";
+  var tab=state._armTab;
+  var IS="width:100%;background:#070d1a;border:1px solid #1a3a6a;color:#a0c0ff;padding:8px 10px;border-radius:7px;font-size:12px;outline:none;box-sizing:border-box";
+  var h=[];
+  h.push("<div style='max-width:960px;margin:0 auto;padding:16px 20px 40px'>");
 
+  // Header
+  h.push("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px'>");
+  h.push("<div style='display:flex;align-items:center;gap:12px'>");
+  h.push("<div style='width:44px;height:44px;background:#0a1428;border:2px solid #3a6ae8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0'>🔫</div>");
+  h.push("<div><h2 style='color:#a0c0ff;font-size:16px;font-weight:800;margin:0'>Livro de Parte — Armamento</h2><p style='color:#3a6a9a;font-size:11px;margin:0'>Patrimônio · Carga · Descarga</p></div>");
+  h.push("</div>");
+  h.push("<div style='display:flex;gap:8px'>");
+  h.push("<button onclick='_armGerarPDFModal()' style='background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:1px solid #22c55e;color:#4ade80;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>📄 PDF</button>");
+  h.push("<button onclick='_armQRModal()' style='background:linear-gradient(135deg,#0f2a6a,#0a1a4a);border:1px solid #3a6ae8;color:#6a9ae8;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>📲 QR Code</button>");
+  h.push("<button onclick='_armSincronizar()' style='background:#0a0f1a;border:1px solid #1a3a6a;color:#3a6a9a;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>🔄 Sincronizar</button>");
+  h.push("</div></div>");
+
+  // Abas
+  var tabs=[["registros","📋 Registros"],["materiais","🗄️ Patrimônio"],["policiais","👮 Policiais"]];
+  h.push("<div style='display:flex;gap:6px;margin-bottom:18px;border-bottom:2px solid #1a3a6a;padding-bottom:0'>");
+  tabs.forEach(function(t){
+    var ativo=tab===t[0];
+    h.push("<button onclick=\"state._armTab='"+t[0]+"';renderLivroParteArmamento(document.getElementById('main'))\" style='padding:9px 18px;border-radius:8px 8px 0 0;font-size:12px;font-weight:700;cursor:pointer;border:2px solid "+(ativo?"#3a6ae8":"#1a3a6a")+";border-bottom:none;background:"+(ativo?"#0f2a6a":"#070d1a")+";color:"+(ativo?"#a0c0ff":"#3a5a8a")+"'>"+t[1]+"</button>");
+  });
+  h.push("</div>");
+
+  if(tab==="registros"){
+    _renderRegistrosCarga(h,IS);
+  } else if(tab==="materiais"){
+    _renderPatrimonioCadastro(h,IS);
+  } else {
+    _renderCadastroPoliciais(h,IS);
+  }
+
+  h.push("</div>");
+  main.innerHTML=h.join("");
+}
+
+function _renderRegistrosCarga(h,IS){
   if(!state._armF) state._armF={busca:"",filtroTipo:"",de:"",ate:""};
   var f=state._armF;
   var cargas=(state.cargasArmamento||[]).slice().reverse();
-
-  // Filtros
   var busca=(f.busca||"").toLowerCase().trim();
   if(busca) cargas=cargas.filter(function(c){
     return (c.nome||"").toLowerCase().includes(busca)||
            (c.matricula||"").toLowerCase().includes(busca)||
            (c.serie||"").toLowerCase().includes(busca)||
-           (c.tipo_arma||"").toLowerCase().includes(busca);
+           (c.tipo_arma||"").toLowerCase().includes(busca)||
+           (c.itens||[]).some(function(it){return (it.codigo||"").toLowerCase().includes(busca)||(it.descricao||"").toLowerCase().includes(busca);});
   });
   if(f.filtroTipo) cargas=cargas.filter(function(c){return c.tipo_carga===f.filtroTipo;});
   if(f.de) cargas=cargas.filter(function(c){return c.data>=f.de;});
   if(f.ate) cargas=cargas.filter(function(c){return c.data<=f.ate;});
 
-  var IS="width:100%;background:#070d1a;border:1px solid #1a3a6a;color:#a0c0ff;padding:8px 10px;border-radius:7px;font-size:12px;outline:none;box-sizing:border-box";
-  var h=[];
-  h.push("<div style='max-width:900px;margin:0 auto;padding:16px 20px 40px'>");
-
-  // Header
-  h.push("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px'>");
-  h.push("<div style='display:flex;align-items:center;gap:12px'>");
-  h.push("<div style='width:44px;height:44px;background:#0a1428;border:2px solid #3a6ae8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0'>🔫</div>");
-  h.push("<div><h2 style='color:#a0c0ff;font-size:16px;font-weight:800;margin:0'>Livro de Parte — Armamento</h2><p style='color:#3a6a9a;font-size:11px;margin:0'>"+cargas.length+" registro(s) encontrado(s)</p></div>");
-  h.push("</div>");
-  h.push("<div style='display:flex;gap:8px'>");
-  h.push("<button onclick='_armQRModal()' style='background:linear-gradient(135deg,#0f2a6a,#0a1a4a);border:1px solid #3a6ae8;color:#6a9ae8;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>📲 QR Code</button>");
-  h.push("<button onclick='_armSincronizar()' style='background:#0a0f1a;border:1px solid #1a3a6a;color:#3a6a9a;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>🔄 Sincronizar</button>");
-  h.push("</div></div>");
-
-  // Filtros
   h.push("<div style='background:#0a1428;border:1px solid #1a3a6a;border-radius:10px;padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px'>");
-  h.push("<input type='text' placeholder='🔍  Buscar por nome, matrícula, série ou arma...' value='"+esc(f.busca||"")+"' oninput=\"state._armF.busca=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:2;min-width:220px'/>");
-  h.push("<select onchange=\"state._armF.filtroTipo=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:140px'>");
+  h.push("<input type='text' placeholder='🔍  Nome, matrícula, código ou descrição...' value='"+esc(f.busca||"")+"' oninput=\"state._armF.busca=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:2;min-width:200px'/>");
+  h.push("<select onchange=\"state._armF.filtroTipo=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:130px'>");
   h.push("<option value=''>Todos os tipos</option>");
   ["Carga","Descarga","Transferência","Conferência"].forEach(function(t){
     h.push("<option value='"+t+"'"+(f.filtroTipo===t?" selected":"")+">"+t+"</option>");
   });
   h.push("</select>");
-  h.push("<input type='date' value='"+(f.de||"")+"' onchange=\"state._armF.de=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:130px' title='Data inicial'/>");
-  h.push("<input type='date' value='"+(f.ate||"")+"' onchange=\"state._armF.ate=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:130px' title='Data final'/>");
+  h.push("<input type='date' value='"+(f.de||"")+"' onchange=\"state._armF.de=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:120px' title='Data inicial'/>");
+  h.push("<input type='date' value='"+(f.ate||"")+"' onchange=\"state._armF.ate=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:120px' title='Data final'/>");
   if(busca||f.filtroTipo||f.de||f.ate) h.push("<button onclick=\"state._armF={busca:'',filtroTipo:'',de:'',ate:''};renderLivroParteArmamento(document.getElementById('main'))\" style='background:none;border:1px solid #3a1a1a;color:#6a3a3a;padding:8px 12px;border-radius:7px;font-size:11px;cursor:pointer'>✕ Limpar</button>");
   h.push("</div>");
 
@@ -10949,43 +11539,46 @@ function renderLivroParteArmamento(main){
     h.push("<button onclick='_armQRModal()' style='background:#0f2a6a;border:1px solid #3a6ae8;color:#6a9ae8;padding:10px 24px;border-radius:8px;font-size:13px;cursor:pointer'>📲 Gerar QR Code</button>");
     h.push("</div>");
   } else {
-    // Tabela
     h.push("<div style='overflow-x:auto;border-radius:12px;border:1px solid #1a3a6a'>");
     h.push("<table style='width:100%;border-collapse:collapse;font-size:12px'>");
     h.push("<thead><tr style='background:#0a1428'>");
-    ["Data/Hora","Policial","Matrícula","Arma","Série","Munição","Carreg.","Tipo","Assinatura"].forEach(function(col){
+    ["Data/Hora","Policial","Matrícula","Itens","Tipo","Assinatura"].forEach(function(col){
       h.push("<th style='padding:9px 12px;color:#3a6a9a;font-weight:700;text-align:left;font-size:10px;text-transform:uppercase;white-space:nowrap'>"+col+"</th>");
     });
     h.push("</tr></thead><tbody>");
     cargas.forEach(function(c,idx){
       var bg=idx%2===0?"#0a0f1a":"#070d1a";
-      var tipoCor={Carga:"#22c55e",Descarga:"#f59e0b",Transferência:"#60a5fa",Conferência:"#a78bfa"}[c.tipo_carga]||"#6b7280";
-      h.push("<tr style='background:"+bg+";border-top:1px solid #0f1a2e' onclick=\"_armVerRegistro('"+c.protocolo+"')\" style='cursor:pointer'>");
+      var tipoCor={Carga:"#22c55e",Descarga:"#f59e0b","Transferência":"#60a5fa","Conferência":"#a78bfa"}[c.tipo_carga]||"#6b7280";
+      // Montar resumo dos itens
+      var itensResumo="";
+      if(c.itens&&c.itens.length){
+        itensResumo=c.itens.map(function(it){return "<span style='display:inline-block;background:#1a2a4a;color:#6a9ae8;border-radius:4px;padding:1px 6px;font-size:10px;margin:1px'>"+esc(it.codigo||it.tipo||"")+"</span>";}).join(" ");
+      } else {
+        // compatibilidade com registros antigos
+        itensResumo="<span style='color:#3a5a8a;font-size:11px'>"+esc(c.tipo_arma||"—")+"</span>";
+      }
+      h.push("<tr style='background:"+bg+";border-top:1px solid #0f1a2e;cursor:pointer' onclick=\"_armVerRegistro('"+esc(c.protocolo)+"')\">");
       h.push("<td style='padding:8px 12px;color:#6a9ae8;white-space:nowrap'>"+esc(c.data||"")+" "+esc(c.hora||"")+"</td>");
       h.push("<td style='padding:8px 12px;color:#e8f0ff;font-weight:600'>"+esc(c.nome||"")+"</td>");
       h.push("<td style='padding:8px 12px;color:#a0c0ff;font-family:monospace'>"+esc(c.matricula||"")+"</td>");
-      h.push("<td style='padding:8px 12px;color:#c0d8ff'>"+esc(c.tipo_arma||"")+"</td>");
-      h.push("<td style='padding:8px 12px;color:#a0c0ff;font-family:monospace'>"+esc(c.serie||"")+"</td>");
-      h.push("<td style='padding:8px 12px;color:#f5ede0;font-weight:700;text-align:center'>"+esc(String(c.municao||"0"))+"</td>");
-      h.push("<td style='padding:8px 12px;color:#c0d0e0;text-align:center'>"+esc(String(c.carregadores||"0"))+"</td>");
+      h.push("<td style='padding:8px 12px'>"+itensResumo+"</td>");
       h.push("<td style='padding:8px 12px'><span style='background:"+tipoCor+"22;color:"+tipoCor+";padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+esc(c.tipo_carga||"")+"</span></td>");
-      h.push("<td style='padding:8px 12px'>"+(c.assinatura?"<img src='"+c.assinatura+"' style='height:32px;border-radius:4px;border:1px solid #1a3a6a;background:#070d1a'/>":"<span style='color:#1a3a5a'>—</span>")+"</td>");
+      var assinOk=c.assinatura&&c.assinatura_adjunto, assinParcial=c.assinatura||c.assinatura_adjunto;
+      h.push("<td style='padding:8px 12px'>");
+      if(c.assinatura) h.push("<img src='"+c.assinatura+"' style='height:26px;border-radius:3px;border:1px solid #1a3a6a;background:#070d1a' title='Policial'/>");
+      if(c.assinatura_adjunto) h.push("<img src='"+c.assinatura_adjunto+"' style='height:26px;border-radius:3px;border:1px solid #3a6a3a;background:#070d1a;margin-left:4px' title='Adjunto'/>");
+      if(!assinParcial) h.push("<span style='color:#1a3a5a'>—</span>");
+      h.push("</td>");
       h.push("</tr>");
     });
     h.push("</tbody></table></div>");
 
-    // KPIs resumo
     var totalCargas=(state.cargasArmamento||[]).filter(function(c){return c.tipo_carga==="Carga";}).length;
     var totalDesc=(state.cargasArmamento||[]).filter(function(c){return c.tipo_carga==="Descarga";}).length;
-    var armasUnicas=[...new Set((state.cargasArmamento||[]).map(function(c){return c.serie;}))].filter(Boolean).length;
     var policiaisUnicos=[...new Set((state.cargasArmamento||[]).map(function(c){return c.matricula;}))].filter(Boolean).length;
+    var matCadastrados=(state.materiaisPatrimonio||[]).filter(function(m){return m.status!=="inativo";}).length;
     h.push("<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px'>");
-    [
-      {l:"Total Cargas",v:totalCargas,c:"#22c55e"},
-      {l:"Total Descargas",v:totalDesc,c:"#f59e0b"},
-      {l:"Armas Distintas",v:armasUnicas,c:"#60a5fa"},
-      {l:"Policiais",v:policiaisUnicos,c:"#a78bfa"}
-    ].forEach(function(k){
+    [{l:"Total Cargas",v:totalCargas,c:"#22c55e"},{l:"Total Descargas",v:totalDesc,c:"#f59e0b"},{l:"Materiais Cadastrados",v:matCadastrados,c:"#60a5fa"},{l:"Policiais",v:policiaisUnicos,c:"#a78bfa"}].forEach(function(k){
       h.push("<div style='background:#0a0f1a;border:1px solid #1a3a6a;border-radius:10px;padding:12px;text-align:center'>");
       h.push("<p style='color:#3a6a9a;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 4px'>"+k.l+"</p>");
       h.push("<p style='color:"+k.c+";font-size:22px;font-weight:900;margin:0'>"+k.v+"</p>");
@@ -10993,8 +11586,451 @@ function renderLivroParteArmamento(main){
     });
     h.push("</div>");
   }
+}
+
+function _renderPatrimonioCadastro(h,IS){
+  var mats=(state.materiaisPatrimonio||[]).slice().reverse();
+  var busca=(state._matBusca||"").toLowerCase().trim();
+  var filtroTipo=state._matFiltroTipo||"";
+  var filtroStatus=state._matFiltroStatus||"ativo";
+  if(busca) mats=mats.filter(function(m){
+    return (m.codigo||"").toLowerCase().includes(busca)||
+           (m.descricao||"").toLowerCase().includes(busca)||
+           (m.serie||"").toLowerCase().includes(busca)||
+           (m.tipo||"").toLowerCase().includes(busca);
+  });
+  if(filtroTipo) mats=mats.filter(function(m){return m.tipo===filtroTipo;});
+  if(filtroStatus) mats=mats.filter(function(m){return (m.status||"ativo")===filtroStatus;});
+
+  var TIPOS_MAT=["Arma","Colete Balístico","Munição","Algemas","Rádio","Lanterna","Bastão","Equipamento Tático","Veículo","Outros"];
+
+  // Formulário de cadastro
+  h.push("<div style='background:#0a1428;border:2px solid #1a3a6a;border-radius:12px;padding:18px;margin-bottom:18px'>");
+  h.push("<h3 style='color:#a0c0ff;font-size:13px;font-weight:800;margin:0 0 14px'>➕ Cadastrar Novo Material</h3>");
+  h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px'>");
+  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Código / Nº Patrimônio <span style='color:#ef4444'>*</span></label>");
+  h.push("<input id='mat-cod' type='text' placeholder='Ex: COL-001 ou ARM-007' style='"+IS+"' oninput='this.value=this.value.toUpperCase()'/></div>");
+  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Tipo <span style='color:#ef4444'>*</span></label>");
+  h.push("<select id='mat-tipo' style='"+IS+"'><option value=''>Selecione...</option>");
+  TIPOS_MAT.forEach(function(t){ h.push("<option>"+t+"</option>"); });
+  h.push("</select></div>");
+  h.push("<div style='grid-column:1/-1'><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Descrição <span style='color:#ef4444'>*</span></label>");
+  h.push("<input id='mat-desc' type='text' placeholder='Ex: Pistola Glock G17 calibre .40' style='"+IS+"'/></div>");
+  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Nº de Série</label>");
+  h.push("<input id='mat-serie' type='text' placeholder='Ex: TM123456' style='"+IS+"' oninput='this.value=this.value.toUpperCase()'/></div>");
+  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Observação</label>");
+  h.push("<input id='mat-obs' type='text' placeholder='Opcional' style='"+IS+"'/></div>");
   h.push("</div>");
-  main.innerHTML=h.join("");
+  h.push("<button onclick='_matSalvar()' style='margin-top:14px;width:100%;background:linear-gradient(135deg,#1a3a8a,#0f2a6a);border:2px solid #3a6ae8;color:#a0c0ff;padding:11px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer'>✅ Cadastrar Material</button>");
+  h.push("</div>");
+
+  // Filtros da lista
+  h.push("<div style='display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px'>");
+  h.push("<input type='text' placeholder='🔍  Código, descrição, série...' value='"+esc(state._matBusca||"")+"' oninput=\"state._matBusca=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:2;min-width:180px'/>");
+  h.push("<select onchange=\"state._matFiltroTipo=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:120px'>");
+  h.push("<option value=''>Todos os tipos</option>");
+  TIPOS_MAT.forEach(function(t){ h.push("<option value='"+t+"'"+(filtroTipo===t?" selected":"")+">"+t+"</option>"); });
+  h.push("</select>");
+  h.push("<select onchange=\"state._matFiltroStatus=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:100px'>");
+  [["ativo","✅ Ativos"],["inativo","❌ Inativos"],["","Todos"]].forEach(function(s){ h.push("<option value='"+s[0]+"'"+(filtroStatus===s[0]?" selected":"")+">"+s[1]+"</option>"); });
+  h.push("</select>");
+  h.push("</div>");
+
+  if(!mats.length){
+    h.push("<div style='text-align:center;padding:40px;background:#070d1a;border:1px dashed #1a3a6a;border-radius:12px'>");
+    h.push("<div style='font-size:40px;margin-bottom:10px'>🗄️</div>");
+    h.push("<p style='color:#3a6a9a;font-size:13px;margin:0'>Nenhum material cadastrado ainda.<br>Use o formulário acima para adicionar.</p>");
+    h.push("</div>");
+  } else {
+    h.push("<div style='overflow-x:auto;border-radius:12px;border:1px solid #1a3a6a'>");
+    h.push("<table style='width:100%;border-collapse:collapse;font-size:12px'>");
+    h.push("<thead><tr style='background:#0a1428'>");
+    ["Código","Tipo","Descrição","Nº Série","Obs","Status","Ações"].forEach(function(col){
+      h.push("<th style='padding:9px 12px;color:#3a6a9a;font-weight:700;text-align:left;font-size:10px;text-transform:uppercase;white-space:nowrap'>"+col+"</th>");
+    });
+    h.push("</tr></thead><tbody>");
+    mats.forEach(function(m,idx){
+      var bg=idx%2===0?"#0a0f1a":"#070d1a";
+      var ativo=(m.status||"ativo")==="ativo";
+      h.push("<tr style='background:"+bg+";border-top:1px solid #0f1a2e'>");
+      h.push("<td style='padding:8px 12px;font-family:monospace;color:#60a5fa;font-weight:700'>"+esc(m.codigo||"")+"</td>");
+      h.push("<td style='padding:8px 12px;color:#a0c0ff'>"+esc(m.tipo||"")+"</td>");
+      h.push("<td style='padding:8px 12px;color:#e8f0ff'>"+esc(m.descricao||"")+"</td>");
+      h.push("<td style='padding:8px 12px;font-family:monospace;color:#7a9ab8'>"+esc(m.serie||"—")+"</td>");
+      h.push("<td style='padding:8px 12px;color:#5a7a9a;font-size:11px'>"+esc(m.obs||"—")+"</td>");
+      h.push("<td style='padding:8px 12px'><span style='background:"+(ativo?"#22c55e22":"#ef444422")+";color:"+(ativo?"#22c55e":"#ef4444")+";padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+(ativo?"Ativo":"Inativo")+"</span></td>");
+      h.push("<td style='padding:8px 12px;white-space:nowrap'>");
+      if(ativo){
+        h.push("<button onclick=\"_matDesativar('"+esc(m.id)+"')\" style='background:none;border:1px solid #3a1a1a;color:#f87171;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer;margin-right:4px'>⛔ Desativar</button>");
+      } else {
+        h.push("<button onclick=\"_matReativar('"+esc(m.id)+"')\" style='background:none;border:1px solid #1a3a1a;color:#4ade80;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer;margin-right:4px'>✅ Reativar</button>");
+      }
+      h.push("<button onclick=\"_matExcluir('"+esc(m.id)+"')\" style='background:none;border:1px solid #2a1a1a;color:#6a3a3a;padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer'>🗑</button>");
+      h.push("</td></tr>");
+    });
+    h.push("</tbody></table></div>");
+  }
+}
+
+// ── Cadastro de Materiais ─────────────────────────────
+function _matSalvar(){
+  var cod=(document.getElementById("mat-cod")||{}).value||"";
+  var tipo=(document.getElementById("mat-tipo")||{}).value||"";
+  var desc=(document.getElementById("mat-desc")||{}).value||"";
+  var serie=(document.getElementById("mat-serie")||{}).value||"";
+  var obs=(document.getElementById("mat-obs")||{}).value||"";
+  if(!cod.trim()||!tipo||!desc.trim()){ showToast("⚠️ Preencha Código, Tipo e Descrição."); return; }
+  if(!state.materiaisPatrimonio) state.materiaisPatrimonio=[];
+  if(state.materiaisPatrimonio.find(function(m){return (m.codigo||"").toUpperCase()===(cod||"").toUpperCase()&&(m.status||"ativo")==="ativo";})){
+    showToast("⚠️ Código "+cod+" já cadastrado (ativo)."); return;
+  }
+  var mat={id:"MAT-"+Date.now(),codigo:cod.trim().toUpperCase(),tipo:tipo,descricao:desc.trim(),serie:serie.trim().toUpperCase(),obs:obs.trim(),status:"ativo",criadoEm:new Date().toISOString()};
+  state.materiaisPatrimonio.push(mat);
+  salvarLocal();
+  showToast("✅ Material "+mat.codigo+" cadastrado!");
+  renderLivroParteArmamento(document.getElementById("main"));
+}
+function _matDesativar(id){
+  var m=(state.materiaisPatrimonio||[]).find(function(x){return x.id===id;});
+  if(!m) return;
+  if(!confirm("Desativar o material "+m.codigo+" — "+m.descricao+"?")) return;
+  m.status="inativo"; salvarLocal();
+  showToast("⛔ "+m.codigo+" desativado.");
+  renderLivroParteArmamento(document.getElementById("main"));
+}
+function _matReativar(id){
+  var m=(state.materiaisPatrimonio||[]).find(function(x){return x.id===id;});
+  if(!m) return;
+  m.status="ativo"; salvarLocal();
+  showToast("✅ "+m.codigo+" reativado.");
+  renderLivroParteArmamento(document.getElementById("main"));
+}
+function _matExcluir(id){
+  var m=(state.materiaisPatrimonio||[]).find(function(x){return x.id===id;});
+  if(!m) return;
+  if(!confirm("Excluir permanentemente o material "+m.codigo+"?\nEssa ação não pode ser desfeita.")) return;
+  state.materiaisPatrimonio=(state.materiaisPatrimonio||[]).filter(function(x){return x.id!==id;});
+  salvarLocal();
+  showToast("🗑 Material excluído.");
+  renderLivroParteArmamento(document.getElementById("main"));
+}
+
+// ── Cadastro de Policiais ─────────────────────────────
+var POSTOS_PM=["Soldado","Cabo","Terceiro Sargento","Segundo Sargento","Primeiro Sargento","Subtenente","Aspirante","Segundo Tenente","Primeiro Tenente","Capitão","Major","Tenente-Coronel","Coronel"];
+
+function _renderCadastroPoliciais(h,IS){
+  var pols=(state.policiais||[]).slice();
+  var busca=(state._polBusca||"").toLowerCase().trim();
+  var filtroStatus=state._polFiltroStatus||"ativo";
+  if(busca) pols=pols.filter(function(p){
+    return (p.matricula||"").toLowerCase().includes(busca)||
+           (p.nome||"").toLowerCase().includes(busca)||
+           (p.posto||"").toLowerCase().includes(busca);
+  });
+  if(filtroStatus) pols=pols.filter(function(p){return (p.status||"ativo")===filtroStatus;});
+  pols.sort(function(a,b){return (a.nome||"").localeCompare(b.nome||"");});
+
+  // Formulário de cadastro
+  h.push("<div style='background:#0a1428;border:2px solid #1a3a6a;border-radius:12px;padding:18px;margin-bottom:18px'>");
+  h.push("<h3 style='color:#a0c0ff;font-size:13px;font-weight:800;margin:0 0 14px'>➕ Cadastrar Policial</h3>");
+  h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px'>");
+  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Matrícula <span style='color:#ef4444'>*</span></label>");
+  h.push("<input id='pol-mat' type='text' placeholder='Ex: 123456' style='"+IS+"'/></div>");
+  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Posto / Graduação <span style='color:#ef4444'>*</span></label>");
+  h.push("<select id='pol-posto' style='"+IS+"'><option value=''>Selecione...</option>");
+  POSTOS_PM.forEach(function(p){ h.push("<option>"+p+"</option>"); });
+  h.push("</select></div>");
+  h.push("<div style='grid-column:1/-1'><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Nome Completo <span style='color:#ef4444'>*</span></label>");
+  h.push("<input id='pol-nome' type='text' placeholder='Nome completo do policial' style='"+IS+"'/></div>");
+  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Telefone</label>");
+  h.push("<input id='pol-tel' type='text' placeholder='(77) 9...' style='"+IS+"'/></div>");
+  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Turno / Pelotão</label>");
+  h.push("<input id='pol-turno' type='text' placeholder='Ex: 1º Pelotão — Alfa' style='"+IS+"'/></div>");
+  h.push("</div>");
+  h.push("<button onclick='_polSalvar()' style='margin-top:14px;width:100%;background:linear-gradient(135deg,#1a3a8a,#0f2a6a);border:2px solid #3a6ae8;color:#a0c0ff;padding:11px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer'>✅ Cadastrar Policial</button>");
+  h.push("</div>");
+
+  // Filtros
+  h.push("<div style='display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px'>");
+  h.push("<input type='text' placeholder='🔍  Nome, matrícula, posto...' value='"+esc(state._polBusca||"")+"' oninput=\"state._polBusca=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:2;min-width:180px'/>");
+  h.push("<select onchange=\"state._polFiltroStatus=this.value;renderLivroParteArmamento(document.getElementById('main'))\" style='"+IS+";flex:1;min-width:100px'>");
+  [["ativo","✅ Ativos"],["inativo","❌ Inativos"],["","Todos"]].forEach(function(s){
+    h.push("<option value='"+s[0]+"'"+(filtroStatus===s[0]?" selected":"")+">"+s[1]+"</option>");
+  });
+  h.push("</select>");
+  h.push("</div>");
+
+  // Contagem
+  var ativos=(state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";}).length;
+  h.push("<p style='color:#3a6a9a;font-size:11px;margin-bottom:10px'>"+ativos+" policial(is) ativo(s) cadastrado(s)</p>");
+
+  if(!pols.length){
+    h.push("<div style='text-align:center;padding:40px;background:#070d1a;border:1px dashed #1a3a6a;border-radius:12px'>");
+    h.push("<div style='font-size:40px;margin-bottom:10px'>👮</div>");
+    h.push("<p style='color:#3a6a9a;font-size:13px;margin:0'>Nenhum policial cadastrado ainda.</p>");
+    h.push("</div>");
+  } else {
+    h.push("<div style='overflow-x:auto;border-radius:12px;border:1px solid #1a3a6a'>");
+    h.push("<table style='width:100%;border-collapse:collapse;font-size:12px'>");
+    h.push("<thead><tr style='background:#0a1428'>");
+    ["Matrícula","Posto","Nome","Telefone","Turno","Status","Ações"].forEach(function(col){
+      h.push("<th style='padding:9px 12px;color:#3a6a9a;font-weight:700;text-align:left;font-size:10px;text-transform:uppercase;white-space:nowrap'>"+col+"</th>");
+    });
+    h.push("</tr></thead><tbody>");
+    pols.forEach(function(p,idx){
+      var bg=idx%2===0?"#0a0f1a":"#070d1a";
+      var ativo=(p.status||"ativo")==="ativo";
+      h.push("<tr style='background:"+bg+";border-top:1px solid #0f1a2e'>");
+      h.push("<td style='padding:8px 12px;font-family:monospace;color:#60a5fa;font-weight:700'>"+esc(p.matricula||"")+"</td>");
+      h.push("<td style='padding:8px 12px;color:#a78bfa;font-size:11px'>"+esc(p.posto||"")+"</td>");
+      h.push("<td style='padding:8px 12px;color:#e8f0ff;font-weight:600'>"+esc(p.nome||"")+"</td>");
+      h.push("<td style='padding:8px 12px;color:#7a9ab8'>"+esc(p.telefone||"—")+"</td>");
+      h.push("<td style='padding:8px 12px;color:#5a7a9a;font-size:11px'>"+esc(p.turno||"—")+"</td>");
+      h.push("<td style='padding:8px 12px'><span style='background:"+(ativo?"#22c55e22":"#ef444422")+";color:"+(ativo?"#22c55e":"#ef4444")+";padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+(ativo?"Ativo":"Inativo")+"</span></td>");
+      h.push("<td style='padding:8px 12px;white-space:nowrap'>");
+      if(ativo){
+        h.push("<button onclick=\"_polDesativar('"+esc(p.id)+"')\" style='background:none;border:1px solid #3a1a1a;color:#f87171;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer;margin-right:4px'>⛔ Desativar</button>");
+      } else {
+        h.push("<button onclick=\"_polReativar('"+esc(p.id)+"')\" style='background:none;border:1px solid #1a3a1a;color:#4ade80;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer;margin-right:4px'>✅ Reativar</button>");
+      }
+      h.push("<button onclick=\"_polExcluir('"+esc(p.id)+"')\" style='background:none;border:1px solid #2a1a1a;color:#6a3a3a;padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer'>🗑</button>");
+      h.push("</td></tr>");
+    });
+    h.push("</tbody></table></div>");
+  }
+}
+
+function _polSalvar(){
+  var mat=(document.getElementById("pol-mat")||{}).value||"";
+  var posto=(document.getElementById("pol-posto")||{}).value||"";
+  var nome=(document.getElementById("pol-nome")||{}).value||"";
+  var tel=(document.getElementById("pol-tel")||{}).value||"";
+  var turno=(document.getElementById("pol-turno")||{}).value||"";
+  if(!mat.trim()||!posto||!nome.trim()){ showToast("⚠️ Preencha Matrícula, Posto e Nome."); return; }
+  if(!state.policiais) state.policiais=[];
+  if(state.policiais.find(function(p){return p.matricula.toLowerCase()===mat.trim().toLowerCase()&&(p.status||"ativo")==="ativo";})){
+    showToast("⚠️ Matrícula "+mat.trim()+" já cadastrada (ativo)."); return;
+  }
+  state.policiais.push({
+    id:"POL-"+Date.now(),
+    matricula:mat.trim(),
+    posto:posto,
+    nome:nome.trim(),
+    telefone:tel.trim(),
+    turno:turno.trim(),
+    status:"ativo",
+    criadoEm:new Date().toISOString()
+  });
+  salvarLocal();
+  showToast("✅ "+nome.trim()+" cadastrado!");
+  renderLivroParteArmamento(document.getElementById("main"));
+}
+function _polDesativar(id){
+  var p=(state.policiais||[]).find(function(x){return x.id===id;});
+  if(!p||!confirm("Desativar "+p.nome+"?")) return;
+  p.status="inativo"; salvarLocal();
+  showToast("⛔ "+p.nome+" desativado.");
+  renderLivroParteArmamento(document.getElementById("main"));
+}
+function _polReativar(id){
+  var p=(state.policiais||[]).find(function(x){return x.id===id;});
+  if(!p) return;
+  p.status="ativo"; salvarLocal();
+  showToast("✅ "+p.nome+" reativado.");
+  renderLivroParteArmamento(document.getElementById("main"));
+}
+function _polExcluir(id){
+  var p=(state.policiais||[]).find(function(x){return x.id===id;});
+  if(!p||!confirm("Excluir permanentemente "+p.nome+"?")) return;
+  state.policiais=(state.policiais||[]).filter(function(x){return x.id!==id;});
+  salvarLocal();
+  showToast("🗑 Policial excluído.");
+  renderLivroParteArmamento(document.getElementById("main"));
+}
+
+// ── PDF Histórico de Carga ────────────────────────────
+function _armGerarPDFModal(){
+  var mEx=document.getElementById("modal-arm-pdf-opts"); if(mEx) mEx.remove();
+  // Lista de policiais para o dropdown
+  var nomes=[...new Set((state.cargasArmamento||[]).map(function(c){return c.matricula&&c.nome?c.matricula+"||"+c.nome:"";}).filter(Boolean))].sort();
+  var modal=document.createElement("div");
+  modal.id="modal-arm-pdf-opts";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px";
+  var IS2="width:100%;background:#070d1a;border:1px solid #1a3a6a;color:#a0c0ff;padding:9px 11px;border-radius:7px;font-size:13px;outline:none;box-sizing:border-box";
+  var h="<div style='background:#0a0f1a;border:2px solid #22c55e44;border-radius:16px;padding:26px;max-width:420px;width:100%'>";
+  h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px'>";
+  h+="<div><h3 style='color:#4ade80;font-size:15px;font-weight:800;margin:0'>📄 Gerar PDF de Histórico</h3><p style='color:#2a5a3a;font-size:11px;margin:3px 0 0'>Carga / Descarga de Armamento</p></div>";
+  h+="<button onclick=\"document.getElementById('modal-arm-pdf-opts').remove()\" style='background:none;border:none;color:#3a6a9a;font-size:22px;cursor:pointer'>×</button></div>";
+
+  // Filtro por policial
+  h+="<div style='margin-bottom:12px'><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:5px'>Policial (opcional)</label>";
+  h+="<select id='pdf-pol' style='"+IS2+"'><option value=''>Todos os policiais</option>";
+  nomes.forEach(function(n){ var p=n.split("||"); h+="<option value='"+esc(n)+"'>"+esc(p[1])+" (Mat. "+esc(p[0])+")</option>"; });
+  h+="</select></div>";
+
+  // Filtro por período
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>";
+  h+="<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:5px'>Data Inicial</label><input type='date' id='pdf-de' style='"+IS2+"'/></div>";
+  h+="<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:5px'>Data Final</label><input type='date' id='pdf-ate' style='"+IS2+"'/></div>";
+  h+="</div>";
+
+  // Agrupamento
+  h+="<div style='margin-bottom:16px'><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:5px'>Agrupar por</label>";
+  h+="<select id='pdf-grupo' style='"+IS2+"'><option value='policial'>Policial</option><option value='data'>Data</option><option value='nenhum'>Sem agrupamento</option></select></div>";
+
+  // Incluir assinatura
+  h+="<label style='display:flex;align-items:center;gap:8px;color:#6a9ae8;font-size:12px;margin-bottom:16px;cursor:pointer'>";
+  h+="<input type='checkbox' id='pdf-assin' checked style='width:16px;height:16px;accent-color:#3a6ae8'/> Incluir assinaturas digitais</label>";
+
+  h+="<button onclick='_armGerarPDF()' style='width:100%;background:linear-gradient(135deg,#1a4a1a,#0a2a0a);border:2px solid #22c55e;color:#4ade80;padding:13px;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer'>📄 Gerar PDF</button>";
+  h+="</div>";
+  modal.innerHTML=h;
+  document.body.appendChild(modal);
+  modal.onclick=function(e){if(e.target===this)this.remove();};
+  // Preenche datas com últimos 30 dias por padrão
+  var hoje=new Date(), h30=new Date(); h30.setDate(h30.getDate()-30);
+  document.getElementById("pdf-ate").value=hoje.toISOString().split("T")[0];
+  document.getElementById("pdf-de").value=h30.toISOString().split("T")[0];
+}
+
+function _armGerarPDF(){
+  var polFiltro=(document.getElementById("pdf-pol")||{}).value||"";
+  var de=(document.getElementById("pdf-de")||{}).value||"";
+  var ate=(document.getElementById("pdf-ate")||{}).value||"";
+  var grupo=(document.getElementById("pdf-grupo")||{}).value||"policial";
+  var incAssin=(document.getElementById("pdf-assin")||{}).checked!==false;
+  document.getElementById("modal-arm-pdf-opts").remove();
+
+  var cargas=(state.cargasArmamento||[]).slice();
+  // Filtros
+  if(de)  cargas=cargas.filter(function(c){return (c.data||"")>=de;});
+  if(ate) cargas=cargas.filter(function(c){return (c.data||"")<=ate;});
+  if(polFiltro){ var mat=polFiltro.split("||")[0]; cargas=cargas.filter(function(c){return c.matricula===mat;}); }
+  cargas.sort(function(a,b){return (a.data+a.hora)<(b.data+b.hora)?-1:1;});
+
+  if(!cargas.length){ showToast("Nenhum registro no filtro selecionado."); return; }
+
+  var w=window.open("","_blank");
+  if(!w){ alert("Permita pop-ups para gerar o PDF"); return; }
+
+  var tipoCores={"Carga":"#15803d","Descarga":"#b45309","Transferência":"#1d4ed8","Conferência":"#6d28d9"};
+  var fmt=function(d){ if(!d) return ""; var p=d.split("-"); return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:d; };
+
+  // ── Agrupamento ──────────────────────────────────────
+  var grupos={};
+  cargas.forEach(function(c){
+    var chave;
+    if(grupo==="policial") chave=c.matricula+"||"+(c.nome||"");
+    else if(grupo==="data") chave=c.data||"sem data";
+    else chave="todos";
+    if(!grupos[chave]) grupos[chave]=[];
+    grupos[chave].push(c);
+  });
+
+  // ── HTML ─────────────────────────────────────────────
+  var css="*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#111;line-height:1.4}";
+  css+=".cab{border-bottom:3px solid #1a3a6a;padding-bottom:10px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start}";
+  css+=".cab h1{font-size:14px;color:#1a3a6a;font-weight:700;text-transform:uppercase;margin:0 0 3px}";
+  css+=".cab p{font-size:9px;color:#666;margin:1px 0}";
+  css+=".filtros{background:#f0f4ff;border:1px solid #c0d0f0;border-radius:5px;padding:8px 12px;margin-bottom:16px;font-size:10px;color:#444;display:flex;gap:20px;flex-wrap:wrap}";
+  css+=".grupo-titulo{background:#1a3a6a;color:#fff;padding:6px 12px;border-radius:4px;font-size:11px;font-weight:700;margin:14px 0 8px;display:flex;justify-content:space-between}";
+  css+="table{width:100%;border-collapse:collapse;margin-bottom:4px}";
+  css+="thead tr{background:#e8eef8}";
+  css+="th{padding:6px 8px;font-size:9px;font-weight:700;text-align:left;text-transform:uppercase;color:#1a3a6a;border-bottom:2px solid #1a3a6a}";
+  css+="td{padding:5px 8px;border-bottom:1px solid #e0e8f0;vertical-align:top}";
+  css+="tr:nth-child(even) td{background:#f7f9ff}";
+  css+=".badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;color:#fff}";
+  css+=".item-tag{display:inline-block;background:#e8eef8;color:#1a3a6a;border-radius:3px;padding:1px 5px;font-size:9px;margin:1px}";
+  css+=".assin-img{max-height:36px;border:1px solid #ccc;border-radius:3px;background:#f0f4ff}";
+  css+=".resumo{background:#f0f4ff;border:1px solid #c0d0f0;border-radius:5px;padding:10px 14px;margin-top:18px;display:flex;gap:20px;flex-wrap:wrap}";
+  css+=".kpi{text-align:center;min-width:80px}.kpi .v{font-size:20px;font-weight:900;color:#1a3a6a}.kpi .l{font-size:8px;color:#666;text-transform:uppercase}";
+  css+="@media print{body{margin:10px}.no-print{display:none}}";
+
+  var polLabel=polFiltro?polFiltro.split("||")[1]+" (Mat. "+polFiltro.split("||")[0]+")":"Todos";
+  var periodoLabel=(de?fmt(de):"—")+" a "+(ate?fmt(ate):"—");
+
+  var body="";
+  body+="<div class='cab'>";
+  body+="<div><h1>📋 Histórico de Carga de Armamento</h1><p>77ª CIPM BCS · Polícia Militar da Bahia</p><p>Emitido em: "+fmt(new Date().toISOString().split("T")[0])+" às "+String(new Date().getHours()).padStart(2,"0")+":"+String(new Date().getMinutes()).padStart(2,"0")+"</p></div>";
+  body+="<div style='text-align:right'><p style='font-size:20px;margin:0'>🔫</p><p style='font-size:9px;color:#999;margin-top:4px'>Total: "+cargas.length+" registro(s)</p></div>";
+  body+="</div>";
+
+  body+="<div class='filtros'>";
+  body+="<span><strong>Policial:</strong> "+esc(polLabel)+"</span>";
+  body+="<span><strong>Período:</strong> "+esc(periodoLabel)+"</span>";
+  body+="<span><strong>Agrupado por:</strong> "+esc(grupo==="policial"?"Policial":grupo==="data"?"Data":"Sem agrupamento")+"</span>";
+  body+="</div>";
+
+  // Renderiza grupos
+  Object.keys(grupos).forEach(function(chave){
+    var regs=grupos[chave];
+    var tituloGrupo="";
+    if(grupo==="policial"){
+      var partes=chave.split("||");
+      tituloGrupo="👮 "+esc(partes[1]||"")+" · Matrícula "+esc(partes[0]);
+    } else if(grupo==="data"){
+      tituloGrupo="📅 "+fmt(chave);
+    }
+
+    if(tituloGrupo){
+      body+="<div class='grupo-titulo'><span>"+tituloGrupo+"</span><span style='opacity:.7;font-weight:400'>"+regs.length+" registro(s)</span></div>";
+    }
+
+    body+="<table><thead><tr>";
+    if(grupo!=="policial") body+="<th>Policial</th>";
+    if(grupo!=="data")     body+="<th>Data/Hora</th>";
+    body+="<th>Matrícula</th><th>Itens</th><th>Tipo</th>";
+    if(incAssin)           body+="<th>Assin. Policial</th><th>Assin. Adjunto</th>";
+    body+="</tr></thead><tbody>";
+
+    regs.forEach(function(c){
+      var tcor=tipoCores[c.tipo_carga]||"#555";
+      body+="<tr>";
+      if(grupo!=="policial") body+="<td style='font-weight:600'>"+esc(c.nome||"")+"</td>";
+      if(grupo!=="data")     body+="<td style='white-space:nowrap;color:#444'>"+fmt(c.data)+" "+esc(c.hora||"")+"</td>";
+      body+="<td style='font-family:monospace;color:#1a3a6a'>"+esc(c.matricula||"")+"</td>";
+      // Itens
+      body+="<td>";
+      if(c.itens&&c.itens.length){
+        c.itens.forEach(function(it){
+          body+="<span class='item-tag'>"+esc(it.codigo||it.tipo||"")+"</span>";
+          if(it.municao>0) body+=" <span style='font-size:9px;color:#888'>"+it.municao+"mun.</span>";
+        });
+      } else {
+        body+=esc(c.tipo_arma||"—")+(c.serie?" · <span style='font-family:monospace'>"+esc(c.serie)+"</span>":"");
+        if(c.municao>0) body+=" · "+esc(String(c.municao))+"mun.";
+      }
+      body+="</td>";
+      body+="<td><span class='badge' style='background:"+tcor+"'>"+esc(c.tipo_carga||"")+"</span></td>";
+      if(incAssin){
+        body+="<td>"+(c.assinatura?"<img class='assin-img' src='"+c.assinatura+"'/>":"—")+"</td>";
+        body+="<td>"+(c.assinatura_adjunto?"<img class='assin-img' src='"+c.assinatura_adjunto+"'/>":"—")+"</td>";
+      }
+      body+="</tr>";
+    });
+    body+="</tbody></table>";
+  });
+
+  // KPIs resumo
+  var totCarga=cargas.filter(function(c){return c.tipo_carga==="Carga";}).length;
+  var totDesc=cargas.filter(function(c){return c.tipo_carga==="Descarga";}).length;
+  var totTrans=cargas.filter(function(c){return c.tipo_carga==="Transferência";}).length;
+  var polUnicos=[...new Set(cargas.map(function(c){return c.matricula;}))].filter(Boolean).length;
+  body+="<div class='resumo no-print' style='margin-top:20px'>";
+  body+="<div class='kpi'><div class='v'>"+cargas.length+"</div><div class='l'>Total</div></div>";
+  body+="<div class='kpi'><div class='v' style='color:#15803d'>"+totCarga+"</div><div class='l'>Cargas</div></div>";
+  body+="<div class='kpi'><div class='v' style='color:#b45309'>"+totDesc+"</div><div class='l'>Descargas</div></div>";
+  body+="<div class='kpi'><div class='v' style='color:#1d4ed8'>"+totTrans+"</div><div class='l'>Transferências</div></div>";
+  body+="<div class='kpi'><div class='v' style='color:#6d28d9'>"+polUnicos+"</div><div class='l'>Policiais</div></div>";
+  body+="</div>";
+
+  body+="<div style='margin-top:24px;text-align:center'>";
+  body+="<button class='no-print' onclick='window.print()' style='background:#1a3a6a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px'>🖨️ Imprimir / Salvar PDF</button>";
+  body+="<button class='no-print' onclick='window.close()' style='background:#eee;color:#333;border:1px solid #ccc;padding:10px 18px;border-radius:7px;font-size:12px;cursor:pointer'>Fechar</button>";
+  body+="</div>";
+
+  w.document.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Histórico Carga Armamento — 77ª CIPM BCS</title><style>"+css+"</style></head><body>"+body+"</body></html>");
+  w.document.close();
 }
 
 function _armQRModal(){
@@ -11037,15 +12073,13 @@ function _armVerRegistro(protocolo){
   h+="<button onclick=\"document.getElementById('modal-arm-det').remove()\" style='background:none;border:none;color:#3a6a9a;font-size:22px;cursor:pointer'>×</button>";
   h+="</div>";
   var campos=[
-    ["📅 Data/Hora", c.data+" às "+c.hora],
-    ["👤 Policial", c.nome],
-    ["🪪 Matrícula", c.matricula],
-    ["🔫 Tipo de Arma", c.tipo_arma],
-    ["🔢 Nº de Série", c.serie],
-    ["🔹 Munição", c.municao+" cartuchos"],
-    ["📦 Carregadores", c.carregadores],
-    ["📋 Tipo", c.tipo_carga],
-    ["💬 Observação", c.obs||"—"]
+    ["📅 Data/Hora",        c.data+" às "+c.hora],
+    ["👤 Policial",         c.nome],
+    ["🪪 Matrícula",        c.matricula],
+    ["👮 Adjunto",          c.nome_adjunto||"—"],
+    ["🪪 Mat. Adjunto",     c.matricula_adjunto||"—"],
+    ["📋 Tipo",             c.tipo_carga],
+    ["💬 Observação",       c.obs||"—"]
   ];
   campos.forEach(function(par){
     h+="<div style='display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #0f1a2e'>";
@@ -11053,10 +12087,42 @@ function _armVerRegistro(protocolo){
     h+="<span style='color:#e8f0ff;font-size:12px;font-weight:600;flex:1'>"+esc(String(par[1]||""))+"</span>";
     h+="</div>";
   });
-  // Assinatura
-  if(c.assinatura){
-    h+="<div style='margin-top:14px'><p style='color:#3a6a9a;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px'>✍ Assinatura Digital</p>";
-    h+="<img src='"+c.assinatura+"' style='width:100%;border-radius:8px;border:1px solid #1a3a6a;background:#070d1a'/></div>";
+  // Itens novos (multi-item)
+  if(c.itens&&c.itens.length){
+    h+="<div style='margin-top:12px'><p style='color:#3a6a9a;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:8px'>📦 Materiais Carregados ("+c.itens.length+" item(s))</p>";
+    c.itens.forEach(function(it){
+      var tipoCorIt={Arma:"#60a5fa","Colete Balístico":"#a78bfa",Munição:"#f59e0b",Algemas:"#22c55e",Rádio:"#34d399",Lanterna:"#fbbf24",Bastão:"#f87171","Equipamento Tático":"#60a5fa",Veículo:"#6b7280",Outros:"#9ca3af"}[it.tipo]||"#60a5fa";
+      h+="<div style='background:#070d1a;border:1px solid #1a3a6a;border-radius:8px;padding:10px 12px;margin-bottom:6px'>";
+      h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:4px'>";
+      h+="<span style='font-family:monospace;color:"+tipoCorIt+";font-weight:700;font-size:13px'>"+esc(it.codigo||"")+"</span>";
+      h+="<span style='background:"+tipoCorIt+"22;color:"+tipoCorIt+";padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700'>"+esc(it.tipo||"")+"</span>";
+      h+="</div>";
+      h+="<p style='color:#e8f0ff;font-size:12px;margin:0 0 4px'>"+esc(it.descricao||"")+"</p>";
+      if(it.serie) h+="<p style='color:#5a7a9a;font-size:10px;margin:0'>Série: "+esc(it.serie)+"</p>";
+      if(it.municao>0||it.carregadores>0) h+="<p style='color:#f5ede0;font-size:11px;margin:2px 0 0'>🔹 "+esc(String(it.municao||0))+" munições · "+esc(String(it.carregadores||0))+" carregador(es)</p>";
+      h+="</div>";
+    });
+    h+="</div>";
+  } else if(c.tipo_arma){
+    // compatibilidade com registros antigos (formato antigo)
+    h+="<div style='margin-top:12px;background:#070d1a;border:1px solid #1a3a6a;border-radius:8px;padding:10px 12px'>";
+    h+="<p style='color:#3a6a9a;font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 6px'>🔫 Armamento (formato legado)</p>";
+    h+="<p style='color:#e8f0ff;font-size:12px;margin:2px 0'>"+esc(c.tipo_arma||"")+" · Série: "+esc(c.serie||"")+"</p>";
+    h+="<p style='color:#f5ede0;font-size:11px;margin:2px 0'>🔹 "+esc(String(c.municao||0))+" munições · "+esc(String(c.carregadores||0))+" carregador(es)</p>";
+    h+="</div>";
+  }
+  // Assinaturas
+  if(c.assinatura||c.assinatura_adjunto){
+    h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px'>";
+    if(c.assinatura){
+      h+="<div><p style='color:#3a6a9a;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:5px'>✍ Policial</p>";
+      h+="<img src='"+c.assinatura+"' style='width:100%;border-radius:7px;border:1px solid #1a3a6a;background:#070d1a'/></div>";
+    }
+    if(c.assinatura_adjunto){
+      h+="<div><p style='color:#3a6a9a;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:5px'>✍ Adjunto</p>";
+      h+="<img src='"+c.assinatura_adjunto+"' style='width:100%;border-radius:7px;border:1px solid #1a3a6a;background:#070d1a'/></div>";
+    }
+    h+="</div>";
   }
   // Tipo badge
   h+="<div style='margin-top:14px;text-align:center'><span style='background:"+tipoCor+"22;color:"+tipoCor+";padding:6px 20px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid "+tipoCor+"44'>"+esc(c.tipo_carga)+"</span></div>";
@@ -12600,12 +13666,39 @@ function exportarPDFOcorrencia(ocIdOverride){
 
 function _mesmaVitima(a, b){
   var na=norm(a.vitima_nome), nb=norm(b.vitima_nome);
+  // Nome vazio, muito curto ou genérico: nunca agrupa
   if(!na||na.length<4||na==="nao identificado"||na==="nao identificada") return false;
+  // Nomes diferentes: nunca agrupa
   if(na!==nb) return false;
+
   var ca=(a.vitima_cpf||"").replace(/\D/g,""), cb=(b.vitima_cpf||"").replace(/\D/g,"");
-  if(ca&&ca.length>=11&&cb&&cb.length>=11) return ca===cb;
-  // Sem CPF: aceita só se nome tiver ao menos 2 palavras (reduz falso positivo)
-  return na.split(" ").filter(function(p){return p.length>1;}).length>=2;
+  // Ambos têm CPF completo: comparação definitiva pelo CPF
+  if(ca.length>=11&&cb.length>=11) return ca===cb;
+  // Um tem CPF e o outro não: não agrupa (risco de confusão entre pessoas homônimas)
+  if(ca.length>=11||cb.length>=11) return false;
+
+  // Sem CPF em nenhum dos dois: critérios discriminatórios rigorosos
+
+  // 1. Sexo: se ambos informados e de sexo oposto → pessoas diferentes
+  var sa=(a.vitima_sexo||"").trim().toLowerCase().charAt(0);
+  var sb=(b.vitima_sexo||"").trim().toLowerCase().charAt(0);
+  if(sa&&sb&&(sa==="m"||sa==="f")&&(sb==="m"||sb==="f")&&sa!==sb) return false;
+
+  // 2. Exige nome composto com ≥3 palavras de mais de 2 letras (evita "Maria Silva" conectar)
+  var palavras=na.split(" ").filter(function(p){return p.length>2;});
+  if(palavras.length<3) return false;
+
+  // 3. Telefone: se ambos têm número (≥8 dígitos) e são diferentes → pessoas diferentes
+  //    Compara os últimos 8 dígitos para tolerar variação de DDD
+  var ta=(a.vitima_telefone||"").replace(/\D/g,""), tb=(b.vitima_telefone||"").replace(/\D/g,"");
+  if(ta.length>=8&&tb.length>=8&&ta.slice(-8)!==tb.slice(-8)) return false;
+
+  // 4. Idade: diferença > 10 anos → pessoas diferentes
+  var ia=parseInt((a.vitima_idade||"").replace(/[^0-9]/g,""),10);
+  var ib=parseInt((b.vitima_idade||"").replace(/[^0-9]/g,""),10);
+  if(ia>0&&ib>0&&Math.abs(ia-ib)>10) return false;
+
+  return true;
 }
 
 function gerarJanelaPDF(oc){
