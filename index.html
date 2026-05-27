@@ -3158,6 +3158,7 @@ function abrirModalEventoAvulso(dataPreench){
     };
     if(!state.eventosAvulsos) state.eventosAvulsos = [];
     state.eventosAvulsos.push(ev);
+    _syncEventoAvulsoSheets(ev);
     // Navegar para o mês do evento
     var partes = data.split("-");
     state.calMes = new Date(parseInt(partes[0]), parseInt(partes[1])-1, 1);
@@ -6001,10 +6002,12 @@ function abrirModalNovaTarefa(projId){
     // Lançar no calendário
     if(!state.eventosAvulsos) state.eventosAvulsos=[];
     var tcor=PROJ_CORES[proj.tipo]||"#6a9a3a";
-    state.eventosAvulsos.push({id:"EV_TRF_"+tarefa.id,criadoEm:new Date().toISOString(),
+    var _evTrf={id:"EV_TRF_"+tarefa.id,criadoEm:new Date().toISOString(),
       tipo:"Projeto",titulo:"["+proj.nome+"] "+titulo,data:data,hora:hora,
       descricao:"Projeto: "+proj.nome+(resp?"\nResponsável: "+resp:""),
-      cor:tcor,status:"Pendente",projetoId:proj.id,tarefaId:tarefa.id});
+      cor:tcor,status:"Pendente",projetoId:proj.id,tarefaId:tarefa.id};
+    state.eventosAvulsos.push(_evTrf);
+    _syncEventoAvulsoSheets(_evTrf);
     salvarLocal(); modal.remove();
     showToast("Tarefa salva e lançada no calendário!");
     verProjeto(projId);
@@ -9066,9 +9069,13 @@ function salvarVisitaEscolar(){
     criadoEm:new Date().toISOString()};
   state.visitasEscolares.push(vis);
   if(!state.atividadesEscolares) state.atividadesEscolares=[];
-  state.atividadesEscolares.push({id:vis.id,escolaId:escolaId,escolaNome:escNome,tipo:"Visita",subtipo:tipo,data:data,hora:hora,responsavel:(document.getElementById("vis-policial")||{value:""}).value.trim(),tema:(document.getElementById("vis-objetivo")||{value:""}).value.trim(),resultado:(document.getElementById("vis-resultado")||{value:""}).value.trim(),criadoEm:vis.criadoEm});
+  var _atEsc={id:vis.id,escolaId:escolaId,escolaNome:escNome,tipo:"Visita",subtipo:tipo,data:data,hora:hora,responsavel:(document.getElementById("vis-policial")||{value:""}).value.trim(),tema:(document.getElementById("vis-objetivo")||{value:""}).value.trim(),resultado:(document.getElementById("vis-resultado")||{value:""}).value.trim(),criadoEm:vis.criadoEm};
+  state.atividadesEscolares.push(_atEsc);
+  _syncAtivEscSheets(_atEsc);
   if(!state.eventosAvulsos) state.eventosAvulsos=[];
-  state.eventosAvulsos.push({id:"CAL_VES_"+vis.id,titulo:"🏫 Visita "+tipo+" — "+escNome,data:data,hora:hora||"08:00",tipo:"Visita Escolar",cor:"#22c55e",visitaEscolarId:vis.id});
+  var _evEsc={id:"CAL_VES_"+vis.id,titulo:"🏫 Visita "+tipo+" — "+escNome,data:data,hora:hora||"08:00",tipo:"Visita Escolar",cor:"#22c55e",visitaEscolarId:vis.id,criadoEm:new Date().toISOString()};
+  state.eventosAvulsos.push(_evEsc);
+  _syncEventoAvulsoSheets(_evEsc);
   salvarLocal();
   salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).catch(function(){});
   showToast("✅ Visita salva e adicionada ao Calendário!");
@@ -11370,7 +11377,9 @@ function abrirChamadaModal(projId){
       return {nome:ins.nome||"",telefone:ins.telefone||"",presente:!!(document.getElementById("ch-"+idx)||{checked:false}).checked};
     });
     if(!state.chamadas) state.chamadas=[];
-    state.chamadas.push({id:"CHA_"+Date.now(),projetoId:p.id,projetoNome:p.nome,instrutor:state.instrutorNome||"",data:data,presencas:presencas});
+    var _chamada={id:"CHA_"+Date.now(),projetoId:p.id,projetoNome:p.nome,instrutor:state.instrutorNome||"",data:data,presencas:presencas,criadoEm:new Date().toISOString()};
+    state.chamadas.push(_chamada);
+    _syncChamadaSheets(_chamada);
     salvarLocal();
     modal.remove();
     var pres=presencas.filter(function(x){return x.presente;}).length;
@@ -11737,6 +11746,35 @@ function _renderPatrimonioCadastro(h,IS){
     });
     h.push("</tbody></table></div>");
   }
+}
+
+// ── Sync Calendário → Sheets (fire-and-forget) ───────────────────
+function _syncAtivEscSheets(ev){
+  if(!SHEETS_URL) return;
+  var cb="cb_atesc_"+Date.now();
+  window[cb]=function(r){delete window[cb];};
+  var sc=document.createElement("script");
+  sc.onerror=function(){delete window[cb];};
+  sc.src=SHEETS_URL+"?acao=salvar&tipo=atividade_escolar&dados="+encodeURIComponent(JSON.stringify(ev))+"&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
+  document.head.appendChild(sc);
+}
+function _syncChamadaSheets(chamada){
+  if(!SHEETS_URL) return;
+  var cb="cb_chama_"+Date.now();
+  window[cb]=function(r){delete window[cb];};
+  var sc=document.createElement("script");
+  sc.onerror=function(){delete window[cb];};
+  sc.src=SHEETS_URL+"?acao=salvar&tipo=chamada_projeto&dados="+encodeURIComponent(JSON.stringify(chamada))+"&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
+  document.head.appendChild(sc);
+}
+function _syncEventoAvulsoSheets(ev){
+  if(!SHEETS_URL) return;
+  var cb="cb_evav_"+Date.now();
+  window[cb]=function(r){delete window[cb];};
+  var sc=document.createElement("script");
+  sc.onerror=function(){delete window[cb];};
+  sc.src=SHEETS_URL+"?acao=salvar&tipo=evento_avulso&dados="+encodeURIComponent(JSON.stringify(ev))+"&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
+  document.head.appendChild(sc);
 }
 
 // ── Sync Policiais/Materiais → Sheets (fire-and-forget) ──────────

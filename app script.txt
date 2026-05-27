@@ -139,6 +139,42 @@ function criarAbasFaltantes() {
     Logger.log("Aba 'solicitacoes' já existe.");
   }
 
+  // ── atividades_escolares ─────────────────────────────────────────
+  if (!ss.getSheetByName("atividades_escolares")) {
+    var atesc = ss.insertSheet("atividades_escolares");
+    atesc.getRange(1,1,1,11).setValues([[
+      "id","data","hora","tipo","subtipo","escolaNome","responsavel","tema","resultado","criadoEm","escolaId"
+    ]]).setFontWeight("bold").setBackground("#0f2035").setFontColor("#38bdf8");
+    atesc.setFrozenRows(1);
+    Logger.log("Aba 'atividades_escolares' criada.");
+  } else {
+    Logger.log("Aba 'atividades_escolares' já existe.");
+  }
+
+  // ── chamadas_projetos ────────────────────────────────────────────
+  if (!ss.getSheetByName("chamadas_projetos")) {
+    var cha = ss.insertSheet("chamadas_projetos");
+    cha.getRange(1,1,1,8).setValues([[
+      "id","data","projetoId","projetoNome","instrutor","total_presentes","total_participantes","criadoEm"
+    ]]).setFontWeight("bold").setBackground("#2d1b69").setFontColor("#a78bfa");
+    cha.setFrozenRows(1);
+    Logger.log("Aba 'chamadas_projetos' criada.");
+  } else {
+    Logger.log("Aba 'chamadas_projetos' já existe.");
+  }
+
+  // ── eventos_avulsos ──────────────────────────────────────────────
+  if (!ss.getSheetByName("eventos_avulsos")) {
+    var evav = ss.insertSheet("eventos_avulsos");
+    evav.getRange(1,1,1,10).setValues([[
+      "id","data","hora","tipo","titulo","descricao","cor","status","resultado","criadoEm"
+    ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#fbbf24");
+    evav.setFrozenRows(1);
+    Logger.log("Aba 'eventos_avulsos' criada.");
+  } else {
+    Logger.log("Aba 'eventos_avulsos' já existe.");
+  }
+
   Logger.log("Concluído. Verifique o painel de execução para detalhes.");
 }
 
@@ -521,6 +557,146 @@ function listarMateriaisPatrimonio(ss) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  ATIVIDADES ESCOLARES
+// ══════════════════════════════════════════════════════════════════
+function salvarAtividadeEscolar(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("atividades_escolares");
+    if (!aba) {
+      aba = ss.insertSheet("atividades_escolares");
+      aba.getRange(1,1,1,11).setValues([[
+        "id","data","hora","tipo","subtipo","escolaNome","responsavel","tema","resultado","criadoEm","escolaId"
+      ]]).setFontWeight("bold").setBackground("#0f2035").setFontColor("#38bdf8");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+      }
+    }
+    aba.appendRow([
+      dados.id         || ("ATESC-"+Date.now()),
+      dados.data       || "",
+      dados.hora       || "",
+      dados.tipo       || "",
+      dados.subtipo    || "",
+      dados.escolaNome || "",
+      dados.responsavel|| "",
+      dados.tema       || "",
+      dados.resultado  || "",
+      dados.criadoEm   || new Date().toISOString(),
+      dados.escolaId   || ""
+    ]);
+    return { ok: true, id: dados.id, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarAtividadesEscolares(ss) {
+  try {
+    var aba = ss.getSheetByName("atividades_escolares");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var hdrs = ["id","data","hora","tipo","subtipo","escolaNome","responsavel","tema","resultado","criadoEm","escolaId"];
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,hdrs.length).getValues();
+    var dados = rows.map(function(r){ var o={}; hdrs.forEach(function(h,i){ o[h]=r[i]; }); return o; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CHAMADAS DE PROJETOS SOCIAIS
+// ══════════════════════════════════════════════════════════════════
+function salvarChamadaProjeto(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("chamadas_projetos");
+    if (!aba) {
+      aba = ss.insertSheet("chamadas_projetos");
+      aba.getRange(1,1,1,8).setValues([[
+        "id","data","projetoId","projetoNome","instrutor","total_presentes","total_participantes","criadoEm"
+      ]]).setFontWeight("bold").setBackground("#2d1b69").setFontColor("#a78bfa");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+      }
+    }
+    var presencas = Array.isArray(dados.presencas) ? dados.presencas : [];
+    var totalPres  = presencas.filter(function(p){ return p && p.presente; }).length;
+    var totalPart  = presencas.length;
+    aba.appendRow([
+      dados.id          || ("CHA-"+Date.now()),
+      dados.data        || "",
+      dados.projetoId   || "",
+      dados.projetoNome || "",
+      dados.instrutor   || "",
+      totalPres,
+      totalPart,
+      dados.criadoEm    || new Date().toISOString()
+    ]);
+    return { ok: true, id: dados.id, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarChamadasProjetos(ss) {
+  try {
+    var aba = ss.getSheetByName("chamadas_projetos");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var hdrs = ["id","data","projetoId","projetoNome","instrutor","total_presentes","total_participantes","criadoEm"];
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,hdrs.length).getValues();
+    var dados = rows.map(function(r){ var o={}; hdrs.forEach(function(h,i){ o[h]=r[i]; }); return o; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  EVENTOS AVULSOS DO CALENDÁRIO
+// ══════════════════════════════════════════════════════════════════
+function salvarEventoAvulso(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("eventos_avulsos");
+    if (!aba) {
+      aba = ss.insertSheet("eventos_avulsos");
+      aba.getRange(1,1,1,10).setValues([[
+        "id","data","hora","tipo","titulo","descricao","cor","status","resultado","criadoEm"
+      ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#fbbf24");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+      }
+    }
+    aba.appendRow([
+      dados.id        || ("EV-"+Date.now()),
+      dados.data      || "",
+      dados.hora      || "",
+      dados.tipo      || "",
+      dados.titulo    || "",
+      dados.descricao || "",
+      dados.cor       || "",
+      dados.status    || "",
+      dados.resultado || "",
+      dados.criadoEm  || new Date().toISOString()
+    ]);
+    return { ok: true, id: dados.id, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarEventosAvulsos(ss) {
+  try {
+    var aba = ss.getSheetByName("eventos_avulsos");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var hdrs = ["id","data","hora","tipo","titulo","descricao","cor","status","resultado","criadoEm"];
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,hdrs.length).getValues();
+    var dados = rows.map(function(r){ var o={}; hdrs.forEach(function(h,i){ o[h]=r[i]; }); return o; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  INSCRIÇÕES DE PROJETOS / CURSOS
 // ══════════════════════════════════════════════════════════════════
 function salvarInscricaoProjeto(ss, dados) {
@@ -899,6 +1075,36 @@ function doGet(e) {
     }
     if(acao==="atualizarStatusMaterial"){
       return saida(atualizarStatusMaterial(ss, e.parameter.id||"", e.parameter.status||"inativo"), cb);
+    }
+
+    // ── ATIVIDADES ESCOLARES ────────────────────────────────────────
+    if(acao==="salvar" && tipo==="atividade_escolar"){
+      var dadosAtEsc={};
+      try{ dadosAtEsc=JSON.parse(e.parameter.dados||"{}"); }catch(ex){}
+      return saida(salvarAtividadeEscolar(ss, dadosAtEsc), cb);
+    }
+    if(acao==="listar" && tipo==="atividades_escolares"){
+      return saida(listarAtividadesEscolares(ss), cb);
+    }
+
+    // ── CHAMADAS DE PROJETOS SOCIAIS ────────────────────────────────
+    if(acao==="salvar" && tipo==="chamada_projeto"){
+      var dadosCha={};
+      try{ dadosCha=JSON.parse(e.parameter.dados||"{}"); }catch(ex){}
+      return saida(salvarChamadaProjeto(ss, dadosCha), cb);
+    }
+    if(acao==="listar" && tipo==="chamadas_projetos"){
+      return saida(listarChamadasProjetos(ss), cb);
+    }
+
+    // ── EVENTOS AVULSOS DO CALENDÁRIO ──────────────────────────────
+    if(acao==="salvar" && tipo==="evento_avulso"){
+      var dadosEv={};
+      try{ dadosEv=JSON.parse(e.parameter.dados||"{}"); }catch(ex){}
+      return saida(salvarEventoAvulso(ss, dadosEv), cb);
+    }
+    if(acao==="listar" && tipo==="eventos_avulsos"){
+      return saida(listarEventosAvulsos(ss), cb);
     }
 
     // ── INSCRIÇÕES DE PROJETOS/CURSOS ───────────────────────────────
