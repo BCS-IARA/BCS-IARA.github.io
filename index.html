@@ -686,11 +686,21 @@ async function carregarDadosAppDoSheets(){
       if(state.tela==="solicitacoes") renderSolicitacoesGestor(document.getElementById("main"));
     });
     _sincSheets("policiais", "id", function(dados){
-      state.policiais = dados;
+      // Merge: mantém locais não enviados ainda + empurra para Sheets
+      var local = state.policiais || [];
+      var idsSheets = dados.map(function(d){ return d.id; });
+      var soPLocal = local.filter(function(l){ return idsSheets.indexOf(l.id) === -1; });
+      soPLocal.forEach(function(pol){ _syncPolSheets(pol); }); // migra para Sheets
+      state.policiais = dados.concat(soPLocal);
       salvarLocal();
     });
     _sincSheets("materiais_patrimonio", "id", function(dados){
-      state.materiaisPatrimonio = dados;
+      // Merge: mantém locais não enviados ainda + empurra para Sheets
+      var local = state.materiaisPatrimonio || [];
+      var idsSheets = dados.map(function(d){ return d.id; });
+      var soMLocal = local.filter(function(l){ return idsSheets.indexOf(l.id) === -1; });
+      soMLocal.forEach(function(mat){ _syncMatSheets(mat); }); // migra para Sheets
+      state.materiaisPatrimonio = dados.concat(soMLocal);
       salvarLocal();
     });
 
@@ -11711,6 +11721,44 @@ function _renderPatrimonioCadastro(h,IS){
   }
 }
 
+// ── Sync Policiais/Materiais → Sheets (fire-and-forget) ──────────
+function _syncPolSheets(pol){
+  if(!SHEETS_URL) return;
+  var cb="cb_pols_"+Date.now();
+  window[cb]=function(r){delete window[cb];};
+  var sc=document.createElement("script");
+  sc.onerror=function(){delete window[cb];};
+  sc.src=SHEETS_URL+"?acao=salvar&tipo=policial&dados="+encodeURIComponent(JSON.stringify(pol))+"&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
+  document.head.appendChild(sc);
+}
+function _syncPolStatusSheets(id,status){
+  if(!SHEETS_URL) return;
+  var cb="cb_polst_"+Date.now();
+  window[cb]=function(r){delete window[cb];};
+  var sc=document.createElement("script");
+  sc.onerror=function(){delete window[cb];};
+  sc.src=SHEETS_URL+"?acao=atualizarStatusPolicial&id="+encodeURIComponent(id)+"&status="+encodeURIComponent(status)+"&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
+  document.head.appendChild(sc);
+}
+function _syncMatSheets(mat){
+  if(!SHEETS_URL) return;
+  var cb="cb_mats_"+Date.now();
+  window[cb]=function(r){delete window[cb];};
+  var sc=document.createElement("script");
+  sc.onerror=function(){delete window[cb];};
+  sc.src=SHEETS_URL+"?acao=salvar&tipo=material_patrimonio&dados="+encodeURIComponent(JSON.stringify(mat))+"&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
+  document.head.appendChild(sc);
+}
+function _syncMatStatusSheets(id,status){
+  if(!SHEETS_URL) return;
+  var cb="cb_matst_"+Date.now();
+  window[cb]=function(r){delete window[cb];};
+  var sc=document.createElement("script");
+  sc.onerror=function(){delete window[cb];};
+  sc.src=SHEETS_URL+"?acao=atualizarStatusMaterial&id="+encodeURIComponent(id)+"&status="+encodeURIComponent(status)+"&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
+  document.head.appendChild(sc);
+}
+
 // ── Cadastro de Materiais ─────────────────────────────
 function _matSalvar(){
   var cod=(document.getElementById("mat-cod")||{}).value||"";
@@ -11726,7 +11774,8 @@ function _matSalvar(){
   var mat={id:"MAT-"+Date.now(),codigo:cod.trim().toUpperCase(),tipo:tipo,descricao:desc.trim(),serie:serie.trim().toUpperCase(),obs:obs.trim(),status:"ativo",criadoEm:new Date().toISOString()};
   state.materiaisPatrimonio.push(mat);
   salvarLocal();
-  showToast("✅ Material "+mat.codigo+" cadastrado!");
+  _syncMatSheets(mat);
+  showToast("✅ Material "+mat.codigo+" cadastrado! Sincronizando...");
   renderLivroParteArmamento(document.getElementById("main"));
 }
 function _matDesativar(id){
@@ -11734,6 +11783,7 @@ function _matDesativar(id){
   if(!m) return;
   if(!confirm("Desativar o material "+m.codigo+" — "+m.descricao+"?")) return;
   m.status="inativo"; salvarLocal();
+  _syncMatStatusSheets(m.id,"inativo");
   showToast("⛔ "+m.codigo+" desativado.");
   renderLivroParteArmamento(document.getElementById("main"));
 }
@@ -11741,6 +11791,7 @@ function _matReativar(id){
   var m=(state.materiaisPatrimonio||[]).find(function(x){return x.id===id;});
   if(!m) return;
   m.status="ativo"; salvarLocal();
+  _syncMatStatusSheets(m.id,"ativo");
   showToast("✅ "+m.codigo+" reativado.");
   renderLivroParteArmamento(document.getElementById("main"));
 }
@@ -11850,7 +11901,7 @@ function _polSalvar(){
   if(state.policiais.find(function(p){return p.matricula.toLowerCase()===mat.trim().toLowerCase()&&(p.status||"ativo")==="ativo";})){
     showToast("⚠️ Matrícula "+mat.trim()+" já cadastrada (ativo)."); return;
   }
-  state.policiais.push({
+  var pol={
     id:"POL-"+Date.now(),
     matricula:mat.trim(),
     posto:posto,
@@ -11859,15 +11910,18 @@ function _polSalvar(){
     turno:turno.trim(),
     status:"ativo",
     criadoEm:new Date().toISOString()
-  });
+  };
+  state.policiais.push(pol);
   salvarLocal();
-  showToast("✅ "+nome.trim()+" cadastrado!");
+  _syncPolSheets(pol);
+  showToast("✅ "+nome.trim()+" cadastrado! Sincronizando...");
   renderLivroParteArmamento(document.getElementById("main"));
 }
 function _polDesativar(id){
   var p=(state.policiais||[]).find(function(x){return x.id===id;});
   if(!p||!confirm("Desativar "+p.nome+"?")) return;
   p.status="inativo"; salvarLocal();
+  _syncPolStatusSheets(p.id,"inativo");
   showToast("⛔ "+p.nome+" desativado.");
   renderLivroParteArmamento(document.getElementById("main"));
 }
@@ -11875,6 +11929,7 @@ function _polReativar(id){
   var p=(state.policiais||[]).find(function(x){return x.id===id;});
   if(!p) return;
   p.status="ativo"; salvarLocal();
+  _syncPolStatusSheets(p.id,"ativo");
   showToast("✅ "+p.nome+" reativado.");
   renderLivroParteArmamento(document.getElementById("main"));
 }

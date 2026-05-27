@@ -264,19 +264,26 @@ var TOKEN      = params.get("token")  || "bcs-token-secreto-2025";
 
 // ── Cache de policiais ────────────────────────────────
 var POLICIAIS_CACHE = [];
+var _policiaisCarregados = false;
 
-function carregarPoliciais(){
+function carregarPoliciais(tentativa){
   if(!SHEETS_URL) return;
+  tentativa = tentativa || 1;
   var cbName = "cb_pol_init_"+Date.now();
-  window[cbName] = function(resp){
+  var tmout = setTimeout(function(){
     delete window[cbName];
+    if(tentativa < 3) carregarPoliciais(tentativa+1); // retry automático
+  }, 10000);
+  window[cbName] = function(resp){
+    clearTimeout(tmout); delete window[cbName];
     if(resp && resp.ok && Array.isArray(resp.dados)){
-      POLICIAIS_CACHE = resp.dados.filter(function(p){ return (p.status||"ativo")==="ativo"; });
+      POLICIAIS_CACHE = resp.dados.filter(function(p){ return (p.status||"ativo").toLowerCase()==="ativo"; });
+      _policiaisCarregados = true;
     }
   };
   var sc = document.createElement("script");
   sc.src = SHEETS_URL+"?acao=listar&tipo=policiais&token="+encodeURIComponent(TOKEN)+"&callback="+cbName;
-  sc.onerror = function(){ delete window[cbName]; };
+  sc.onerror = function(){ clearTimeout(tmout); delete window[cbName]; };
   document.head.appendChild(sc);
 }
 carregarPoliciais();
@@ -289,6 +296,14 @@ function _buscarNaLista(mat, statusId, infoId, nomeId, timer){
   if(!mat || mat.length < 3) return;
   clearTimeout(timer);
   return setTimeout(function(){
+    // Cache ainda carregando?
+    if(!_policiaisCarregados && POLICIAIS_CACHE.length === 0){
+      el.style.cssText = "display:flex;align-items:center;padding:0 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;background:#3a6ae822;color:#6a9ae8;border:1px solid #3a6ae844";
+      el.textContent   = "⏳ Carregando...";
+      // Tenta de novo em 2s
+      var _retry = setTimeout(function(){ _buscarNaLista(mat, statusId, infoId, nomeId, null); }, 2000);
+      return;
+    }
     var p = POLICIAIS_CACHE.find(function(x){ return x.matricula.toLowerCase() === mat.trim().toLowerCase(); });
     if(p){
       document.getElementById(nomeId).value = p.posto ? p.posto+" "+p.nome : p.nome;
@@ -299,6 +314,9 @@ function _buscarNaLista(mat, statusId, infoId, nomeId, timer){
     } else if(POLICIAIS_CACHE.length > 0){
       el.style.cssText = "display:flex;align-items:center;padding:0 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44";
       el.textContent   = "⚠️ Não cadastrado";
+    } else {
+      el.style.cssText = "display:flex;align-items:center;padding:0 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;background:#ef444422;color:#ef4444;border:1px solid #ef444444";
+      el.textContent   = "⚠️ Sem dados";
     }
   }, 400);
 }
@@ -311,18 +329,23 @@ function buscarAdjunto(mat){  _adjTimer = _buscarNaLista(mat,"adj-status","adj-i
 // ── Cache de materiais (carregado do Sheets) ──────────
 var MATERIAIS_CACHE = [];
 
-function carregarMateriais(){
+function carregarMateriais(tentativa){
   if(!SHEETS_URL) return;
+  tentativa = tentativa || 1;
   var cbName = "cb_mat_init_"+Date.now();
-  window[cbName] = function(resp){
+  var tmout = setTimeout(function(){
     delete window[cbName];
+    if(tentativa < 3) carregarMateriais(tentativa+1); // retry automático
+  }, 10000);
+  window[cbName] = function(resp){
+    clearTimeout(tmout); delete window[cbName];
     if(resp && resp.ok && Array.isArray(resp.dados)){
-      MATERIAIS_CACHE = resp.dados.filter(function(m){ return (m.status||"ativo")==="ativo"; });
+      MATERIAIS_CACHE = resp.dados.filter(function(m){ return (m.status||"ativo").toLowerCase()==="ativo"; });
     }
   };
   var sc = document.createElement("script");
   sc.src = SHEETS_URL+"?acao=listar&tipo=materiais_patrimonio&token="+encodeURIComponent(TOKEN)+"&callback="+cbName;
-  sc.onerror = function(){ delete window[cbName]; };
+  sc.onerror = function(){ clearTimeout(tmout); delete window[cbName]; };
   document.head.appendChild(sc);
 }
 carregarMateriais();
