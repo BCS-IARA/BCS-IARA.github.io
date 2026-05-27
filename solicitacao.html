@@ -130,9 +130,21 @@ select option{ background:#0f1a2e; }
         <option value="Mudança de Escala">Mudança de Escala</option>
         <option value="Designação de Função">Designação de Função</option>
         <option value="Adiantamento Salarial">Adiantamento Salarial</option>
+        <option value="Solicitação de Material Bélico">Solicitação de Material Bélico</option>
         <option value="Outros">Outros</option>
       </select>
     </label>
+
+    <!-- Seletor de material (visível apenas quando assunto = Material Bélico) -->
+    <div id="bloco-material" style="display:none">
+      <label class="campo">
+        <span>Material Disponível <em>*</em></span>
+        <select id="f-material" onchange="selecionarMaterial(this.value)">
+          <option value="">— Selecione o material —</option>
+        </select>
+        <div id="mat-sol-info" style="display:none;margin-top:5px;background:#070d1a;border:1px solid #2a1c10;border-radius:7px;padding:7px 10px;font-size:11px;color:#d4a87a"></div>
+      </label>
+    </div>
 
     <label class="campo">
       <span>Texto da Solicitação <em>*</em></span>
@@ -213,6 +225,70 @@ function carregarPoliciais(tentativa){
 }
 carregarPoliciais();
 
+// ── Cache de materiais do patrimônio ──────────────────
+var MATERIAIS_CACHE = [];
+var _materiaisCarregados = false;
+
+function carregarMateriais(tentativa){
+  if(!SHEETS_URL) return;
+  tentativa = tentativa || 1;
+  var cbName = "cb_mat_sol_"+Date.now();
+  var tmout = setTimeout(function(){
+    delete window[cbName];
+    var sc = document.getElementById("sc_mat_sol");
+    if(sc) sc.remove();
+    if(tentativa < 3) carregarMateriais(tentativa+1);
+  }, 10000);
+  window[cbName] = function(resp){
+    clearTimeout(tmout); delete window[cbName];
+    if(resp && resp.ok && Array.isArray(resp.dados)){
+      MATERIAIS_CACHE = resp.dados.filter(function(m){ return (m.status||"ativo").toLowerCase()==="ativo"; });
+      _materiaisCarregados = true;
+      _popularSelectMaterial();
+    }
+    var sc = document.getElementById("sc_mat_sol"); if(sc) sc.remove();
+  };
+  var sc = document.createElement("script");
+  sc.id  = "sc_mat_sol";
+  sc.src = SHEETS_URL+"?acao=listar&tipo=materiais_patrimonio&token="+encodeURIComponent(TOKEN)+"&callback="+cbName;
+  sc.onerror = function(){ clearTimeout(tmout); delete window[cbName]; sc.remove(); if(tentativa < 3) carregarMateriais(tentativa+1); };
+  document.head.appendChild(sc);
+}
+carregarMateriais();
+
+function _popularSelectMaterial(){
+  var sel = document.getElementById("f-material");
+  if(!sel) return;
+  while(sel.options.length > 1) sel.remove(1);
+  MATERIAIS_CACHE.forEach(function(m){
+    var opt = document.createElement("option");
+    opt.value = m.id || m.codigo;
+    opt.textContent = "["+m.codigo+"] "+m.descricao+" ("+m.tipo+")";
+    sel.appendChild(opt);
+  });
+}
+
+function selecionarMaterial(val){
+  var mat = MATERIAIS_CACHE.find(function(m){ return (m.id||m.codigo) === val; });
+  var infoEl  = document.getElementById("mat-sol-info");
+  var textoEl = document.getElementById("f-texto");
+  if(mat){
+    infoEl.style.display = "block";
+    infoEl.innerHTML = "📦 Tipo: <b>"+mat.tipo+"</b>  ·  Série/Nº: <b>"+(mat.serie||"—")+"</b>";
+    textoEl.value =
+      "Solicito a Vossa Senhoria autorização para retirada/uso do seguinte material patrimonial:\n\n"+
+      "• Código: "+mat.codigo+"\n"+
+      "• Tipo: "+mat.tipo+"\n"+
+      "• Descrição: "+mat.descricao+
+      (mat.serie ? "\n• Nº Série: "+mat.serie : "")+
+      "\n\nMotivo: ";
+    textoEl.focus();
+    textoEl.setSelectionRange(textoEl.value.length, textoEl.value.length);
+  } else {
+    infoEl.style.display = "none";
+  }
+}
+
 // ── Busca policial por matrícula ──────────────────────
 var _polTimer    = null;
 var _pmJaCadastrado = false; // flag: true = já existe no sistema
@@ -272,10 +348,25 @@ var TEXTOS_PADRAO = {
 };
 
 function ajustarTexto(){
-  var assunto = document.getElementById("f-assunto").value;
-  var textoEl = document.getElementById("f-texto");
-  if(textoEl.value.trim()==="" && TEXTOS_PADRAO[assunto]){
-    textoEl.value = TEXTOS_PADRAO[assunto];
+  var assunto   = document.getElementById("f-assunto").value;
+  var textoEl   = document.getElementById("f-texto");
+  var blocoMat  = document.getElementById("bloco-material");
+  var selMat    = document.getElementById("f-material");
+  var infoEl    = document.getElementById("mat-sol-info");
+
+  if(assunto === "Solicitação de Material Bélico"){
+    blocoMat.style.display = "block";
+    if(_materiaisCarregados && selMat.options.length <= 1) _popularSelectMaterial();
+    textoEl.value = "";
+    textoEl.placeholder = "Selecione o material acima para preencher automaticamente, ou descreva manualmente…";
+  } else {
+    blocoMat.style.display = "none";
+    selMat.value = "";
+    infoEl.style.display = "none";
+    textoEl.placeholder = "Solicito a Vossa Senhoria a concessão de…";
+    if(textoEl.value.trim()==="" && TEXTOS_PADRAO[assunto]){
+      textoEl.value = TEXTOS_PADRAO[assunto];
+    }
   }
 }
 
@@ -342,6 +433,12 @@ function enviarSolicitacao(e){
   var texto      = document.getElementById("f-texto").value.trim();
   var assinatura = getAssinaturaDataURL();
 
+  // Valida material bélico
+  var materialSel = document.getElementById("f-material");
+  if(assunto === "Solicitação de Material Bélico" && materialSel && !materialSel.value){
+    alert("Por favor, selecione o material bélico desejado."); return;
+  }
+
   if(!matricula||!nome||!data||!dest||!assunto||!texto){
     alert("Por favor, preencha todos os campos obrigatórios."); return;
   }
@@ -360,6 +457,10 @@ function enviarSolicitacao(e){
   // Protocolo único
   var protocolo = "SOL-"+(Date.now()%1000000)+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
 
+  // Material bélico selecionado (se aplicável)
+  var matSelVal = (materialSel && materialSel.value) ? materialSel.value : "";
+  var matSelObj = matSelVal ? MATERIAIS_CACHE.find(function(m){ return (m.id||m.codigo)===matSelVal; }) : null;
+
   var dados = {
     protocolo:   protocolo,
     data:        dataFmt,
@@ -372,6 +473,9 @@ function enviarSolicitacao(e){
     destinatario:dest,
     assunto:     assunto,
     texto:       texto,
+    material_codigo:    matSelObj ? matSelObj.codigo      : "",
+    material_descricao: matSelObj ? matSelObj.descricao   : "",
+    material_tipo:      matSelObj ? matSelObj.tipo        : "",
     assinatura:  assinatura,
     status:      "pendente",
     data_registro: new Date().toISOString(),
@@ -381,6 +485,9 @@ function enviarSolicitacao(e){
   // ── Auto-cadastro: PM não estava no sistema ───────────
   if(!_pmJaCadastrado && matricula && nome){
     _autocadastrarPolicial({ matricula:matricula, nome:nome, posto:posto, telefone:telefone, turno:turno });
+    // Adiciona ao cache local para reconhecimento imediato nesta sessão
+    POLICIAIS_CACHE.push({ matricula:matricula, nome:nome, posto:posto, telefone:telefone, turno:turno, status:"ativo" });
+    _pmJaCadastrado = true;
   }
 
   // Salvar local como fallback
