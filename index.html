@@ -11653,34 +11653,54 @@ function _renderRegistrosCarga(h,IS){
     h.push("</div>");
   } else {
     h.push("<div style='overflow-x:auto;border-radius:12px;border:1px solid #1a3a6a'>");
-    h.push("<table style='width:100%;border-collapse:collapse;font-size:12px'>");
+    h.push("<table style='width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed'>");
+    h.push("<colgroup><col style='width:90px'/><col style='width:35%'/><col style='width:110px'/><col/><col style='width:110px'/><col style='width:100px'/></colgroup>");
     h.push("<thead><tr style='background:#0a1428'>");
-    ["Data/Hora","Policial","Matrícula","Itens","Tipo","Assinatura"].forEach(function(col){
-      h.push("<th style='padding:9px 12px;color:#3a6a9a;font-weight:700;text-align:left;font-size:10px;text-transform:uppercase;white-space:nowrap'>"+col+"</th>");
+    ["Data/Hora","Policial","Matrícula","Materiais","Tipo","Assinatura"].forEach(function(col){
+      h.push("<th style='padding:9px 12px;color:#3a6a9a;font-weight:700;text-align:left;font-size:10px;text-transform:uppercase;white-space:nowrap;letter-spacing:.5px'>"+col+"</th>");
     });
     h.push("</tr></thead><tbody>");
     cargas.forEach(function(c,idx){
       var bg=idx%2===0?"#0a0f1a":"#070d1a";
       var tipoCor={Carga:"#22c55e",Descarga:"#f59e0b","Transferência":"#60a5fa","Conferência":"#a78bfa"}[c.tipo_carga]||"#6b7280";
-      // Montar resumo dos itens
+      // ── Formatar data e hora (suporta YYYY-MM-DD, DD/MM/YYYY, Date string) ──
+      var dataFmt="—", horaFmt="";
+      try{
+        var dv=String(c.data||"");
+        var mISO=dv.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        var mBR=dv.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+        if(mISO) dataFmt=mISO[3]+"/"+mISO[2]+"/"+mISO[1];
+        else if(mBR) dataFmt=dv.substring(0,10);
+        else if(dv){var dt=new Date(dv);if(!isNaN(dt))dataFmt=("0"+dt.getDate()).slice(-2)+"/"+("0"+(dt.getMonth()+1)).slice(-2)+"/"+dt.getFullYear();}
+      }catch(e){}
+      try{
+        var hv=String(c.hora||"");
+        if(/^\d{1,2}:\d{2}/.test(hv)) horaFmt=hv.substring(0,5);
+        else if(hv){var ht=new Date(hv);if(!isNaN(ht))horaFmt=("0"+ht.getHours()).slice(-2)+":"+("0"+ht.getMinutes()).slice(-2);}
+      }catch(e){}
+      // ── Resumo dos itens ──
       var itensResumo="";
       if(c.itens&&c.itens.length){
-        itensResumo=c.itens.map(function(it){return "<span style='display:inline-block;background:#1a2a4a;color:#6a9ae8;border-radius:4px;padding:1px 6px;font-size:10px;margin:1px'>"+esc(it.codigo||it.tipo||"")+"</span>";}).join(" ");
+        itensResumo=c.itens.slice(0,3).map(function(it){
+          return "<span style='display:inline-block;background:#1a2a4a;color:#6a9ae8;border-radius:4px;padding:1px 6px;font-size:10px;margin:1px;white-space:nowrap'>"+esc(it.codigo||it.tipo||"")+"</span>";
+        }).join("")+(c.itens.length>3?"<span style='color:#3a5a8a;font-size:10px;margin-left:3px'>+"+( c.itens.length-3)+"</span>":"");
       } else {
-        // compatibilidade com registros antigos
         itensResumo="<span style='color:#3a5a8a;font-size:11px'>"+esc(c.tipo_arma||"—")+"</span>";
       }
-      h.push("<tr style='background:"+bg+";border-top:1px solid #0f1a2e;cursor:pointer' onclick=\"_armVerRegistro('"+esc(c.protocolo)+"')\">");
-      h.push("<td style='padding:8px 12px;color:#6a9ae8;white-space:nowrap'>"+esc(c.data||"")+" "+esc(c.hora||"")+"</td>");
-      h.push("<td style='padding:8px 12px;color:#e8f0ff;font-weight:600'>"+esc(c.nome||"")+"</td>");
-      h.push("<td style='padding:8px 12px;color:#a0c0ff;font-family:monospace'>"+esc(c.matricula||"")+"</td>");
-      h.push("<td style='padding:8px 12px'>"+itensResumo+"</td>");
-      h.push("<td style='padding:8px 12px'><span style='background:"+tipoCor+"22;color:"+tipoCor+";padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+esc(c.tipo_carga||"")+"</span></td>");
-      var assinOk=c.assinatura&&c.assinatura_adjunto, assinParcial=c.assinatura||c.assinatura_adjunto;
-      h.push("<td style='padding:8px 12px'>");
-      if(c.assinatura) h.push("<img src='"+c.assinatura+"' style='height:26px;border-radius:3px;border:1px solid #1a3a6a;background:#070d1a' title='Policial'/>");
-      if(c.assinatura_adjunto) h.push("<img src='"+c.assinatura_adjunto+"' style='height:26px;border-radius:3px;border:1px solid #3a6a3a;background:#070d1a;margin-left:4px' title='Adjunto'/>");
-      if(!assinParcial) h.push("<span style='color:#1a3a5a'>—</span>");
+      // ── Nome formatado (quebra em posto + nome) ──
+      var nomePartes=(c.nome||"").split(" ");
+      var nomeExib=esc(c.nome||"—");
+      h.push("<tr style='background:"+bg+";border-top:1px solid #0f1a2e;cursor:pointer;transition:background .15s' onmouseover=\"this.style.background='#112040'\" onmouseout=\"this.style.background='"+bg+"'\" onclick=\"_armVerRegistro('"+esc(c.protocolo)+"')\">");
+      h.push("<td style='padding:9px 12px;white-space:nowrap'><div style='color:#6a9ae8;font-family:monospace;font-size:12px;font-weight:700'>"+esc(dataFmt)+"</div>"+(horaFmt?"<div style='color:#2a4a7a;font-size:11px;margin-top:1px'>"+esc(horaFmt)+"</div>":"")+"</td>");
+      h.push("<td style='padding:9px 12px;max-width:160px'><div style='color:#e8f0ff;font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+nomeExib+"</div></td>");
+      h.push("<td style='padding:9px 12px'><span style='color:#a0c0ff;font-family:monospace;font-size:11px'>"+esc(c.matricula||"")+"</span></td>");
+      h.push("<td style='padding:9px 12px'>"+itensResumo+"</td>");
+      h.push("<td style='padding:9px 12px'><span style='background:"+tipoCor+"22;color:"+tipoCor+";padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;border:1px solid "+tipoCor+"44;white-space:nowrap'>"+esc(c.tipo_carga||"")+"</span></td>");
+      var assinParcial=c.assinatura||c.assinatura_adjunto;
+      h.push("<td style='padding:9px 12px;text-align:center'>");
+      if(c.assinatura) h.push("<img src='"+c.assinatura+"' style='height:24px;max-width:60px;border-radius:3px;border:1px solid #1a3a6a;background:#070d1a;object-fit:contain;vertical-align:middle' title='Policial'/>");
+      if(c.assinatura_adjunto) h.push("<img src='"+c.assinatura_adjunto+"' style='height:24px;max-width:60px;border-radius:3px;border:1px solid #2a5a3a;background:#070d1a;object-fit:contain;vertical-align:middle;margin-left:4px' title='Adjunto'/>");
+      if(!assinParcial) h.push("<span style='color:#1a3a5a;font-size:11px'>sem assin.</span>");
       h.push("</td>");
       h.push("</tr>");
     });
