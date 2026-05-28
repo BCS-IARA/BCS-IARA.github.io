@@ -460,6 +460,33 @@ function carregarMateriais(tentativa){
 }
 carregarMateriais();
 
+// ── Sincroniza cargas do Sheets → localStorage ao abrir ──
+// Garante que disponibilidade reflita outros dispositivos
+function _sincCargas(){
+  if(!SHEETS_URL||!TOKEN) return;
+  var cbName="cb_sc_"+Date.now();
+  var tmout=setTimeout(function(){delete window[cbName];},10000);
+  window[cbName]=function(resp){
+    clearTimeout(tmout); delete window[cbName];
+    if(resp&&resp.ok&&Array.isArray(resp.dados)&&resp.dados.length){
+      try{
+        var local=JSON.parse(localStorage.getItem("bcs_cargas_armamento")||"[]");
+        var prots={}; local.forEach(function(c){if(c.protocolo)prots[c.protocolo]=1;});
+        var novas=0;
+        resp.dados.forEach(function(r){
+          if(r.protocolo&&!prots[r.protocolo]){ local.push(r); novas++; }
+        });
+        if(novas>0) localStorage.setItem("bcs_cargas_armamento",JSON.stringify(local));
+      }catch(e){}
+    }
+  };
+  var sc=document.createElement("script");
+  sc.src=SHEETS_URL+"?acao=listar&tipo=carga_armamento&token="+encodeURIComponent(TOKEN)+"&callback="+cbName;
+  sc.onerror=function(){clearTimeout(tmout);delete window[cbName];};
+  document.head.appendChild(sc);
+}
+_sincCargas();
+
 // ── Autocomplete de material ──────────────────────────
 var _matAtual = null;
 var _sugestaoIdx = -1;

@@ -11573,9 +11573,39 @@ function _expandirInstrutor(id){
 // ══════════════════════════════════════════════════
 // MÓDULO LIVRO DE PARTE — ARMAMENTO
 // ══════════════════════════════════════════════════
+function _armSincronizarSilent(){
+  if(typeof SHEETS_URL==="undefined"||!SHEETS_URL) return;
+  var agora=Date.now();
+  if(state._armLastSync && agora-state._armLastSync<120000) return; // throttle 2 min
+  state._armLastSync=agora;
+  var cbName="cb_arm_as_"+agora;
+  window[cbName]=function(resp){
+    delete window[cbName];
+    if(resp&&resp.ok&&Array.isArray(resp.dados)&&resp.dados.length){
+      if(!state.cargasArmamento) state.cargasArmamento=[];
+      var novas=0;
+      resp.dados.forEach(function(r){
+        if(!state.cargasArmamento.find(function(x){return x.protocolo===r.protocolo;})){
+          state.cargasArmamento.push(r); novas++;
+        }
+      });
+      if(novas>0){
+        salvarLocal();
+        renderLivroParteArmamento(document.getElementById("main"));
+      }
+    }
+  };
+  var sc=document.createElement("script");
+  sc.src=SHEETS_URL+"?acao=listar&tipo=carga_armamento&token="+encodeURIComponent(typeof BCS_TOKEN!=="undefined"?BCS_TOKEN:"")+"&callback="+cbName;
+  sc.onerror=function(){delete window[cbName];};
+  document.head.appendChild(sc);
+}
+
 function renderLivroParteArmamento(main){
   // Re-lê localStorage para capturar registros salvos em carga-armamento.html
   try{ state.cargasArmamento=JSON.parse(localStorage.getItem("bcs_cargas_armamento")||"[]"); }catch(e){}
+  // Sync silencioso em background (cross-device)
+  _armSincronizarSilent();
   if(!state._armTab) state._armTab="registros";
   var tab=state._armTab;
   var IS="width:100%;background:#070d1a;border:1px solid #1a3a6a;color:#a0c0ff;padding:8px 10px;border-radius:7px;font-size:12px;outline:none;box-sizing:border-box";
@@ -12546,6 +12576,7 @@ function _armVerRegistro(protocolo){
 
 function _armSincronizar(){
   if(typeof SHEETS_URL==="undefined"||!SHEETS_URL){ showToast("Sheets não configurado."); return; }
+  state._armLastSync=0; // força re-sync ignorando throttle
   showToast("🔄 Buscando registros...");
   var cbName="cb_arm_sync_"+Date.now();
   window[cbName]=function(resp){
