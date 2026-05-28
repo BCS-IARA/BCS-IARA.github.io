@@ -428,7 +428,7 @@ function carregarLocal() {
 // ══════════════════════════════════════════════════
 function exportarDadosBCS(){
   var dados={
-    versao:"BCS_v1",
+    versao:"BCS_v2",
     exportadoEm:new Date().toISOString(),
     db: state.db,
     projetos: state.projetos||[],
@@ -438,7 +438,21 @@ function exportarDadosBCS(){
     ocorrenciasArquivadas: state.ocorrenciasArquivadas||[],
     ocorrenciasEncerradas: state.ocorrenciasEncerradas||[],
     alertasGraves: state.alertasGraves||[],
-    filaPendente: state.filaPendente||[]
+    filaPendente: state.filaPendente||[],
+    // módulos que ficam só no localStorage
+    projetosSociais: state.projetosSociais||[],
+    inscricoesProjetos: state.inscricoesProjetos||[],
+    chamadas: state.chamadas||[],
+    alertasProjetosSociais: state.alertasProjetos||[],
+    policiais: state.policiais||[],
+    cargasArmamento: state.cargasArmamento||[],
+    solicitacoes: state.solicitacoes||[],
+    invItens: state.invItens||[],
+    invMovimentacoes: state.invMovimentacoes||[],
+    invConferencias: state.invConferencias||[],
+    escolas: state.escolas||[],
+    visitasEscolares: state.visitasEscolares||[],
+    atividadesEscolares: state.atividadesEscolares||[]
   };
   var json=JSON.stringify(dados,null,2);
   var blob=new Blob([json],{type:"application/json"});
@@ -474,6 +488,19 @@ function importarDadosBCS(input){
       if(dados.ocorrenciasEncerradas) state.ocorrenciasEncerradas=dados.ocorrenciasEncerradas;
       if(dados.alertasGraves) state.alertasGraves=dados.alertasGraves;
       if(dados.filaPendente) state.filaPendente=dados.filaPendente;
+      // módulos v2
+      if(dados.projetosSociais) state.projetosSociais=dados.projetosSociais;
+      if(dados.inscricoesProjetos) state.inscricoesProjetos=dados.inscricoesProjetos;
+      if(dados.chamadas) state.chamadas=dados.chamadas;
+      if(dados.policiais) state.policiais=dados.policiais;
+      if(dados.cargasArmamento) state.cargasArmamento=dados.cargasArmamento;
+      if(dados.solicitacoes) state.solicitacoes=dados.solicitacoes;
+      if(dados.invItens) state.invItens=dados.invItens;
+      if(dados.invMovimentacoes) state.invMovimentacoes=dados.invMovimentacoes;
+      if(dados.invConferencias) state.invConferencias=dados.invConferencias;
+      if(dados.escolas) state.escolas=dados.escolas;
+      if(dados.visitasEscolares) state.visitasEscolares=dados.visitasEscolares;
+      if(dados.atividadesEscolares) state.atividadesEscolares=dados.atividadesEscolares;
       // 🔒 Guardar registros SIGESPOL em chave SEPARADA — imune ao Sheets mesmo se cache antigo
       var sigespolParaBackup = (state.db.ocorrencias||[]).filter(function(o){ return o.fonte==='SIGESPOL'; });
       if(sigespolParaBackup.length>0){
@@ -547,9 +574,12 @@ async function sincronizarSheets(){
   if(!SHEETS_URL) return;
   try{
     // Sequencial para evitar colisão de callbacks JSONP paralelos
-    await salvarDadoAppSheets("bcs_projetos",        state.projetos||[]);
-    await salvarDadoAppSheets("bcs_eventos_avulsos",  state.eventosAvulsos||[]);
-    await salvarDadoAppSheets("bcs_alertas_projetos", state.alertasProjetos||[]);
+    await salvarDadoAppSheets("bcs_projetos",          state.projetos||[]);
+    await salvarDadoAppSheets("bcs_eventos_avulsos",   state.eventosAvulsos||[]);
+    await salvarDadoAppSheets("bcs_alertas_projetos",  state.alertasProjetos||[]);
+    await salvarDadoAppSheets("bcs_projetos_sociais",  state.projetosSociais||[]);
+    await salvarDadoAppSheets("bcs_inscricoes_proj",   state.inscricoesProjetos||[]);
+    await salvarDadoAppSheets("bcs_policiais",         state.policiais||[]);
     await salvarDadoAppSheets("bcs_agendamentos",     state.db.agendamentos||[]);
     await salvarDadoAppSheets("bcs_visitas",          state.db.visitas||[]);
     await salvarDadoAppSheets("bcs_atendimentos",     state.db.atendimentos||[]);
@@ -615,15 +645,18 @@ function _salvarLocalSemSync(){
 async function carregarDadosAppDoSheets(){
   if(!SHEETS_URL) return;
   try{
-    var projetos     = await lerDadoAppSheets("bcs_projetos");
-    var eventos      = await lerDadoAppSheets("bcs_eventos_avulsos");
-    var alertas      = await lerDadoAppSheets("bcs_alertas_projetos");
-    var agendamentos   = await lerDadoAppSheets("bcs_agendamentos");
-    var visitas        = await lerDadoAppSheets("bcs_visitas");
-    var atendimentos   = await lerDadoAppSheets("bcs_atendimentos");
-    var escolasSheets  = await lerDadoAppSheets("bcs_escolas");
-    var atividEscSheets= await lerDadoAppSheets("bcs_atividades_esc");
-    var ocModulosSheets= await lerDadoAppSheets("bcs_oc_modulos");
+    var projetos          = await lerDadoAppSheets("bcs_projetos");
+    var eventos           = await lerDadoAppSheets("bcs_eventos_avulsos");
+    var alertas           = await lerDadoAppSheets("bcs_alertas_projetos");
+    var agendamentos      = await lerDadoAppSheets("bcs_agendamentos");
+    var visitas           = await lerDadoAppSheets("bcs_visitas");
+    var atendimentos      = await lerDadoAppSheets("bcs_atendimentos");
+    var escolasSheets     = await lerDadoAppSheets("bcs_escolas");
+    var atividEscSheets   = await lerDadoAppSheets("bcs_atividades_esc");
+    var ocModulosSheets   = await lerDadoAppSheets("bcs_oc_modulos");
+    var projSociaisSheets = await lerDadoAppSheets("bcs_projetos_sociais");
+    var inscricoesSheets  = await lerDadoAppSheets("bcs_inscricoes_proj");
+    var policiaisSheets   = await lerDadoAppSheets("bcs_policiais");
 
     var localProj  = state.projetos||[];
     var localEv    = state.eventosAvulsos||[];
@@ -672,6 +705,10 @@ async function carregarDadosAppDoSheets(){
     // 🏫 Módulo Escolar
     state.escolas             = _mergeById(state.escolas||[],         escolasSheets);
     state.atividadesEscolares = _mergeById(state.atividadesEscolares||[], atividEscSheets);
+    // 🌱 Projetos Sociais + Policiais
+    state.projetosSociais  = _mergeById(state.projetosSociais||[],  projSociaisSheets);
+    state.inscricoesProjetos = _mergeById(state.inscricoesProjetos||[], inscricoesSheets);
+    state.policiais        = _mergeById(state.policiais||[],         policiaisSheets);
 
     // 🏫 Restaurar classificacao/escolaNome de outros dispositivos via Sheets
     try{
