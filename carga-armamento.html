@@ -936,22 +936,50 @@ function enviarCarga(e){
   }catch(er){}
 
   if(SHEETS_URL && TOKEN){
-    // Envia para Sheets SEM assinaturas (base64 excede limite de URL em GET/JSONP)
+    // Comprime assinaturas para miniatura JPEG (~3-5KB) antes de enviar ao Sheets
+    // Evita estouro do limite de URL do JSONP mantendo legibilidade no PDF
+    function _miniAssin(dataURL){
+      if(!dataURL) return "";
+      try{
+        var img=new Image();
+        img.src=dataURL;
+        var W=240, H=80;
+        var cv2=document.createElement("canvas");
+        cv2.width=W; cv2.height=H;
+        var ctx2=cv2.getContext("2d");
+        ctx2.fillStyle="#070d1a";
+        ctx2.fillRect(0,0,W,H);
+        ctx2.drawImage(img,0,0,W,H);
+        return cv2.toDataURL("image/jpeg",0.5);
+      }catch(e){ return ""; }
+    }
     var dadosSheets = {};
     Object.keys(dados).forEach(function(k){
       if(k!=="assinatura" && k!=="assinatura_adjunto") dadosSheets[k]=dados[k];
     });
-    dadosSheets.tem_assinatura = true; // marca que assinatura existe localmente
+    dadosSheets.assinatura         = _miniAssin(dados.assinatura);
+    dadosSheets.assinatura_adjunto = _miniAssin(dados.assinatura_adjunto);
+    dadosSheets.tem_assinatura = true;
 
     var cbName = "cb_arm_"+Date.now();
     window[cbName] = function(){ delete window[cbName]; clearTimeout(tmout); mostrarSucesso(); };
     var tmout = setTimeout(mostrarSucesso, 8000);
     var script = document.createElement("script");
-    script.src = SHEETS_URL
+    // Se a URL com miniaturas ainda ficar > 60KB, envia sem assinaturas (fallback seguro)
+    var urlComAssin = SHEETS_URL
       +"?acao=salvar&tipo=carga_armamento"
       +"&dados="+encodeURIComponent(JSON.stringify(dadosSheets))
       +"&token="+encodeURIComponent(TOKEN)
       +"&callback="+cbName;
+    if(urlComAssin.length > 60000){
+      var dadosSemAssin = Object.assign({},dadosSheets);
+      dadosSemAssin.assinatura=""; dadosSemAssin.assinatura_adjunto="";
+      script.src = SHEETS_URL+"?acao=salvar&tipo=carga_armamento"
+        +"&dados="+encodeURIComponent(JSON.stringify(dadosSemAssin))
+        +"&token="+encodeURIComponent(TOKEN)+"&callback="+cbName;
+    } else {
+      script.src = urlComAssin;
+    }
     script.onerror = function(){ clearTimeout(tmout); mostrarSucesso(); };
     document.head.appendChild(script);
   } else {
