@@ -10039,7 +10039,12 @@ function renderTela() {
       };
 
       // Botões
-      document.getElementById("btn-cancelar-lancar").onclick=function(){ state.tela="dashboard"; render(); };
+      document.getElementById("btn-cancelar-lancar").onclick=function(){
+        var retorno = state._lancarRetornoGestor;
+        state._lancarRetornoGestor = false;
+        state.tela = retorno ? "ocorrencias" : "dashboard";
+        render();
+      };
       document.getElementById("btn-salvar-lancar").onclick=function(){
         var classificacao=(document.getElementById("oc-classificacao")||{value:""}).value.trim();
         if(!classificacao){ showToast("Selecione a Classificação da Atividade","error"); document.getElementById("classif-btns").scrollIntoView({behavior:"smooth",block:"center"}); return; }
@@ -10108,7 +10113,9 @@ function renderTela() {
           enviarSheets("ocorrencias",oc);
           salvarLocal();
           showToast("✓ Ocorrência lançada com sucesso!");
-          state.tela="dashboard";
+          var retorno = state._lancarRetornoGestor;
+          state._lancarRetornoGestor = false;
+          state.tela = retorno ? "ocorrencias" : "dashboard";
           render();
         } catch(e){ console.error("[IARA] Erro ao lançar:",e); showToast("Erro: "+e.message,"error"); }
       };
@@ -14769,7 +14776,10 @@ function renderOcorrenciasGestor(el, perfil_atual){
 
   var h = [];
   h.push("<div style='max-width:900px;margin:0 auto;padding:16px'>");
-  h.push("<input id='oc-busca' type='text' placeholder='🔍 Filtrar por nome, Nº, bairro, tipo, suspeito...' value='"+(state.filtroOcBusca||"")+"' style='width:100%;background:#2a1c10;border:1px solid #2a3818;color:#f2eada;padding:10px 13px;border-radius:8px;font-size:13px;margin-bottom:10px;box-sizing:border-box;outline:none'/>");
+  h.push("<div style='display:flex;gap:8px;margin-bottom:10px;align-items:center'>");
+  h.push("<input id='oc-busca' type='text' placeholder='🔍 Filtrar por nome, Nº, bairro, tipo, suspeito...' value='"+(state.filtroOcBusca||"")+"' style='flex:1;background:#2a1c10;border:1px solid #2a3818;color:#f2eada;padding:10px 13px;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none'/>");
+  h.push("<button onclick='_gestorLancarOcManual()' style='flex-shrink:0;background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:2px solid #22c55e;color:#4ade80;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px'><span>📝</span> Lançar Ocorrência</button>");
+  h.push("</div>");
 
   // Botão IA — Analisar tipos da semana
   var _temIaKey = !!(localStorage.getItem("bcs_anthropic_key")||"");
@@ -15042,6 +15052,12 @@ function renderOcorrenciasGestor(el, perfil_atual){
 }
 
 // Filtra a lista de ocorrências para exibir só as conectadas a uma ocorrência específica
+function _gestorLancarOcManual(){
+  // Marca que ao salvar deve voltar para ocorrencias (não para dashboard)
+  state._lancarRetornoGestor = true;
+  setTela("lancar");
+}
+
 function _filtrarConectadas(ocId){
   var oc = (state.db.ocorrencias||[]).find(function(x){ return x.id===ocId; });
   if(!oc){ showToast("Ocorrência não encontrada","error"); return; }
