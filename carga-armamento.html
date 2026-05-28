@@ -734,7 +734,17 @@ function criarCanvas(canvasId, boxId, labelId){
       temAssin=false;
       document.getElementById(labelId).style.opacity="1";
     },
-    toDataURL: function(){ return cv.toDataURL("image/png"); }
+    toDataURL: function(){
+      // Comprime para JPEG 320x90 antes de salvar — evita PNG gigante em telas retina
+      var W=320, H=90;
+      var tmp=document.createElement("canvas");
+      tmp.width=W; tmp.height=H;
+      var tctx=tmp.getContext("2d");
+      tctx.fillStyle="#070d1a";
+      tctx.fillRect(0,0,W,H);
+      tctx.drawImage(cv,0,0,cv.width,cv.height,0,0,W,H);
+      return tmp.toDataURL("image/jpeg",0.7);
+    }
   };
 }
 
@@ -830,16 +840,17 @@ function enviarCarga(e){
     function _miniAssin(dataURL){
       if(!dataURL) return "";
       try{
+        // já está em JPEG 320x90; reduz mais para caber na URL do Sheets
         var img=new Image();
         img.src=dataURL;
-        var W=240, H=80;
+        var W=200, H=65;
         var cv2=document.createElement("canvas");
         cv2.width=W; cv2.height=H;
         var ctx2=cv2.getContext("2d");
         ctx2.fillStyle="#070d1a";
         ctx2.fillRect(0,0,W,H);
         ctx2.drawImage(img,0,0,W,H);
-        return cv2.toDataURL("image/jpeg",0.5);
+        return cv2.toDataURL("image/jpeg",0.55);
       }catch(e){ return ""; }
     }
     var dadosSheets = {};
@@ -860,7 +871,7 @@ function enviarCarga(e){
       +"&dados="+encodeURIComponent(JSON.stringify(dadosSheets))
       +"&token="+encodeURIComponent(TOKEN)
       +"&callback="+cbName;
-    if(urlComAssin.length > 60000){
+    if(urlComAssin.length > 90000){
       var dadosSemAssin = Object.assign({},dadosSheets);
       dadosSemAssin.assinatura=""; dadosSemAssin.assinatura_adjunto="";
       script.src = SHEETS_URL+"?acao=salvar&tipo=carga_armamento"
