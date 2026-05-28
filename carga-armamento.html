@@ -410,8 +410,6 @@ function carregarMateriais(tentativa){
   document.head.appendChild(sc);
 }
 carregarMateriais();
-// Renderiza imediatamente com cache local (enquanto Sheets carrega)
-_renderizarMateriais();
 
 // ── Sincroniza cargas do Sheets → localStorage ao abrir ──
 // Garante que disponibilidade reflita outros dispositivos
@@ -456,6 +454,9 @@ var CORES_TIPO = {
   "Algemas":"#22c55e","Rádio":"#34d399","Lanterna":"#fbbf24",
   "Bastão":"#f87171","Equipamento Tático":"#60a5fa","Veículo":"#6b7280","Outros":"#9ca3af"
 };
+
+// Renderiza com o que já está no cache local (ITENS agora está inicializado)
+_renderizarMateriais();
 
 function _renderizarMateriais(){
   var grid = document.getElementById("grid-materiais");
