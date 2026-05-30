@@ -3455,6 +3455,54 @@ function _vcmPrioridade(v){
   return pesoNivel + (pa.dias||0); // vencidas (dias negativos) sobem
 }
 
+// Agrega o caso de uma vítima a partir de uma ocorrência (para o monitor, sem filtro de bairro)
+function _vcmAgregar(oc){
+  var todas=(state.db.ocorrencias||[]);
+  var ocs=todas.filter(function(x){return _mesmaVitima(oc,x);}).sort(function(a,b){return(a.data||"")>(b.data||"")?-1:1;});
+  if(!ocs.length) ocs=[oc];
+  var frida=(state.db.frida||[]).filter(function(fr){return ocs.some(function(x){return x.id===fr.ocorrenciaId;});}).sort(function(a,b){return(a.data||"")>(b.data||"")?-1:1;});
+  var ags=(state.db.agendamentos||[]).filter(function(ag){return ocs.some(function(x){return x.id===ag.ocorrenciaId;});}).sort(function(a,b){return(a.data||"")>(b.data||"")?1:-1;});
+  var temMp=ocs.some(function(x){return x.medida_protetiva&&x.medida_protetiva!=="Não";});
+  var fridaRecente=frida.find(function(fr){return fr.nivel&&fr.nivel!=="";})||null;
+  var proximaVisita=ags.find(function(ag){return ag.status==="Agendado";})||null;
+  var ultimaVisita=ags.filter(function(ag){return ag.status!=="Agendado";}).sort(function(a,b){return(a.data||"")>(b.data||"")?-1:1;})[0]||null;
+  var diasSemVisita=ultimaVisita?Math.floor((new Date()-new Date(ultimaVisita.data+"T12:00"))/(864e5)):999;
+  var encerrado=ocs.some(function(x){return x._encerrado;});
+  var vit={ocBase:oc,ocs:ocs,frida:frida,fridaRecente:fridaRecente,temMp:temMp,proximaVisita:proximaVisita,ultimaVisita:ultimaVisita,diasSemVisita:diasSemVisita,encerrado:encerrado};
+  vit.fase=_vcmFase(vit);
+  vit.proximaAcao=_vcmProximaAcao(vit);
+  return vit;
+}
+
+// Salva o estado dos casos VCM (rede + contatos)
+function _vcmSalvarCasos(){
+  if(state.vcmCasos) localStorage.setItem("bcs_vcm_casos", JSON.stringify(state.vcmCasos));
+}
+
+// Marca/desmarca um órgão da rede de proteção
+function _vcmToggleRede(chave, orgao, nomeRef){
+  var caso=_vcmGetCaso(chave, nomeRef);
+  if(!caso.rede[orgao] || !caso.rede[orgao].marcado){
+    caso.rede[orgao]={marcado:true, data:new Date().toISOString()};
+  } else {
+    caso.rede[orgao]={marcado:false, data:caso.rede[orgao].data};
+  }
+  caso.atualizadoEm=new Date().toISOString();
+  _vcmSalvarCasos();
+}
+
+// Registra um contato (toque) de acompanhamento
+function _vcmRegistrarContato(chave, nomeRef, dados){
+  var caso=_vcmGetCaso(chave, nomeRef);
+  caso.contatos.push({
+    id:"ct_"+Date.now(), data:new Date().toISOString(),
+    tipo:dados.tipo||"ligacao", feito:dados.feito!==false,
+    resposta:dados.resposta||"", obs:dados.obs||""
+  });
+  caso.atualizadoEm=new Date().toISOString();
+  _vcmSalvarCasos();
+}
+
 function _buildVitimas(periodo){
   var agora=new Date(), dataCorte=null;
   if(periodo==="semana"){dataCorte=new Date(agora);dataCorte.setDate(agora.getDate()-7);}
@@ -16060,7 +16108,11 @@ var FRIDA_PERGUNTAS=["A violência vem aumentando de gravidade e/ou frequência 
 function abrirMonitorVCM(ocId){
   var ocVcm=state.db.ocorrencias.find(function(x){return x.id===ocId;});
   if(!ocVcm) return;
+  var _mAnt=document.getElementById("modal-frida"); if(_mAnt) _mAnt.remove(); // evita modal duplicado ao reabrir
   var perguntas=FRIDA_PERGUNTAS;
+  var _vcmCaso=_vcmAgregar(ocVcm);                 // agregado do caso (fase, risco, próxima ação)
+  var _vcmChaveAtual=_vcmChave(ocVcm);             // chave estável da vítima
+  _vcmGetCaso(_vcmChaveAtual, ocVcm.vitima_nome||"");
   function calcFrida(respostas){var sim=0,naoSabe=0;respostas.forEach(function(r){if(r==="sim")sim++;else if(r==="nao_sabe"||r==="nao_aplica")naoSabe++;});var tabela=[["B","B","B","B","B","B","B","B","B","B","B","M"],["B","B","B","B","B","B","B","B","M","M","M","M"],["B","B","B","B","M","M","M","M","M","M","M","M"],["M","M","M","M","M","M","M","M","M","M","E","M"],["M","M","M","M","M","M","M","M","E","E","E","M"],["M","M","M","M","M","M","E","E","E","E","E","M"],["M","M","M","M","E","E","E","E","E","E","E","M"],["M","M","E","E","E","E","E","E","E","E","E","M"],["E","E","E","E","E","E","E","E","E","E","E","M"]];return {sim:sim,naoSabe:naoSabe,nivel:tabela[sim<=8?sim:8][naoSabe<=10?naoSabe:11]};}
   var vcmAnexoB64="",vcmAnexoNome="",vcmAnexoTipo="";
   var fridaCalc={nivel:"",sim:0,naoSabe:0,respostas:[]};
@@ -16084,6 +16136,37 @@ function abrirMonitorVCM(ocId){
   hf.push("<button onclick='document.getElementById(\"modal-frida\").remove()' style='background:#42301e;border:1px solid #5e4636;color:#a07c58;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer'>✕</button>");
   hf.push("</div>");
   hf.push("</div><div style='padding:20px'>");
+
+  // ── BANNER DO CASO — fase, risco, próxima ação ────────────────
+  (function(){
+    var v=_vcmCaso, fase=VCM_FASES[v.fase]||VCM_FASES.acompanhamento;
+    var nivel=(v.fridaRecente&&v.fridaRecente.nivel)||"";
+    var nc={B:{c:"#10b981",l:"BAIXO"},M:{c:"#d4a87a",l:"MÉDIO"},E:{c:"#ef4444",l:"ELEVADO"}}[nivel]||{c:"#8a6a4a",l:"SEM FRIDA"};
+    var pa=v.proximaAcao;
+    hf.push("<div style='background:linear-gradient(135deg,#1a0e08,#2a1810);border:1px solid "+fase.cor+"55;border-left:4px solid "+fase.cor+";border-radius:10px;padding:14px 16px;margin-bottom:16px'>");
+    hf.push("<div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px'>");
+    hf.push("<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap'>");
+    hf.push("<span style='background:"+fase.cor+"22;color:"+fase.cor+";padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700'>"+fase.icon+" "+fase.label+"</span>");
+    hf.push("<span style='background:"+nc.c+"22;color:"+nc.c+";border:1px solid "+nc.c+";padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700'>Risco "+nc.l+"</span>");
+    if(v.temMp) hf.push("<span style='color:#d4a87a;font-size:11px;font-weight:700'>🛡 Medida Protetiva</span>");
+    if(v.ocs.length>1) hf.push("<span style='color:#9a7060;font-size:11px'>📁 "+v.ocs.length+" ocorrências</span>");
+    hf.push("</div>");
+    hf.push("</div>");
+    // Linha da próxima ação
+    if(pa){
+      var stCor,stTxt;
+      if(pa.vencida){ stCor="#ef4444"; stTxt="⚠ Ação vencida há "+Math.abs(pa.dias)+" dia(s)"; }
+      else if(pa.dias===0){ stCor="#f59e0b"; stTxt="⏰ Ação vence hoje"; }
+      else { stCor="#7a9a5a"; stTxt="✓ Próxima ação em "+pa.dias+" dia(s)"; }
+      var prazoTxt=nivel?("a cada "+pa.prazoDias+" dias (risco "+nc.l.toLowerCase()+")"):"avaliar risco com urgência";
+      hf.push("<div style='margin-top:10px;padding-top:10px;border-top:1px solid #3a2a18;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px'>");
+      hf.push("<span style='color:"+stCor+";font-size:12px;font-weight:700'>"+stTxt+"</span>");
+      hf.push("<span style='color:#6a5030;font-size:10px'>Periodicidade: "+prazoTxt+"</span>");
+      hf.push("</div>");
+    }
+    hf.push("</div>");
+  })();
+
   hf.push("<div style='background:#2a1c10;border:1px solid #5e4636;border-radius:10px;padding:16px;margin-bottom:16px'>");
   hf.push("<p style='color:#d4a87a;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 14px'>Resumo do Atendimento</p>");
   hf.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>");
@@ -16183,6 +16266,71 @@ function abrirMonitorVCM(ocId){
     });
   }
   hf.push("</div>");
+
+  // ── REDE DE PROTEÇÃO — checklist de encaminhamentos ───────────
+  (function(){
+    var caso=_vcmGetCaso(_vcmChaveAtual, ocVcm.vitima_nome||"");
+    var marcados=VCM_REDE.filter(function(o){return caso.rede[o.k]&&caso.rede[o.k].marcado;}).length;
+    hf.push("<div style='margin-bottom:14px;border:1px solid #2a5a3a55;border-radius:10px;overflow:hidden'>");
+    hf.push("<div style='background:#0a1f12;padding:12px 14px;display:flex;align-items:center;justify-content:space-between'>");
+    hf.push("<span style='color:#4ade80;font-size:12px;font-weight:700'>🛡 Rede de Proteção — Encaminhamentos</span>");
+    hf.push("<span style='background:#22c55e22;color:#4ade80;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700'>"+marcados+"/"+VCM_REDE.length+"</span>");
+    hf.push("</div>");
+    hf.push("<div style='padding:10px 12px;display:grid;gap:6px'>");
+    VCM_REDE.forEach(function(o){
+      var st=caso.rede[o.k]||{};
+      var on=!!st.marcado;
+      var dataTxt=on&&st.data?new Date(st.data).toLocaleDateString("pt-BR"):"";
+      hf.push("<div onclick=\"_vcmToggleRede('"+_vcmChaveAtual.replace(/'/g,"\\'")+"','"+o.k+"','"+(ocVcm.vitima_nome||"").replace(/'/g,"\\'")+"');abrirMonitorVCM('"+ocVcm.id+"')\" style='display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;cursor:pointer;background:"+(on?"#0d2a18":"#1a1208")+";border:1px solid "+(on?"#22c55e55":"#2a1c10")+"'>");
+      hf.push("<span style='width:20px;height:20px;border-radius:5px;border:2px solid "+(on?"#22c55e":"#5e4636")+";background:"+(on?"#22c55e":"transparent")+";display:flex;align-items:center;justify-content:center;font-size:12px;color:#0a1f12;font-weight:700;flex-shrink:0'>"+(on?"✓":"")+"</span>");
+      hf.push("<div style='flex:1;min-width:0'>");
+      hf.push("<span style='color:"+(on?"#4ade80":"#c8a87a")+";font-size:12px;font-weight:700'>"+o.icon+" "+o.label+(o.destaque?" <span style=\"color:#ff69b4;font-size:9px\">★ principal</span>":"")+"</span>");
+      hf.push("<p style='color:#6a5030;font-size:10px;margin:1px 0 0'>"+o.desc+"</p>");
+      hf.push("</div>");
+      if(on&&dataTxt) hf.push("<span style='color:#4ade8088;font-size:10px;white-space:nowrap'>"+dataTxt+"</span>");
+      hf.push("</div>");
+    });
+    hf.push("</div></div>");
+  })();
+
+  // ── REGISTRAR CONTATO RÁPIDO (ligação de acompanhamento) ──────
+  (function(){
+    var caso=_vcmGetCaso(_vcmChaveAtual, ocVcm.vitima_nome||"");
+    var contatos=(caso.contatos||[]).slice().sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;});
+    hf.push("<div style='margin-bottom:14px;border:1px solid #1a3a5a55;border-radius:10px;overflow:hidden'>");
+    hf.push("<div style='background:#08151f;padding:12px 14px;display:flex;align-items:center;justify-content:space-between'>");
+    hf.push("<span style='color:#60a5fa;font-size:12px;font-weight:700'>📞 Contatos de Acompanhamento</span>");
+    hf.push("<span style='background:#3a6ae822;color:#60a5fa;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700'>"+contatos.length+"</span>");
+    hf.push("</div>");
+    hf.push("<div style='padding:12px 14px'>");
+    // Form rápido
+    hf.push("<div style='display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap'>");
+    hf.push("<select id='vcm-ct-tipo' style='background:#0a1828;border:1px solid #1a3a5a;color:#c5daf5;padding:7px 9px;border-radius:6px;font-size:11px;outline:none'><option value='ligacao'>📞 Ligação</option><option value='visita'>🏠 Visita</option><option value='mensagem'>💬 Mensagem</option></select>");
+    hf.push("<select id='vcm-ct-resp' style='background:#0a1828;border:1px solid #1a3a5a;color:#c5daf5;padding:7px 9px;border-radius:6px;font-size:11px;outline:none'><option value='atendeu'>✓ Conseguiu contato</option><option value='nao_atendeu'>✗ Não atendeu</option><option value='mudou'>⚠ Situação mudou</option></select>");
+    hf.push("</div>");
+    hf.push("<input id='vcm-ct-obs' type='text' placeholder='Observação do contato (opcional)' style='width:100%;background:#0a1828;border:1px solid #1a3a5a;color:#c5daf5;padding:8px 10px;border-radius:6px;font-size:11px;outline:none;box-sizing:border-box;margin-bottom:8px'/>");
+    hf.push("<button id='btn-vcm-contato' style='width:100%;background:linear-gradient(135deg,#0a2a4a,#1a4a7a);border:1px solid #3a6ae8;color:#a0c5f8;padding:9px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>📝 Registrar Contato</button>");
+    // Lista de contatos
+    if(contatos.length){
+      hf.push("<div style='margin-top:12px;display:grid;gap:6px;max-height:160px;overflow-y:auto'>");
+      contatos.slice(0,8).forEach(function(c){
+        var tIco={ligacao:"📞",visita:"🏠",mensagem:"💬"}[c.tipo]||"📞";
+        var rCor={atendeu:"#10b981",nao_atendeu:"#f59e0b",mudou:"#ef4444"}[c.resposta]||"#60a5fa";
+        var rTxt={atendeu:"Contato feito",nao_atendeu:"Não atendeu",mudou:"Situação mudou"}[c.resposta]||c.resposta;
+        var dt=c.data?new Date(c.data).toLocaleDateString("pt-BR")+" "+new Date(c.data).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"";
+        hf.push("<div style='background:#0a1828;border:1px solid #14263a;border-radius:7px;padding:8px 10px'>");
+        hf.push("<div style='display:flex;align-items:center;justify-content:space-between;gap:6px'>");
+        hf.push("<span style='color:#c5daf5;font-size:11px;font-weight:700'>"+tIco+" <span style='color:"+rCor+"'>"+rTxt+"</span></span>");
+        hf.push("<span style='color:#3a5a7a;font-size:10px'>"+dt+"</span>");
+        hf.push("</div>");
+        if(c.obs) hf.push("<p style='color:#7a9aba;font-size:10px;margin:3px 0 0;font-style:italic'>"+esc(c.obs)+"</p>");
+        hf.push("</div>");
+      });
+      hf.push("</div>");
+    }
+    hf.push("</div></div>");
+  })();
+
   // ── FRIDA ─────────────────────────────────────────────────
   hf.push("<div style='border:1px solid #3a2a18;border-radius:10px;overflow:hidden'>");
   hf.push("<button id='btn-frida-toggle' style='width:100%;background:#1a1208;border:none;color:#d4a87a;padding:14px 16px;text-align:left;cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px'><span id='frida-toggle-icon'>▶</span> Aplicar Avaliação de Risco FRIDA</button>");
@@ -16244,6 +16392,15 @@ function abrirMonitorVCM(ocId){
     showToast("✓ Atendimento salvo e visita agendada!");document.getElementById("modal-frida").remove();
   };
   document.getElementById("btn-vcm-encerrar").onclick=function(){_salvarAtendimentoVcm(true);showToast("✓ Acompanhamento encerrado e salvo!");document.getElementById("modal-frida").remove();};
+  var _btnCt=document.getElementById("btn-vcm-contato");
+  if(_btnCt) _btnCt.onclick=function(){
+    var tipo=(document.getElementById("vcm-ct-tipo")||{}).value||"ligacao";
+    var resp=(document.getElementById("vcm-ct-resp")||{}).value||"atendeu";
+    var obs=(document.getElementById("vcm-ct-obs")||{}).value||"";
+    _vcmRegistrarContato(_vcmChaveAtual, ocVcm.vitima_nome||"", {tipo:tipo, resposta:resp, obs:obs, feito:resp!=="nao_atendeu"});
+    showToast("✓ Contato registrado! Próxima ação recalculada.");
+    abrirMonitorVCM(ocVcm.id); // reabre para refletir a nova linha do tempo
+  };
 }
 
 // ============================================================
