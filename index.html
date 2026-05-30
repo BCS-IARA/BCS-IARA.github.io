@@ -317,6 +317,7 @@ function salvarLocal() {
     if(state.invMovimentacoes) localStorage.setItem("bcs_inv_mov",JSON.stringify(state.invMovimentacoes));
     if(state.invConferencias) localStorage.setItem("bcs_inv_conf",JSON.stringify(state.invConferencias));
     if(state.vcmCasos) localStorage.setItem("bcs_vcm_casos",JSON.stringify(state.vcmCasos));
+    if(state.vcmEncaminhamentos) localStorage.setItem("bcs_vcm_enc",JSON.stringify(state.vcmEncaminhamentos));
     if(state.policiais) localStorage.setItem("bcs_policiais",JSON.stringify(state.policiais));
     if(state.solicitacoes) localStorage.setItem("bcs_solicitacoes",JSON.stringify(state.solicitacoes));
     if(state.escolas) localStorage.setItem("bcs_escolas",JSON.stringify(state.escolas));
@@ -452,6 +453,7 @@ function exportarDadosBCS(){
     invMovimentacoes: state.invMovimentacoes||[],
     invConferencias: state.invConferencias||[],
     vcmCasos: state.vcmCasos||{},
+    vcmEncaminhamentos: state.vcmEncaminhamentos||[],
     escolas: state.escolas||[],
     visitasEscolares: state.visitasEscolares||[],
     atividadesEscolares: state.atividadesEscolares||[]
@@ -501,6 +503,7 @@ function importarDadosBCS(input){
       if(dados.invMovimentacoes) state.invMovimentacoes=dados.invMovimentacoes;
       if(dados.invConferencias) state.invConferencias=dados.invConferencias;
       if(dados.vcmCasos) state.vcmCasos=dados.vcmCasos;
+      if(dados.vcmEncaminhamentos) state.vcmEncaminhamentos=dados.vcmEncaminhamentos;
       if(dados.escolas) state.escolas=dados.escolas;
       if(dados.visitasEscolares) state.visitasEscolares=dados.visitasEscolares;
       if(dados.atividadesEscolares) state.atividadesEscolares=dados.atividadesEscolares;
@@ -1065,6 +1068,7 @@ let state = {
   devolutivasCrav: JSON.parse(localStorage.getItem("bcs_devolutivas_crav")||"[]"),
   // Fluxo VCM — casos (rede de proteção + contatos por vítima)
   vcmCasos: JSON.parse(localStorage.getItem("bcs_vcm_casos")||"{}"),
+  vcmEncaminhamentos: JSON.parse(localStorage.getItem("bcs_vcm_enc")||"[]"),
 };
 
 // Inicializar arrays vazios se undefined
@@ -3589,8 +3593,104 @@ function _modalVcm(titulo, vitimas){
   });
 }
 
+function _renderVcmEncaminhamentos(main){
+  var encs=(state.vcmEncaminhamentos||[]).slice().sort(function(a,b){
+    // pendentes primeiro, depois por data desc
+    if(a.status==="pendente"&&b.status!=="pendente") return -1;
+    if(a.status!=="pendente"&&b.status==="pendente") return 1;
+    return (b.dataRegistro||"")>(a.dataRegistro||"")?1:-1;
+  });
+  var nPend=encs.filter(function(e){return e.status==="pendente";}).length;
+  var nEnv=encs.filter(function(e){return e.status==="enviado";}).length;
+  var nTotal=encs.length;
+
+  var h="<div style='max-width:1200px;margin:0 auto;padding:16px'>";
+  // Abas (igual ao dashboard)
+  h+="<div style='display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid #3a1a2a'>";
+  h+="<button onclick=\"state.vcmTab='dashboard';renderDashboardVCM(document.getElementById('main')||document.getElementById('main-content'))\" style='padding:9px 20px;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;background:transparent;color:#7a5050;font-size:13px;cursor:pointer'>📊 Dashboard</button>";
+  h+="<button onclick=\"state.vcmTab='encaminhamentos';renderDashboardVCM(document.getElementById('main')||document.getElementById('main-content'))\" style='padding:9px 20px;border:none;border-bottom:3px solid #ff1493;margin-bottom:-2px;background:transparent;color:#ff69b4;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px'>📤 Encaminhamentos"+(nPend>0?" <span style='background:#ff1493;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700'>"+nPend+"</span>":"")+"</button>";
+  h+="</div>";
+  // Cabeçalho
+  h+="<div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px'>";
+  h+="<div><h2 style='font-size:18px;font-weight:700;color:#ff69b4;margin:0 0 2px'>📤 Relatórios Pendentes de Encaminhamento</h2>";
+  h+="<p style='color:#7a5050;font-size:12px;margin:0'>"+nPend+" pendente(s) · "+nEnv+" enviado(s) · "+nTotal+" total</p></div>";
+  h+="</div>";
+
+  if(!encs.length){
+    h+="<div style='text-align:center;padding:60px 20px;color:#5a3040'>";
+    h+="<div style='font-size:40px;margin-bottom:12px'>📭</div>";
+    h+="<p style='font-size:14px'>Nenhum encaminhamento registrado.</p>";
+    h+="<p style='font-size:12px;margin-top:6px'>Abra o Monitor VCM de uma vítima e use o menu <b>Encaminhar</b>.</p>";
+    h+="</div></div>";
+    main.innerHTML=h; return;
+  }
+
+  // Agrupa por status: pendente, depois enviado
+  ["pendente","enviado"].forEach(function(status){
+    var grupo=encs.filter(function(e){return e.status===status;});
+    if(!grupo.length) return;
+    h+="<div style='margin-bottom:20px'>";
+    h+="<div style='display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid "+(status==="pendente"?"#5a1a1a":"#1a2a1a")+"'>";
+    h+="<span style='color:"+(status==="pendente"?"#ef4444":"#22c55e")+";font-size:13px;font-weight:700'>"+(status==="pendente"?"⏳ Pendentes":"✅ Enviados")+"</span>";
+    h+="<span style='background:"+(status==="pendente"?"#ef444422":"#22c55e22")+";color:"+(status==="pendente"?"#ef4444":"#22c55e")+";padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700'>"+grupo.length+"</span>";
+    h+="</div>";
+    h+="<div style='display:flex;flex-direction:column;gap:8px'>";
+    grupo.forEach(function(enc){
+      var orgLabel=_orgaoLabels[enc.servico]||enc.servico;
+      var dt=enc.dataRegistro?new Date(enc.dataRegistro).toLocaleDateString("pt-BR"):"—";
+      var dtEnv=enc.dataEnvio?new Date(enc.dataEnvio).toLocaleDateString("pt-BR"):"";
+      var oc=(state.db.ocorrencias||[]).find(function(o){return o.id===enc.ocorrenciaId;});
+      h+="<div style='background:#0e0808;border:1px solid "+(status==="pendente"?"#3a1a1a":"#1a2a1a")+";border-left:4px solid "+(status==="pendente"?"#ef4444":"#22c55e")+";border-radius:8px;padding:14px 16px'>";
+      h+="<div style='display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px'>";
+      h+="<div style='flex:1;min-width:0'>";
+      h+="<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px'>";
+      h+="<span style='color:#f5ede0;font-size:14px;font-weight:700'>"+esc(enc.vitimaNome||"—")+"</span>";
+      h+="<span style='background:#a855f722;color:#c084fc;border:1px solid #a855f744;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700'>"+orgLabel+"</span>";
+      if(enc.vitimaBairro) h+="<span style='color:#7a5050;font-size:11px'>"+esc(enc.vitimaBairro)+"</span>";
+      h+="</div>";
+      h+="<p style='color:#6a5040;font-size:11px;margin:0'>Registrado: "+dt+(enc.ocNumero?" · Ref: "+esc(enc.ocNumero):"")+(dtEnv?" · Enviado: "+dtEnv:"")+"</p>";
+      if(enc.obs) h+="<p style='color:#8a7060;font-size:11px;margin:4px 0 0;font-style:italic'>"+esc(enc.obs)+"</p>";
+      h+="</div>";
+      // Botões
+      h+="<div style='display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start'>";
+      if(oc){
+        h+="<button onclick=\"state._pdfOcId='"+enc.ocorrenciaId+"';exportarPDFOcorrencia();\" style='background:#1a1a0a;border:1px solid #d4a87a;color:#d4a87a;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>📄 Gerar PDF</button>";
+        h+="<button onclick=\"abrirMonitorVCM('"+enc.ocorrenciaId+"')\" style='background:#1a0a1a;border:1px solid #ff69b4;color:#ff69b4;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>👁 Monitor</button>";
+      }
+      if(status==="pendente"){
+        h+="<button onclick=\"_vcmMarcarEnviado('"+enc.id+"')\" style='background:#0a1a0a;border:1px solid #22c55e;color:#22c55e;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>✓ Marcar Enviado</button>";
+      }
+      h+="</div>";
+      h+="</div></div>";
+    });
+    h+="</div></div>";
+  });
+  h+="</div>";
+  main.innerHTML=h;
+}
+
+function _vcmMarcarEnviado(encId){
+  if(!state.vcmEncaminhamentos) return;
+  var idx=state.vcmEncaminhamentos.findIndex(function(e){return e.id===encId;});
+  if(idx<0) return;
+  state.vcmEncaminhamentos[idx].status="enviado";
+  state.vcmEncaminhamentos[idx].dataEnvio=new Date().toISOString();
+  localStorage.setItem("bcs_vcm_enc",JSON.stringify(state.vcmEncaminhamentos));
+  salvarLocal();
+  showToast("✓ Marcado como enviado!");
+  var main=document.getElementById("main")||document.getElementById("main-content");
+  if(main) renderDashboardVCM(main);
+}
+
 function renderDashboardVCM(main){
   if(!state.vcmFiltro) state.vcmFiltro="todas";
+  if(!state.vcmTab) state.vcmTab="dashboard";
+  var tab=state.vcmTab;
+  var nEnc=(state.vcmEncaminhamentos||[]).filter(function(e){return e.status==="pendente";}).length;
+
+  // Roteador de abas
+  if(tab==="encaminhamentos"){ _renderVcmEncaminhamentos(main); return; }
+
   var periodo=state.vcmFiltro;
   // Cards e tabela respeitam o período selecionado
   var vitimas=_buildVitimas(periodo);
@@ -3613,6 +3713,11 @@ function renderDashboardVCM(main){
   ];
 
   var h="<div style='max-width:1200px;margin:0 auto;padding:16px'>";
+  // ── ABAS PRINCIPAIS ─────────────────────────────────────────────
+  h+="<div style='display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid #3a1a2a'>";
+  h+="<button onclick=\"state.vcmTab='dashboard';renderDashboardVCM(document.getElementById('main')||document.getElementById('main-content'))\" style='padding:9px 20px;border:none;border-bottom:3px solid "+(tab==="dashboard"?"#ff1493":"transparent")+";margin-bottom:-2px;background:transparent;color:"+(tab==="dashboard"?"#ff69b4":"#7a5050")+";font-size:13px;font-weight:"+(tab==="dashboard"?"700":"400")+";cursor:pointer'>📊 Dashboard</button>";
+  h+="<button onclick=\"state.vcmTab='encaminhamentos';renderDashboardVCM(document.getElementById('main')||document.getElementById('main-content'))\" style='padding:9px 20px;border:none;border-bottom:3px solid "+(tab==="encaminhamentos"?"#ff1493":"transparent")+";margin-bottom:-2px;background:transparent;color:"+(tab==="encaminhamentos"?"#ff69b4":"#7a5050")+";font-size:13px;font-weight:"+(tab==="encaminhamentos"?"700":"400")+";cursor:pointer;display:flex;align-items:center;gap:6px'>📤 Encaminhamentos"+(nEnc>0?" <span style='background:#ff1493;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700'>"+nEnc+"</span>":"")+"</button>";
+  h+="</div>";
   h+="<div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px'>";
   h+="<div><h2 style='font-size:20px;font-weight:700;color:#ff69b4;margin:0 0 2px'>🌸 Dashboard VCM</h2>";
   h+="<p style='color:#7a5050;font-size:12px;margin:0'>Bairros: Primavera · Panorama · Pedrinhas · Alto Marom · Europa Unida · Cruzeiro · Guarani</p></div>";
@@ -15482,25 +15587,50 @@ var _orgaoNomes = {
 };
 
 function gerarLinkEncaminhamento(ocId, servico){
-  var oc = (state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
-  if(!oc) return;
-  var url = CRAV_BASE_URL + "crav-devolutiva.html"
-    + "?servico=" + encodeURIComponent(servico||"crav")
-    + "&oc="      + encodeURIComponent(oc.id)
-    + "&nome="    + encodeURIComponent(oc.vitima_nome||"")
-    + "&bairro="  + encodeURIComponent(oc.bairro||"")
-    + "&ref="     + encodeURIComponent(oc.numero_bo||oc.id||"");
-  var orgNome = _orgaoNomes[servico] || "Órgão";
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(url).then(function(){
-      showToast("✓ Link "+orgNome+" copiado! Cole no WhatsApp.");
-    }).catch(function(){ prompt("Copie e envie ao "+orgNome+":", url); });
-  } else {
-    prompt("Copie e envie ao "+orgNome+":", url);
+  // Mantido por retrocompatibilidade — redireciona para o novo fluxo
+  _vcmEncaminhar(ocId, servico);
+}
+function gerarLinkCrav(ocId){ _vcmEncaminhar(ocId,"crav"); }
+
+var _orgaoLabels={
+  crav:"CRAV", deam:"DEAM / Delegacia", creas:"CREAS",
+  mp:"Ministério Público", defensoria:"Defensoria Pública",
+  saude:"Saúde", conselho_tutelar:"Conselho Tutelar", dean:"DEAN", outros:"Outros"
+};
+
+function _vcmEncaminhar(ocId, servico){
+  var oc=(state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
+  if(!oc){ showToast("Ocorrência não encontrada","error"); return; }
+  if(!state.vcmEncaminhamentos) state.vcmEncaminhamentos=[];
+  // Evita duplicata pendente para o mesmo órgão
+  var jaPendente=state.vcmEncaminhamentos.some(function(e){
+    return e.ocorrenciaId===ocId && e.servico===servico && e.status==="pendente";
+  });
+  if(jaPendente){
+    showToast((_orgaoLabels[servico]||servico)+" já tem encaminhamento pendente para esta vítima","error");
+    return;
+  }
+  var enc={
+    id:"enc_"+Date.now(), ocorrenciaId:ocId,
+    vitimaNome:oc.vitima_nome||"", vitimaBairro:oc.bairro||"",
+    ocNumero:oc.numero||oc.id||"", servico:servico||"crav",
+    dataRegistro:new Date().toISOString(), status:"pendente",
+    dataEnvio:"", obs:""
+  };
+  state.vcmEncaminhamentos.push(enc);
+  localStorage.setItem("bcs_vcm_enc",JSON.stringify(state.vcmEncaminhamentos));
+  salvarLocal();
+  showToast("✓ Encaminhado para "+(_orgaoLabels[servico]||servico)+" — veja a aba Encaminhamentos");
+  // Marca também na rede de proteção (checklist do monitor)
+  var chave=_vcmChave(oc);
+  if(chave){
+    var caso=_vcmGetCaso(chave, oc.vitima_nome||"");
+    if(!caso.rede[servico]||!caso.rede[servico].marcado){
+      caso.rede[servico]={marcado:true,data:new Date().toISOString()};
+      _vcmSalvarCasos();
+    }
   }
 }
-// Alias retrocompatível
-function gerarLinkCrav(ocId){ gerarLinkEncaminhamento(ocId,"crav"); }
 
 function imprimirFichaCrav(ocId){
   var oc = (state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
@@ -16138,13 +16268,16 @@ function abrirMonitorVCM(ocId){
   hf.push("<div><p style='color:#ff1493;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0 0 2px'>Monitor VCM</p>");
   hf.push("<p style='color:#f2eada;font-size:14px;font-weight:700;margin:0'>"+(ocVcm.vitima_nome||"Vítima")+"</p></div>");
   hf.push("<div style='display:flex;gap:6px;align-items:center'>");
-  hf.push("<select onchange='if(this.value)gerarLinkEncaminhamento(\""+ocVcm.id+"\",this.value);this.value=\"\"' style='background:#2a1c10;border:1px solid #a855f777;color:#c084fc;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;outline:none'>");
-  hf.push("<option value=''>🔗 Encaminhar...</option>");
+  hf.push("<select onchange='if(this.value)_vcmEncaminhar(\""+ocVcm.id+"\",this.value);this.value=\"\"' style='background:#2a1c10;border:1px solid #a855f777;color:#c084fc;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;outline:none'>");
+  hf.push("<option value=''>📤 Encaminhar para...</option>");
   hf.push("<option value='crav'>💜 CRAV</option>");
+  hf.push("<option value='deam'>🚔 DEAM / Delegacia</option>");
+  hf.push("<option value='creas'>🏛 CREAS</option>");
+  hf.push("<option value='mp'>⚖️ Ministério Público</option>");
+  hf.push("<option value='defensoria'>📋 Defensoria Pública</option>");
+  hf.push("<option value='saude'>🏥 Saúde</option>");
   hf.push("<option value='conselho_tutelar'>👶 Conselho Tutelar</option>");
-  hf.push("<option value='delegacia'>🚔 Delegacia</option>");
-  hf.push("<option value='dean'>🧒 DEAN</option>");
-  hf.push("<option value='outros'>🏛 Outros</option>");
+  hf.push("<option value='outros'>📌 Outros</option>");
   hf.push("</select>");
   hf.push("<button onclick='document.getElementById(\"modal-frida\").remove()' style='background:#42301e;border:1px solid #5e4636;color:#a07c58;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer'>✕</button>");
   hf.push("</div>");
