@@ -16641,6 +16641,16 @@ function _invCarregarAssin(canvas, dataURL){
   img.src=dataURL;
 }
 
+function _invAutoValidade(){
+  var dtaq = (document.getElementById("inv-dtaq")||{}).value||"";
+  if(!dtaq){ showToast("Informe a Data de Aquisição primeiro","error"); return; }
+  var d = new Date(dtaq+"T12:00");
+  d.setFullYear(d.getFullYear()+6);
+  var y=d.getFullYear(), m=("0"+(d.getMonth()+1)).slice(-2), dd=("0"+d.getDate()).slice(-2);
+  var val = document.getElementById("inv-validade");
+  if(val){ val.value=y+"-"+m+"-"+dd; val.style.borderColor="#d4a87a"; }
+}
+
 function _invAtualizarSubs(){
   var cat=document.getElementById("inv-cat");
   var sub=document.getElementById("inv-sub");
@@ -16712,6 +16722,24 @@ function _invAbrirItem(id){
   html += "<div><label style='color:#999;font-size:11px'>Localização*</label><select id='inv-local' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>"+locOpts+"</select></div>";
   html += "<div><label style='color:#999;font-size:11px'>Data Aquisição</label><input id='inv-dtaq' type='date' value='"+(item?item.data_aquisicao||"":"")+"' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
   html += "</div>";
+
+  // Campos específicos: tamanho, gênero, data de validade
+  html += "<div style='border:1px solid #2a2a1a;border-radius:8px;padding:12px;background:#0d0d08'>";
+  html += "<p style='color:#d4a87a;font-size:11px;font-weight:700;margin:0 0 10px'>📐 Características Adicionais <span style='color:#555;font-size:10px;font-weight:400'>(colete, EPI, equipamento com validade)</span></p>";
+  html += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px'>";
+  // Tamanho
+  var tmOpts=["","PP","P","M","G","GG","XG","XGG","Único"].map(function(t){return "<option value='"+t+"'"+(item&&item.tamanho===t?" selected":"")+">"+( t||"— Não se aplica")+"</option>";}).join("");
+  html += "<div><label style='color:#999;font-size:11px'>Tamanho</label><select id='inv-tamanho' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>"+tmOpts+"</select></div>";
+  // Gênero
+  var gnOpts=["","Masculino","Feminino","Unissex"].map(function(g){return "<option value='"+g+"'"+(item&&item.genero===g?" selected":"")+">"+( g||"— Não se aplica")+"</option>";}).join("");
+  html += "<div><label style='color:#999;font-size:11px'>Gênero</label><select id='inv-genero' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>"+gnOpts+"</select></div>";
+  // Data de validade — calcula automaticamente +6 anos se tiver data de aquisição
+  var dtVenc = item && item.data_validade ? item.data_validade : "";
+  html += "<div><label style='color:#d4a87a;font-size:11px;font-weight:700'>Data de Validade</label>";
+  html += "<input id='inv-validade' type='date' value='"+dtVenc+"' style='width:100%;background:#1a1a1a;border:1px solid #d4a87a55;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>";
+  html += "<button type='button' onclick='_invAutoValidade()' style='width:100%;margin-top:4px;background:#1a1a08;border:1px solid #d4a87a44;color:#d4a87a;padding:4px;border-radius:5px;font-size:10px;cursor:pointer'>⚡ +6 anos da aquisição</button>";
+  html += "</div>";
+  html += "</div></div>";
 
   // Observações
   html += "<div><label style='color:#999;font-size:11px'>Observações</label><textarea id='inv-obs' rows='2' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box'>"+(item?esc(item.observacoes||""):"")+"</textarea></div>";
@@ -16863,6 +16891,9 @@ function _invSalvarItem(idExistente){
     estado: (document.getElementById("inv-estado")||{}).value||"bom",
     localizacao: (document.getElementById("inv-local")||{}).value||"",
     data_aquisicao: (document.getElementById("inv-dtaq")||{}).value||"",
+    tamanho:       (document.getElementById("inv-tamanho")||{}).value||"",
+    genero:        (document.getElementById("inv-genero")||{}).value||"",
+    data_validade: (document.getElementById("inv-validade")||{}).value||"",
     observacoes: (document.getElementById("inv-obs")||{}).value||"",
     foto: (document.getElementById("inv-foto-data")||{}).value||"",
     tipo_carga: tipoCarga,
@@ -17269,6 +17300,22 @@ function renderInventario(main){
   h+="<div style='background:#0a1a0a;border:1px solid #d4a87a33;border-radius:10px;padding:12px;text-align:center'><div style='color:#d4a87a;font-size:20px;font-weight:800'>📋 "+nConf+"</div><div style='color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.5px'>Conferências</div></div>";
   h+="</div>";
 
+  // ── KPI: itens com validade vencida ou vencendo em 90 dias ────
+  var _hoje=new Date(); _hoje.setHours(0,0,0,0);
+  var _90dias=new Date(_hoje.getTime()+90*864e5);
+  var _vencidos=itens.filter(function(x){return x.data_validade&&new Date(x.data_validade+"T12:00")<_hoje;});
+  var _vencendo=itens.filter(function(x){return x.data_validade&&new Date(x.data_validade+"T12:00")>=_hoje&&new Date(x.data_validade+"T12:00")<=_90dias;});
+  if(_vencidos.length||_vencendo.length){
+    h+="<div style='background:#1a0808;border:1px solid #ef444466;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap'>";
+    h+="<span style='font-size:20px'>⏰</span>";
+    h+="<div style='flex:1'>";
+    if(_vencidos.length) h+="<span style='color:#ef4444;font-size:13px;font-weight:700'>"+_vencidos.length+" item(s) com validade VENCIDA</span><br>";
+    if(_vencendo.length) h+="<span style='color:#f59e0b;font-size:12px;font-weight:700'>"+_vencendo.length+" item(s) vencem nos próximos 90 dias</span>";
+    h+="</div>";
+    h+="<button onclick=\"state._invFiltBusca='';state._invTab='itens';state._invFiltroValidade=true;_invAplicarFiltros()\" style='background:#1a0808;border:1px solid #ef444466;color:#ef4444;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>Ver itens →</button>";
+    h+="</div>";
+  }
+
   // ── Alerta: itens sem conferência há mais de 30 dias ──────────
   var _agora=Date.now();
   var _semConf=itens.filter(function(x){
@@ -17335,14 +17382,28 @@ function renderInventario(main){
           var est=INV_ESTADOS[item.estado]||{label:item.estado,cor:"#888"};
           var _cargaPolicial=item.carga_responsavel_nome?((item.carga_responsavel_grad?esc(item.carga_responsavel_grad)+" ":"")+esc(item.carga_responsavel_nome)+(item.carga_responsavel_matricula?" ("+esc(item.carga_responsavel_matricula)+")":"")):"-";
           var cargaTxt=(item.tipo_carga==="fixa"||item.tipo_carga==="pessoal")?"✅ Carga: "+_cargaPolicial:"";
-          h+="<div style='background:#111;border:1px solid #1a2a1a;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap'>";
+          // Validade
+          var _valdBadge="";
+          if(item.data_validade){
+            var _dvd=new Date(item.data_validade+"T12:00"), _dhj=new Date(); _dhj.setHours(0,0,0,0);
+            var _dias=Math.ceil((_dvd-_dhj)/864e5);
+            if(_dias<0) _valdBadge="<span style='background:#ef444422;color:#ef4444;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700'>⛔ VENCIDO</span>";
+            else if(_dias<=90) _valdBadge="<span style='background:#f59e0b22;color:#f59e0b;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700'>⚠ Vence em "+_dias+"d</span>";
+            else _valdBadge="<span style='background:#22c55e11;color:#22c55e88;padding:2px 7px;border-radius:5px;font-size:10px'>Val: "+new Date(item.data_validade+"T12:00").toLocaleDateString("pt-BR")+"</span>";
+          }
+          h+="<div style='background:#111;border:1px solid "+(item.data_validade&&new Date(item.data_validade+"T12:00")<new Date()?"#ef444455":"#1a2a1a")+"';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap'>";
           if(item.foto){
             h+="<img src='"+item.foto+"' style='width:56px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #2a2a2a;flex-shrink:0'>";
           } else {
             h+="<div style='width:56px;height:42px;background:#1a1a1a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0'>"+INV_CATS[cat].icon+"</div>";
           }
           h+="<div style='flex:1;min-width:0'>";
-          h+="<div style='color:#e8e0d0;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</div>";
+          h+="<div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap'>";
+          h+="<span style='color:#e8e0d0;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</span>";
+          if(item.tamanho) h+="<span style='background:#1a1a2a;color:#a78bfa;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:700'>"+esc(item.tamanho)+"</span>";
+          if(item.genero) h+="<span style='background:#1a1a2a;color:#c084fc;padding:1px 7px;border-radius:5px;font-size:10px'>"+esc(item.genero)+"</span>";
+          if(_valdBadge) h+=_valdBadge;
+          h+="</div>";
           h+="<div style='color:#888;font-size:11px;margin-top:2px'>";
           if(item.tombamento) h+="<span style='color:#d4a87a'>Nº "+esc(item.tombamento)+"</span> · ";
           h+=esc(item.localizacao||"—");
