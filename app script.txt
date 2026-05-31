@@ -1288,8 +1288,55 @@ function doPost(e) {
       if (d.tipo&&d.registro) return saida(salvar(ss,d.tipo,d.registro),cb);
       return saida({ok:false,erro:"Payload inválido"},cb);
     }
+    // ── UPLOAD DE FOTO PARA GOOGLE DRIVE ───────────────────────────
+    if (d.acao==="uploadFoto" && d.id && d.foto) {
+      return saida(uploadFotoInventario(d.id, d.foto, d.nome||""), cb);
+    }
+
     return saida({ok:false,erro:"Nenhum dado recebido"},cb);
   } catch(err){ return saida({ok:false,erro:"Erro doPost: "+err.toString()}); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  UPLOAD FOTO INVENTÁRIO → GOOGLE DRIVE
+// ══════════════════════════════════════════════════════════════════
+function uploadFotoInventario(itemId, fotoBase64, nomeItem) {
+  try {
+    // Remove prefixo data:image/...;base64,
+    var partes = fotoBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!partes || partes.length !== 3) {
+      return { ok: false, erro: "Formato de imagem inválido" };
+    }
+    var mime    = partes[1];
+    var b64data = partes[2];
+    var bytes   = Utilities.base64Decode(b64data);
+    var blob    = Utilities.newBlob(bytes, mime, "inv_" + itemId + ".jpg");
+
+    // Pasta "IARA-Inventario" no Drive (cria se não existir)
+    var folders = DriveApp.getFoldersByName("IARA-Inventario");
+    var folder  = folders.hasNext() ? folders.next() : DriveApp.createFolder("IARA-Inventario");
+
+    // Remove foto antiga do mesmo item (evita acúmulo)
+    var antigos = folder.getFilesByName("inv_" + itemId + ".jpg");
+    while (antigos.hasNext()) { antigos.next().setTrashed(true); }
+
+    // Faz o upload
+    var file = folder.createFile(blob);
+    file.setName("inv_" + itemId + ".jpg");
+    file.setDescription((nomeItem||itemId) + " — 77ª CIPM BCS");
+
+    // Torna público (somente leitura, qualquer pessoa com o link)
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    // URL de visualização direta (compatível com <img src=...>)
+    var url = "https://drive.google.com/uc?export=view&id=" + file.getId();
+
+    Logger.log("[INV] Foto enviada: " + url);
+    return { ok: true, url: url, fileId: file.getId(), itemId: itemId };
+
+  } catch(e) {
+    return { ok: false, erro: e.toString() };
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
