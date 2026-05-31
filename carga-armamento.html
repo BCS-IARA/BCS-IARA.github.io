@@ -195,9 +195,13 @@ select option{ background:#0f1a2e; }
 
   <div class="sucesso" id="bloco-sucesso">
     <div class="icon">✅</div>
-    <h2>Carga registrada!</h2>
+    <h2 id="titulo-sucesso">Carga registrada!</h2>
     <p id="msg-sucesso">Registro salvo com sucesso.</p>
     <div id="protocolo" style="margin-top:16px;background:#070d1a;border:1px solid #1a3a6a;border-radius:10px;padding:14px;font-size:13px;color:#6a9ae8;font-family:monospace;word-break:break-all"></div>
+    <button id="btn-recibo" onclick="gerarRecibo()" style="margin-top:20px;width:100%;background:linear-gradient(135deg,#1a3a8a,#0f2a6a);border:2px solid #3a6ae8;color:#a0c0ff;padding:14px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.3px">
+      📄 Imprimir / Salvar Recibo
+    </button>
+    <p style="color:#1a3a5a;font-size:11px;margin-top:10px">Guarde o recibo como comprovante da operação</p>
   </div>
 </div>
 
@@ -869,20 +873,25 @@ function enviarCarga(e){
     origem:        "qr_armamento"
   };
 
+  // Guarda os dados para o recibo
+  window._reciboData   = dados;
+  window._reciboProto  = protocolo;
+
   function mostrarSucesso(){
     document.getElementById("form-carga").style.display = "none";
     document.getElementById("bloco-sucesso").style.display = "block";
+    var tipo = dados.tipo_carga || "Carga";
     var nome1 = dados.nome.split(" ")[0];
+    document.getElementById("titulo-sucesso").textContent = tipo + " registrada!";
     var resumo = dados.itens.map(function(it){
       var l = "🔹 "+it.codigo+" — "+it.tipo+": "+it.descricao;
-      if((it.tipo||"").toLowerCase().includes("arma")) l += " ("+it.municao+" mun.)";
+      if((it.tipo||"").toLowerCase().includes("arma")) l += " ("+it.municao+" mun., "+it.carregadores+" carr.)";
       return l;
     }).join("<br>");
     document.getElementById("msg-sucesso").innerHTML =
-      "<strong style='color:#a0c0ff'>"+nome1+"</strong>, carga registrada!<br><br>"+
+      "<strong style='color:#a0c0ff'>"+nome1+"</strong>, "+tipo.toLowerCase()+" registrada!<br><br>"+
       "📅 "+dados.data+" às "+dados.hora+"<br>"+
-      resumo+"<br>"+
-      "<span style='color:#2a5a3a;font-size:11px'>Tipo: "+dados.tipo_carga+"</span>";
+      resumo;
     document.getElementById("protocolo").textContent = "Protocolo: "+protocolo;
   }
 
@@ -995,6 +1004,114 @@ function enviarCarga(e){
     setTimeout(mostrarSucesso, 600);
   }
 }
+
+// ── Geração do Recibo ────────────────────────────────────────────
+function gerarRecibo(){
+  var d = window._reciboData;
+  var proto = window._reciboProto;
+  if(!d){ alert("Dados do recibo não encontrados."); return; }
+
+  var tipo   = d.tipo_carga || "Carga";
+  var dtFmt  = d.data || "";
+  var horaFmt= d.hora || "";
+
+  var itensRows = (d.itens||[]).map(function(it, i){
+    var extras = "";
+    if(it.municao  != null && it.municao  !== "") extras += "<br><small>Munição: "+it.municao+"</small>";
+    if(it.carregadores != null && it.carregadores !== "") extras += "<small> · Carregadores: "+it.carregadores+"</small>";
+    return "<tr>"
+      +"<td style='text-align:center'>"+(i+1)+"</td>"
+      +"<td style='font-family:monospace;font-weight:700;color:#1a3a6a'>"+esc(it.codigo||"")+"</td>"
+      +"<td>"+esc(it.tipo||"")+"</td>"
+      +"<td><b>"+esc(it.descricao||"")+"</b>"+(it.serie?"<br><small style='color:#888'>Nº "+esc(it.serie)+"</small>":"")+"</td>"
+      +"<td style='text-align:center'>"+extras.replace(/<[^>]+>/g,"").replace("Munição:","").replace("Carregadores:","").trim()||"—"+"</td>"
+      +"</tr>";
+  }).join("");
+
+  var html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'>"
+    +"<title>Recibo "+tipo+" — "+proto+"</title>"
+    +"<style>"
+    +"*{box-sizing:border-box;margin:0;padding:0}"
+    +"body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:24px}"
+    +"@media print{body{padding:8px}@page{size:A4;margin:1.5cm}}"
+    +".header{border-bottom:3px solid #1a3a6a;padding-bottom:12px;margin-bottom:16px}"
+    +".header h1{font-size:14px;color:#0f2040;font-weight:800}"
+    +".titulo{text-align:center;font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1px;border:2px solid #1a3a6a;padding:8px;border-radius:6px;margin:12px 0;color:#0f2040}"
+    +".grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}"
+    +".box{border:1px solid #ccd6e8;border-radius:6px;padding:10px 12px}"
+    +".lbl{font-size:9px;font-weight:700;color:#3a5a8a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}"
+    +".val{font-size:13px;font-weight:700;color:#0f1a2e}"
+    +"table{width:100%;border-collapse:collapse;margin-bottom:14px}"
+    +"thead tr{background:#1a3a6a;color:#fff}"
+    +"th{padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase}"
+    +"td{padding:6px 8px;border-bottom:1px solid #e8eef8;font-size:11px}"
+    +"tr:nth-child(even) td{background:#f5f8ff}"
+    +".assin-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:18px;padding-top:16px;border-top:2px solid #1a3a6a}"
+    +".assin-bloco{text-align:center;border:1px solid #ccd6e8;border-radius:8px;padding:12px}"
+    +".assin-bloco img{width:100%;max-height:80px;object-fit:contain;background:#fff;border:1px solid #e0e8f0;border-radius:4px;margin-bottom:8px}"
+    +".assin-linha{height:65px;border-bottom:1px solid #333;margin-bottom:8px}"
+    +".rodape{margin-top:16px;text-align:center;font-size:9px;color:#8a9aba;border-top:1px solid #ccd6e8;padding-top:8px}"
+    +"</style></head><body>"
+
+    // Cabeçalho
+    +"<div class='header'>"
+    +"<h1>Polícia Militar da Bahia — 77ª CIPM · Base Comunitária de Segurança Nova Cidade</h1>"
+    +"<p style='font-size:10px;color:#3a5a8a;margin-top:3px'>Sistema IARA · Controle de Armamento</p>"
+    +"</div>"
+
+    // Título
+    +"<div class='titulo'>Recibo de "+tipo+" de Armamento</div>"
+
+    // Protocolo + Data
+    +"<div class='grid2'>"
+    +"<div class='box'><div class='lbl'>Protocolo</div><div class='val' style='font-family:monospace;font-size:12px'>"+esc(proto)+"</div></div>"
+    +"<div class='box' style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>"
+    +"<div><div class='lbl'>Data</div><div class='val'>"+esc(dtFmt)+"</div></div>"
+    +"<div><div class='lbl'>Hora</div><div class='val'>"+esc(horaFmt)+"</div></div>"
+    +"</div></div>"
+
+    // Policiais
+    +"<div class='grid2'>"
+    +"<div class='box'><div class='lbl'>👮 Policial Solicitante</div>"
+    +"<div class='val'>"+esc(d.nome||"—")+"</div>"
+    +"<div style='font-size:10px;color:#5a7a9a;margin-top:3px'>Matr.: "+esc(d.matricula||"—")+"</div></div>"
+    +"<div class='box'><div class='lbl'>🎖 Adjunto / Recebedor</div>"
+    +"<div class='val'>"+esc(d.nome_adjunto||"—")+"</div>"
+    +"<div style='font-size:10px;color:#5a7a9a;margin-top:3px'>Matr.: "+esc(d.matricula_adjunto||"—")+"</div></div>"
+    +"</div>"
+
+    // Tabela de itens
+    +"<table><thead><tr>"
+    +"<th style='width:30px'>#</th><th>Código</th><th>Tipo</th><th>Descrição / Nº Série</th><th>Munição / Carr.</th>"
+    +"</tr></thead><tbody>"+itensRows+"</tbody></table>"
+
+    // Observação
+    +(d.obs ? "<div style='background:#f5f8ff;border:1px solid #ccd6e8;border-radius:6px;padding:10px 12px;margin-bottom:14px'><div class='lbl'>Observações</div><p style='margin-top:4px;font-size:11px'>"+esc(d.obs)+"</p></div>" : "")
+
+    // Assinaturas
+    +"<div class='assin-grid'>"
+    +"<div class='assin-bloco'>"
+    +"<div class='lbl' style='text-align:left;margin-bottom:8px'>Assinatura do Policial Solicitante</div>"
+    +(d.assinatura ? "<img src='"+d.assinatura+"'/>" : "<div class='assin-linha'></div>")
+    +"<p style='font-weight:700;font-size:11px'>"+esc(d.nome||"")+"</p>"
+    +"<p style='font-size:10px;color:#5a7a9a;margin-top:2px'>Matr.: "+esc(d.matricula||"")+"</p>"
+    +"</div>"
+    +"<div class='assin-bloco'>"
+    +"<div class='lbl' style='text-align:left;margin-bottom:8px'>Assinatura do Adjunto</div>"
+    +(d.assinatura_adjunto ? "<img src='"+d.assinatura_adjunto+"'/>" : "<div class='assin-linha'></div>")
+    +"<p style='font-weight:700;font-size:11px'>"+esc(d.nome_adjunto||"")+"</p>"
+    +"<p style='font-size:10px;color:#5a7a9a;margin-top:2px'>Matr.: "+esc(d.matricula_adjunto||"")+"</p>"
+    +"</div>"
+    +"</div>"
+
+    +"<div class='rodape'>Documento gerado pelo Sistema IARA · 77ª CIPM BCS · "+new Date().toLocaleString("pt-BR")+"</div>"
+    +"</body></html>";
+
+  var w = window.open("","_blank","width=820,height=1000");
+  if(w){ w.document.write(html); w.document.close(); setTimeout(function(){ w.print(); }, 500); }
+}
+
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 </script>
 </body>
 </html>
