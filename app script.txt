@@ -1140,6 +1140,20 @@ function doGet(e) {
       return saida(deletarProjetoSocial(ss,e.parameter.id||""),cb);
     }
 
+    // ── CANDIDATURAS ────────────────────────────────────────────────
+    if(acao==="salvar" && tipo==="candidatura"){
+      var dCA={}; try{dCA=JSON.parse(e.parameter.dados||"{}");}catch(ex){}
+      return saida(salvarCandidatura(ss,dCA),cb);
+    }
+    if(acao==="listar" && tipo==="candidaturas"){
+      var projId=e.parameter.projeto_id||"";
+      return saida(listarCandidaturas(ss,projId),cb);
+    }
+    if(acao==="atualizarCandidatura"){
+      var cId=e.parameter.id||"", cStatus=e.parameter.status||"pendente", cObs=e.parameter.obs||"";
+      return saida(atualizarStatusCandidatura(ss,cId,cStatus,cObs),cb);
+    }
+
     // ── GESTÃO DE PROJETOS (KANBAN/COMANDO) ─────────────────────────
     if(acao==="salvar" && tipo==="projeto_gestor"){
       var dPG={}; try{dPG=JSON.parse(e.parameter.dados||"{}");}catch(ex){}
@@ -1282,6 +1296,8 @@ function doPost(e) {
       if (d.acao==="ia"&&d.messages&&d.system) return saida(chamarIA(d.system,d.messages),cb);
       // ── Tipos especiais que têm funções próprias ────────────────
       if (d.tipo==="carga_armamento"&&d.registro) return saida(salvarCargaArmamento(ss,d.registro),cb);
+      if (d.tipo==="candidatura"&&d.registro) return saida(salvarCandidatura(ss,d.registro),cb);
+      if (d.tipo==="projeto_social"&&d.registro) return saida(salvarProjetoSocial(ss,d.registro),cb);
       if (d.tipo==="policial"&&d.registro) return saida(salvarPolicial(ss,d.registro),cb);
       if (d.tipo==="solicitacao"&&d.registro) return saida(salvarSolicitacao(ss,d.registro),cb);
       if (d.tipo==="atividade_escolar"&&d.registro) return saida(salvarAtividadeEscolar(ss,d.registro),cb);
@@ -1567,6 +1583,50 @@ function listarDevolutivasCrav(ss) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  CANDIDATURAS (Projetos Sociais)
+//  Armazena na aba "candidaturas" — foto comprovante e assinatura
+//  ficam na célula dados_json (base64 comprimido)
+// ══════════════════════════════════════════════════════════════════
+function salvarCandidatura(ss, dados) {
+  if (!dados || !dados.id) return { ok: false, erro: "id obrigatório" };
+  // Remove dados pesados antes de salvar (mantém apenas versão comprimida)
+  var copia = Object.assign({}, dados);
+  // Comprovante e assinatura já vêm comprimidos do cliente — mas garantimos limite
+  if (copia.comprovante_residencia && copia.comprovante_residencia.length > 20000)
+    copia.comprovante_residencia = "[foto_grande_local]";
+  if (copia.responsavel_assinatura && copia.responsavel_assinatura.length > 10000)
+    copia.responsavel_assinatura = "[assin_local]";
+  return _salvarJson(ss, "candidaturas", "#1a0a3a", "#c89ae8", copia);
+}
+function listarCandidaturas(ss, projetoId) {
+  var todos = _listarJson(ss, "candidaturas");
+  if (projetoId) {
+    todos = todos.filter(function(c){ return c.projeto_id === projetoId; });
+  }
+  return { ok: true, dados: todos };
+}
+function atualizarStatusCandidatura(ss, id, status, obs) {
+  var aba = ss.getSheetByName("candidaturas");
+  if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
+  var ids = aba.getRange(2, 1, aba.getLastRow()-1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(id)) {
+      // Lê JSON atual, atualiza status e salva de volta
+      try {
+        var cell = aba.getRange(i+2, 3);
+        var json = JSON.parse(cell.getValue()||"{}");
+        json.status = status;
+        json.data_decisao = new Date().toISOString();
+        if (obs) json.obs_decisao = obs;
+        cell.setValue(JSON.stringify(json));
+        return { ok: true, id: id, status: status };
+      } catch(e) { return { ok: false, erro: e.toString() }; }
+    }
+  }
+  return { ok: false, erro: "ID não encontrado" };
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  INVENTÁRIO
 // ══════════════════════════════════════════════════════════════════
 function salvarInvItem(ss, dados) {
@@ -1621,6 +1681,7 @@ function criarTodasAbasNovas() {
 
   var novas = [
     { nome: "projetos_sociais",   cor: "#1a0a3a", txt: "#c89ae8" },
+    { nome: "candidaturas",       cor: "#1a0a3a", txt: "#a78bfa" },
     { nome: "projetos_gestor",    cor: "#1a1a0a", txt: "#d4a87a" },
     { nome: "escolas",            cor: "#0f2035", txt: "#38bdf8" },
     { nome: "conselho_atas",      cor: "#061a0e", txt: "#22c55e" },

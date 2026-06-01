@@ -7682,6 +7682,8 @@ function _renderCandidaturas(main){
         state.candidaturas.push(c);
     });
   }catch(e){}
+  // Busca candidaturas do Sheets (outros dispositivos/instrutores)
+  _sincCandidaturasSheets();
 
   var tabC=state._candTab||"pendentes";
   var IS="width:100%;background:#1a0a28;border:1px solid #3a1a58;color:#e0d0ff;padding:8px;border-radius:6px;font-size:12px;outline:none;box-sizing:border-box";
@@ -7783,8 +7785,36 @@ function _decidirCandidatura(id, decisao){
   state.candidaturas[idx].data_decisao=new Date().toISOString();
   localStorage.setItem("bcs_candidaturas",JSON.stringify(state.candidaturas));
   salvarLocal();
+  // Sincroniza decisão com Sheets
+  _invEnviarSheets("candidatura", state.candidaturas[idx]);
   showToast(decisao==="aprovado"?"✅ Candidatura aprovada!":"❌ Candidatura recusada.");
   _renderCandidaturas(document.getElementById("main")||document.getElementById("main-content"));
+}
+
+// Sincroniza candidaturas do Sheets (para instrutores em outros dispositivos)
+function _sincCandidaturasSheets(){
+  if(!SHEETS_URL) return;
+  var cb="cb_cand_"+Date.now();
+  var tmout=setTimeout(function(){delete window[cb];},15000);
+  window[cb]=function(resp){
+    clearTimeout(tmout); delete window[cb];
+    if(!resp||!resp.ok||!Array.isArray(resp.dados)||!resp.dados.length) return;
+    if(!state.candidaturas) state.candidaturas=[];
+    var novas=0;
+    resp.dados.forEach(function(c){
+      var ex=state.candidaturas.find(function(x){return x.id===c.id;});
+      if(!ex){ state.candidaturas.push(c); novas++; }
+      else if(c.data_decisao&&(!ex.data_decisao||c.data_decisao>ex.data_decisao)){
+        // Sheets tem decisão mais recente — atualiza local
+        Object.assign(ex,{status:c.status,data_decisao:c.data_decisao,obs_decisao:c.obs_decisao});
+      }
+    });
+    if(novas>0){ localStorage.setItem("bcs_candidaturas",JSON.stringify(state.candidaturas)); salvarLocal(); }
+  };
+  var sc=document.createElement("script");
+  sc.src=SHEETS_URL+"?acao=listar&tipo=candidaturas&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
+  sc.onerror=function(){clearTimeout(tmout);delete window[cb];};
+  document.head.appendChild(sc);
 }
 
 function renderProjetosSociais(main){
