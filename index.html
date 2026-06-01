@@ -18477,6 +18477,86 @@ function _invGerarPDFConferencia(confId){
 // FIM MÓDULO INVENTÁRIO
 // ============================================================
 
+// ── Seed: Projetos Sociais 77ª CIPM BCS ─────────────────────────
+(function(){
+  if(!state.projetosSociais) state.projetosSociais=[];
+  var projetos=[
+    {id:"SOC_001",nome:"Projeto Adote um Pequeno Leitor",area:"Educação",status:"Ativo",
+     instrutor:"Instituto Pedro Melo (parceria)",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"A definir",horario:"A definir",vagas:null,faixaEtaria:"Crianças e adolescentes",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Viabiliza a entrega de livros infanto-juvenis para crianças e adolescentes com o objetivo de fomentar a leitura. Parceria com o Instituto Pedro Melo.",
+     parceria:"Instituto Pedro Melo"},
+    {id:"SOC_002",nome:"Projeto Informática de Base",area:"Tecnologia",status:"Ativo",
+     instrutor:"SD PM Willy Iglesias (Eng. da Computação)",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"Terças-feiras",horario:"A definir",vagas:null,faixaEtaria:"Crianças, adolescentes e jovens",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Ensina Informática Básica e Avançada para crianças, adolescentes e jovens. O instrutor é o SD PM Willy Iglesias, graduado em Engenharia da Computação.",
+     parceria:""},
+    {id:"SOC_003",nome:"Projeto Acordes Mágicos",area:"Música",status:"Ativo",
+     instrutor:"Sr. Carlos Eduardo (voluntário)",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"Sextas-feiras",horario:"Tarde",vagas:null,faixaEtaria:"Crianças e adolescentes",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Proporciona aulas de violão para crianças e adolescentes. O instrutor é o voluntário Sr. Carlos Eduardo.",
+     parceria:""},
+    {id:"SOC_004",nome:"Projeto Luta Cidadã",area:"Esporte",status:"Ativo",
+     instrutor:"Soldado PM Uilliam (Faixa Preta 2º DAN)",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"Segundas, Terças e Quintas",horario:"A definir",vagas:null,faixaEtaria:"Crianças e adolescentes",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Ensina a arte milenar do judô para crianças e adolescentes em parceria com a Pastoral do Menor.",
+     parceria:"Pastoral do Menor"},
+    {id:"SOC_005",nome:"Projeto Gravidez com Amparo",area:"Saúde & Bem-estar",status:"Ativo",
+     instrutor:"A definir",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"A definir",horario:"A definir",vagas:null,faixaEtaria:"Gestantes",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Orienta e difunde a importância da amamentação e o cuidado durante a gestação para mães carentes. Distribui itens e enxovais mediante doações de parceiros.",
+     parceria:"Parceiros doadores"},
+    {id:"SOC_006",nome:"Projeto Empoderamento Feminino",area:"Educação",status:"Ativo",
+     instrutor:"Microlins (parceria)",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"A definir",horario:"A definir",vagas:null,faixaEtaria:"Mulheres em vulnerabilidade social",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Visa atender mulheres em vulnerabilidade social e que sofrem ou sofreram violência doméstica, proporcionando cursos para melhorar o currículo profissional e inseri-las no mercado de trabalho.",
+     parceria:"Microlins"},
+    {id:"SOC_007",nome:"Projeto Universidade para Todos",area:"Educação",status:"Ativo",
+     instrutor:"UESB (parceria)",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"A definir",horario:"Noturno",vagas:20,faixaEtaria:"Jovens e adultos",
+     dataInicio:"2026-04-01",dataFim:"2026-11-30",
+     descricao:"Em parceria com a UESB, oferece 20 vagas para curso pré-vestibular na Base Comunitária, no turno noturno, de abril a novembro (data do ENEM).",
+     parceria:"UESB"},
+    {id:"SOC_008",nome:"Projeto Robótica na Base",area:"Tecnologia",status:"Ativo",
+     instrutor:"SD PM Willy Iglesias (Eng. da Computação)",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"Quintas-feiras",horario:"A definir",vagas:null,faixaEtaria:"Crianças e adolescentes",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Aulas de programação e robótica com objetivo de desenvolvimento cognitivo e despertar científico.",
+     parceria:""},
+    {id:"SOC_009",nome:"Projeto Esporte por Toda Parte",area:"Esporte",status:"Ativo",
+     instrutor:"Profa. Luanna Rainne (Lic. Ed. Física) + 3 estagiários",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"A definir",horario:"A definir",vagas:null,faixaEtaria:"Adolescentes, adultos e idosos",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Aulas de ginástica, capoeira e boxe em parceria com a SUDESB. Instrutora licenciada em Educação Física, apoiada por três estagiários.",
+     parceria:"SUDESB"},
+    {id:"SOC_010",nome:"Projeto Gibi Turma da BCS",area:"Arte",status:"Ativo",
+     instrutor:"77ª CIPM BCS",local:"Base Comunitária de Segurança Nova Cidade",
+     diasSemana:"—",horario:"—",vagas:null,faixaEtaria:"Crianças até 8 anos",
+     dataInicio:"2026-01-01",dataFim:"",
+     descricao:"Lança um gibi lúdico instruindo sobre bons hábitos no dia a dia, cuidado com o meio ambiente e outros temas para crianças de até 8 anos.",
+     parceria:""}
+  ];
+  var adicionados=0;
+  projetos.forEach(function(p){
+    var ja=(state.projetosSociais||[]).find(function(x){return x.id===p.id;});
+    if(!ja){
+      p.criadoEm=p.criadoEm||"2026-01-01T00:00:00.000Z";
+      state.projetosSociais.push(p);
+      adicionados++;
+    }
+  });
+  if(adicionados>0){
+    localStorage.setItem("bcs_projetos_sociais",JSON.stringify(state.projetosSociais));
+    console.log("[BCS] "+adicionados+" projeto(s) social(is) cadastrado(s).");
+  }
+})();
+
 render();
 _carregando = false;
 if(SHEETS_URL){
