@@ -318,6 +318,7 @@ function salvarLocal() {
     if(state.invConferencias) localStorage.setItem("bcs_inv_conf",JSON.stringify(state.invConferencias));
     if(state.vcmCasos) localStorage.setItem("bcs_vcm_casos",JSON.stringify(state.vcmCasos));
     if(state.vcmEncaminhamentos) localStorage.setItem("bcs_vcm_enc",JSON.stringify(state.vcmEncaminhamentos));
+    if(state.candidaturas) localStorage.setItem("bcs_candidaturas",JSON.stringify(state.candidaturas));
     if(state.policiais) localStorage.setItem("bcs_policiais",JSON.stringify(state.policiais));
     if(state.solicitacoes) localStorage.setItem("bcs_solicitacoes",JSON.stringify(state.solicitacoes));
     if(state.escolas) localStorage.setItem("bcs_escolas",JSON.stringify(state.escolas));
@@ -1069,6 +1070,7 @@ let state = {
   // Fluxo VCM — casos (rede de proteção + contatos por vítima)
   vcmCasos: JSON.parse(localStorage.getItem("bcs_vcm_casos")||"{}"),
   vcmEncaminhamentos: JSON.parse(localStorage.getItem("bcs_vcm_enc")||"[]"),
+  candidaturas: JSON.parse(localStorage.getItem("bcs_candidaturas")||"[]"),
 };
 
 // Inicializar arrays vazios se undefined
@@ -7425,9 +7427,14 @@ function renderCursosComunitarios(main){
   h.push("<div style='max-width:800px;margin:0 auto;padding:16px 20px 40px'>");
 
   // tabs
-  h.push("<div style='display:flex;gap:6px;margin-bottom:18px'>");
-  h.push("<button onclick=\"state._psTab='monitoramento';renderProjetosSociais(document.getElementById('main'))\" style='padding:9px 18px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #4a2a78;background:#0e0820;color:#5a4a80'>📊 Monitoramento</button>");
-  h.push("<button onclick=\"state._psTab='cursos';renderProjetosSociais(document.getElementById('main'))\" style='padding:9px 18px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid #a78bfa;background:#a78bfa22;color:#a78bfa'>📚 Cursos Comunitários</button>");
+  var _tab=state._psTab||"cursos";
+  var _nCandPend=(state.candidaturas||[]).filter(function(c){return c.status==="pendente";}).length;
+  h.push("<div style='display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap'>");
+  [["monitoramento","📊 Monitoramento"],["cursos","📚 Projetos"],["candidaturas","📋 Candidaturas"],["portfolio","🌐 Portfólio"]].forEach(function(t){
+    var ativo=_tab===t[0];
+    var extra=t[0]==="candidaturas"&&_nCandPend>0?" <span style='background:#a78bfa;color:#1a0a28;border-radius:8px;padding:1px 6px;font-size:10px'>"+_nCandPend+"</span>":"";
+    h.push("<button onclick=\"state._psTab='"+t[0]+"';renderProjetosSociais(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:"+(ativo?"2px solid #a78bfa":"1px solid #4a2a78")+";background:"+(ativo?"#a78bfa22":"#0e0820")+";color:"+(ativo?"#a78bfa":"#5a4a80")+"'>"+t[1]+extra+"</button>");
+  });
   h.push("</div>");
 
   // Header
@@ -7665,11 +7672,136 @@ function verInscricoesCurso(id){
 // ══════════════════════════════════════════════════════
 //  MÓDULO PROJETOS SOCIAIS
 // ══════════════════════════════════════════════════════
+function _renderCandidaturas(main){
+  if(!state.candidaturas) state.candidaturas=[];
+  // Sincroniza candidaturas do localStorage (formulário externo → mesmo device)
+  try{
+    var loc=JSON.parse(localStorage.getItem("bcs_candidaturas")||"[]");
+    loc.forEach(function(c){
+      if(!state.candidaturas.find(function(x){return x.id===c.id;}))
+        state.candidaturas.push(c);
+    });
+  }catch(e){}
+
+  var tabC=state._candTab||"pendentes";
+  var IS="width:100%;background:#1a0a28;border:1px solid #3a1a58;color:#e0d0ff;padding:8px;border-radius:6px;font-size:12px;outline:none;box-sizing:border-box";
+
+  var pend=state.candidaturas.filter(function(c){return c.status==="pendente";});
+  var aprov=state.candidaturas.filter(function(c){return c.status==="aprovado";});
+  var recus=state.candidaturas.filter(function(c){return c.status==="recusado";});
+
+  var h=[];
+  h.push("<div style='max-width:900px;margin:0 auto;padding:16px 20px 40px'>");
+
+  // Tabs superiores (projetos/candidaturas/portfolio)
+  var _nCandPend=pend.length;
+  h.push("<div style='display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap'>");
+  [["monitoramento","📊 Monitoramento"],["cursos","📚 Projetos"],["candidaturas","📋 Candidaturas"],["portfolio","🌐 Portfólio"]].forEach(function(t){
+    var ativo=t[0]==="candidaturas";
+    var extra=t[0]==="candidaturas"&&_nCandPend>0?" <span style='background:#a78bfa;color:#1a0a28;border-radius:8px;padding:1px 6px;font-size:10px'>"+_nCandPend+"</span>":"";
+    h.push("<button onclick=\"state._psTab='"+t[0]+"';renderProjetosSociais(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:"+(ativo?"2px solid #a78bfa":"1px solid #4a2a78")+";background:"+(ativo?"#a78bfa22":"#0e0820")+";color:"+(ativo?"#a78bfa":"#5a4a80")+"'>"+t[1]+extra+"</button>");
+  });
+  h.push("</div>");
+
+  h.push("<h2 style='color:#e0d0ff;font-size:16px;font-weight:800;margin:0 0 4px'>📋 Candidaturas</h2>");
+  h.push("<p style='color:#7060a0;font-size:12px;margin:0 0 16px'>"+pend.length+" pendente(s) · "+aprov.length+" aprovada(s) · "+recus.length+" recusada(s)</p>");
+
+  // Sub-tabs
+  h.push("<div style='display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid #2a1a4a;padding-bottom:0'>");
+  [["pendentes","⏳ Pendentes",pend.length],["aprovados","✅ Aprovados",aprov.length],["recusados","❌ Recusados",recus.length]].forEach(function(t){
+    var a=tabC===t[0];
+    h.push("<button onclick='state._candTab=\""+t[0]+"\";_renderCandidaturas(document.getElementById(\"main\"))' style='padding:7px 14px;border:none;border-bottom:3px solid "+(a?"#a78bfa":"transparent")+";background:transparent;color:"+(a?"#a78bfa":"#5a4a80")+";font-size:12px;cursor:pointer;font-weight:"+(a?"700":"400")+"'>"+t[1]+(t[2]>0?" ("+t[2]+")":"")+"</button>");
+  });
+  h.push("</div>");
+
+  var lista=tabC==="pendentes"?pend:tabC==="aprovados"?aprov:recus;
+  if(!lista.length){
+    h.push("<div style='text-align:center;padding:50px;color:#4a3a6a'><div style='font-size:36px;margin-bottom:12px'>📭</div><p>Nenhuma candidatura "+tabC+".</p></div>");
+  } else {
+    h.push("<div style='display:flex;flex-direction:column;gap:12px'>");
+    lista.forEach(function(c){
+      var dt=c.data_candidatura?new Date(c.data_candidatura).toLocaleDateString("pt-BR"):"—";
+      var scor=c.status==="aprovado"?"#22c55e":c.status==="recusado"?"#ef4444":"#f59e0b";
+      h.push("<div style='background:#130d24;border:1px solid #2a1a4a;border-left:4px solid "+scor+";border-radius:10px;padding:16px'>");
+      h.push("<div style='display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap'>");
+      h.push("<div style='flex:1;min-width:0'>");
+      h.push("<p style='color:#e0d0ff;font-size:14px;font-weight:700;margin:0'>"+esc(c.nome||"—")+"</p>");
+      h.push("<p style='color:#7060a0;font-size:11px;margin:3px 0 0'>"+esc(c.projeto_nome||"—")+" · "+dt+"</p>");
+      if(c.data_nascimento){ var idade=Math.floor((new Date()-new Date(c.data_nascimento))/(365.25*864e5)); h.push("<p style='color:#6a5a90;font-size:11px;margin:2px 0 0'>"+idade+" anos · "+esc(c.bairro||"—")+"</p>"); }
+      if(c.responsavel_nome) h.push("<p style='color:#6a5a90;font-size:10px;margin:2px 0 0'>Responsável: "+esc(c.responsavel_nome)+" ("+esc(c.responsavel_parentesco||"—")+")</p>");
+      if(c.motivacao) h.push("<p style='color:#8a7aaa;font-size:11px;margin:6px 0 0;font-style:italic;border-left:2px solid #3a1a58;padding-left:8px'>\""+esc(c.motivacao.slice(0,120))+(c.motivacao.length>120?"...":"")+"\"</p>");
+      h.push("</div>");
+      h.push("<div style='display:flex;flex-direction:column;gap:6px;flex-shrink:0'>");
+      // Assinatura
+      if(c.responsavel_assinatura) h.push("<div style='text-align:center'><img src='"+c.responsavel_assinatura+"' style='max-width:120px;height:40px;object-fit:contain;border:1px solid #3a1a58;border-radius:4px;background:#fff'><br><span style='color:#5a4a80;font-size:9px'>Assinatura</span></div>");
+      // Comprovante
+      if(c.comprovante_residencia&&c.comprovante_residencia!=="[foto_local]") h.push("<div style='text-align:center'><img src='"+c.comprovante_residencia+"' style='max-width:80px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #3a1a58;cursor:pointer' onclick='window.open(this.src,\"_blank\")'><br><span style='color:#5a4a80;font-size:9px'>Comprovante</span></div>");
+      h.push("</div></div>");
+      // Botões de decisão
+      if(c.status==="pendente"){
+        h.push("<div style='display:flex;gap:8px;margin-top:12px;flex-wrap:wrap'>");
+        h.push("<button onclick='_decidirCandidatura(\""+c.id+"\",\"aprovado\")' style='background:#0a2a1a;border:1px solid #22c55e;color:#22c55e;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>✅ Aprovar</button>");
+        h.push("<button onclick='_decidirCandidatura(\""+c.id+"\",\"recusado\")' style='background:#2a0a0a;border:1px solid #ef4444;color:#ef4444;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>❌ Recusar</button>");
+        h.push("</div>");
+      } else {
+        h.push("<div style='margin-top:8px'><span style='background:"+scor+"22;color:"+scor+";padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700'>"+esc(c.status.charAt(0).toUpperCase()+c.status.slice(1))+"</span>"+(c.data_decisao?"<span style='color:#4a3a6a;font-size:10px;margin-left:8px'>"+new Date(c.data_decisao).toLocaleDateString("pt-BR")+"</span>":"")+"</div>");
+      }
+      h.push("</div>");
+    });
+    h.push("</div>");
+  }
+  h.push("</div>");
+  main.innerHTML=h.join("");
+}
+
+function _qrCandidatura(projId, projNome){
+  var base="https://bcs-iara.github.io/candidatura.html";
+  var link=base+"?id="+encodeURIComponent(projId)+"&nome="+encodeURIComponent(projNome)+"&sheets="+encodeURIComponent(SHEETS_URL||"")+"&token="+encodeURIComponent(BCS_TOKEN||"");
+  var qrUrl="https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data="+encodeURIComponent(link);
+  var mEx=document.getElementById("modal-qr-cand"); if(mEx) mEx.remove();
+  var el=document.createElement("div");
+  el.id="modal-qr-cand";
+  el.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px";
+  el.innerHTML="<div style='background:#130d24;border:2px solid #6a3a9a;border-radius:16px;padding:24px;max-width:360px;width:100%;text-align:center'>"
+    +"<button onclick=\"document.getElementById('modal-qr-cand').remove()\" style='float:right;background:none;border:none;color:#7060a0;font-size:20px;cursor:pointer'>✕</button>"
+    +"<div style='font-size:28px;margin-bottom:8px'>🌱</div>"
+    +"<h3 style='color:#e0d0ff;font-size:15px;font-weight:800;margin:0 0 4px'>"+esc(projNome)+"</h3>"
+    +"<p style='color:#7060a0;font-size:11px;margin:0 0 16px'>QR Code para candidatura a vaga</p>"
+    +"<img src='"+qrUrl+"' width='200' height='200' style='border-radius:10px;border:2px solid #2a1a4a;background:#fff;margin-bottom:14px'>"
+    +"<p style='color:#3a2a5a;font-size:9px;word-break:break-all;margin-bottom:16px'>"+link+"</p>"
+    +"<a href='"+link+"' target='_blank' style='display:block;background:linear-gradient(135deg,#6a2a9a,#4a1a7a);color:#e8d0ff;padding:11px;border-radius:8px;font-size:13px;font-weight:700'>📝 Abrir Formulário</a>"
+    +"</div>";
+  el.onclick=function(e){if(e.target===this)this.remove();};
+  document.body.appendChild(el);
+}
+
+function _decidirCandidatura(id, decisao){
+  if(!state.candidaturas) return;
+  var idx=state.candidaturas.findIndex(function(c){return c.id===id;});
+  if(idx<0) return;
+  state.candidaturas[idx].status=decisao;
+  state.candidaturas[idx].data_decisao=new Date().toISOString();
+  localStorage.setItem("bcs_candidaturas",JSON.stringify(state.candidaturas));
+  salvarLocal();
+  showToast(decisao==="aprovado"?"✅ Candidatura aprovada!":"❌ Candidatura recusada.");
+  _renderCandidaturas(document.getElementById("main")||document.getElementById("main-content"));
+}
+
 function renderProjetosSociais(main){
-  if(!state._psTab) state._psTab="monitoramento";
+  if(!state._psTab) state._psTab="cursos";
   // ── roteamento por sub-aba ──
   if(state._psTab==="cursos"){
     renderCursosComunitarios(main);
+    return;
+  }
+  if(state._psTab==="candidaturas"){
+    _renderCandidaturas(main);
+    return;
+  }
+  if(state._psTab==="portfolio"){
+    window.open("https://bcs-iara.github.io/projetos","_blank");
+    state._psTab="cursos";
+    renderProjetosSociais(main);
     return;
   }
   if(!state._psF) state._psF={periodo:"mes",busca:"",de:"",ate:""};
@@ -11877,6 +12009,7 @@ function renderPortalInstrutor(app){
         h.push("<button onclick=\"abrirChamadaModal('"+c.id+"')\" style='flex:2;min-width:120px;background:linear-gradient(135deg,#1a0a28,#2a1040);border:1px solid #8a4aba;color:#c89ae8;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>📋 Fazer Chamada</button>");
       }
       h.push("<button onclick=\"verListaInscricoes('"+c.id+"')\" style='flex:1;min-width:100px;background:#0a0014;border:1px solid #4a2a68;color:#8a5ab8;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>👥 Inscritos</button>");
+      h.push("<button onclick='_qrCandidatura(\""+c.id+"\",\""+esc(c.nome)+"\")' style='flex:1;min-width:80px;background:#1a0a28;border:1px solid #8a4aba44;color:#a78bfa;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>📱 QR Vaga</button>");
       if(minhasChamadas.length>0){
         h.push("<button onclick=\"verHistoricoChamadas('"+c.id+"')\" style='flex:1;min-width:100px;background:#0a1408;border:1px solid #2a4a2a;color:#4a8a4a;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>📅 Histórico</button>");
       }

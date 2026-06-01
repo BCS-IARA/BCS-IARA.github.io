@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Projetos Sociais — 77ª CIPM BCS</title>
+<meta name="description" content="Projetos sociais realizados pela 77ª CIPM BCS através da Base Comunitária de Segurança Nova Cidade em Vitória da Conquista / BA"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0714;color:#e8e0f0;min-height:100vh}
+a{color:inherit;text-decoration:none}
+
+/* Hero */
+.hero{background:linear-gradient(135deg,#0f0520 0%,#1a0a34 50%,#0a0520 100%);padding:50px 20px 40px;text-align:center;border-bottom:1px solid #2a1a4a;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,#6a2a9a22 0%,transparent 70%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:#2a1250;border:1px solid #6a3a9a55;border-radius:20px;padding:6px 16px;font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:20px}
+.hero h1{font-size:clamp(24px,5vw,38px);font-weight:900;color:#fff;margin-bottom:10px;line-height:1.15}
+.hero h1 span{color:#a78bfa}
+.hero p{font-size:14px;color:#8060a0;max-width:580px;margin:0 auto 24px;line-height:1.7}
+.hero-stats{display:flex;justify-content:center;gap:32px;flex-wrap:wrap}
+.stat{text-align:center}
+.stat b{display:block;font-size:28px;font-weight:900;color:#a78bfa}
+.stat span{font-size:11px;color:#6050a0;text-transform:uppercase;letter-spacing:.5px}
+
+/* Container */
+.container{max-width:1100px;margin:0 auto;padding:40px 20px}
+
+/* Filtros */
+.filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px;justify-content:center}
+.filtro-btn{padding:7px 18px;border-radius:20px;border:1px solid #2a1a4a;background:transparent;color:#7060a0;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
+.filtro-btn.ativo,.filtro-btn:hover{background:#6a2a9a22;border-color:#6a3a9a;color:#a78bfa}
+
+/* Grid de projetos */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+
+/* Card de projeto */
+.proj-card{background:linear-gradient(145deg,#0e0820,#140c28);border:1px solid #2a1a4a;border-radius:16px;overflow:hidden;transition:transform .2s,border-color .2s;display:flex;flex-direction:column}
+.proj-card:hover{transform:translateY(-3px);border-color:#6a3a9a55}
+.proj-card-top{padding:20px 20px 14px;flex:1}
+.proj-area-badge{display:inline-flex;align-items:center;gap:5px;background:#2a1250;border:1px solid #4a2a78;border-radius:6px;padding:3px 10px;font-size:10px;color:#a78bfa;font-weight:700;margin-bottom:12px}
+.proj-card h2{font-size:16px;font-weight:800;color:#e0d0ff;margin-bottom:8px;line-height:1.3}
+.proj-desc{font-size:12px;color:#7060a0;line-height:1.65;margin-bottom:14px}
+.proj-meta{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.proj-meta-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#6a5a90}
+.proj-meta-row span:first-child{font-size:14px;flex-shrink:0}
+.proj-card-bottom{padding:14px 20px;border-top:1px solid #1a1030;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.proj-status{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700}
+.btn-candidatura{background:linear-gradient(135deg,#6a2a9a,#4a1a7a);border:none;color:#e8d0ff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-candidatura:hover{background:linear-gradient(135deg,#7a3aaa,#5a2a8a)}
+
+/* Sobre */
+.sobre{background:linear-gradient(135deg,#0e0820,#140c28);border:1px solid #2a1a4a;border-radius:16px;padding:32px;margin-top:40px;text-align:center}
+.sobre h2{color:#a78bfa;font-size:20px;font-weight:800;margin-bottom:12px}
+.sobre p{color:#7060a0;font-size:13px;line-height:1.8;max-width:600px;margin:0 auto}
+
+/* Footer */
+footer{text-align:center;padding:24px;color:#3a2a5a;font-size:11px;border-top:1px solid #1a0a2e;margin-top:40px}
+
+/* Modal candidatura */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-inner{background:#130d24;border:2px solid #6a3a9a;border-radius:16px;padding:24px;max-width:400px;width:100%;text-align:center}
+.qr-img{border-radius:10px;margin:16px 0;border:2px solid #2a1a4a}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">🌱 <span>77ª CIPM BCS · Projetos Sociais</span></div>
+  <h1>Transformando vidas<br><span>na Nova Cidade</span></h1>
+  <p>A 77ª CIPM promove projetos sociais destinados a pessoas em situação de vulnerabilidade que residem na área de atuação da Base Comunitária de Segurança Nova Cidade, em Vitória da Conquista / BA.</p>
+  <div class="hero-stats" id="hero-stats">
+    <div class="stat"><b id="stat-projetos">10</b><span>Projetos ativos</span></div>
+    <div class="stat"><b id="stat-areas">6</b><span>Áreas de atuação</span></div>
+    <div class="stat"><b>2026</b><span>Ciclo atual</span></div>
+  </div>
+</section>
+
+<!-- Conteúdo -->
+<div class="container">
+
+  <!-- Filtros por área -->
+  <div class="filtros" id="filtros">
+    <button class="filtro-btn ativo" onclick="filtrar('todos',this)">Todos</button>
+    <button class="filtro-btn" onclick="filtrar('Esporte',this)">⚽ Esporte</button>
+    <button class="filtro-btn" onclick="filtrar('Tecnologia',this)">💻 Tecnologia</button>
+    <button class="filtro-btn" onclick="filtrar('Música',this)">🎵 Música</button>
+    <button class="filtro-btn" onclick="filtrar('Educação',this)">📚 Educação</button>
+    <button class="filtro-btn" onclick="filtrar('Saúde & Bem-estar',this)">❤️ Saúde</button>
+    <button class="filtro-btn" onclick="filtrar('Arte',this)">🎨 Arte</button>
+  </div>
+
+  <!-- Grid dos projetos -->
+  <div class="grid" id="grid-projetos">
+    <div style="grid-column:1/-1;text-align:center;padding:40px;color:#4a3a7a">
+      <div style="font-size:36px;margin-bottom:12px">⏳</div>
+      <p>Carregando projetos...</p>
+    </div>
+  </div>
+
+  <!-- Sobre a BCS -->
+  <div class="sobre">
+    <h2>🏛️ Base Comunitária de Segurança Nova Cidade</h2>
+    <p>A Base Comunitária de Segurança é um equipamento de segurança pública da Polícia Militar da Bahia instalado no coração da comunidade. Além do policiamento, promove projetos sociais que impactam diretamente na qualidade de vida dos moradores da região.</p>
+    <p style="margin-top:12px">Todos os projetos são gratuitos e destinados a pessoas em vulnerabilidade social residentes na área de atuação da unidade.</p>
+  </div>
+
+</div>
+
+<!-- Modal QR / Candidatura -->
+<div class="modal-overlay" id="modal-qr" style="display:none" onclick="if(event.target===this)fecharModal()">
+  <div class="modal-inner">
+    <button onclick="fecharModal()" style="float:right;background:none;border:none;color:#7060a0;font-size:20px;cursor:pointer">✕</button>
+    <div style="font-size:32px;margin-bottom:8px">🌱</div>
+    <h3 id="modal-titulo" style="color:#e0d0ff;font-size:16px;font-weight:800;margin-bottom:6px"></h3>
+    <p id="modal-info" style="color:#7060a0;font-size:12px;margin-bottom:16px"></p>
+    <img id="modal-qr-img" class="qr-img" width="180" height="180" alt="QR Code"/>
+    <p style="color:#5a4a80;font-size:10px;margin-bottom:16px;word-break:break-all" id="modal-link"></p>
+    <a id="modal-btn" href="#" target="_blank" style="display:block;background:linear-gradient(135deg,#6a2a9a,#4a1a7a);color:#e8d0ff;padding:12px;border-radius:8px;font-size:13px;font-weight:700;text-align:center">📝 Abrir Formulário de Candidatura</a>
+  </div>
+</div>
+
+<footer>
+  <p>77ª CIPM — Polícia Militar da Bahia · Base Comunitária de Segurança Nova Cidade · Vitória da Conquista / BA</p>
+  <p style="margin-top:4px">Sistema IARA · <a href="/" style="color:#6a3a9a">Acesso restrito</a></p>
+</footer>
+
+<script>
+var SHEETS_URL = "";
+var SHEETS_TOKEN = "bcs-token-secreto-2025";
+var BASE_URL = "https://bcs-iara.github.io/";
+
+// Tenta carregar URL das configurações locais
+try{ SHEETS_URL = localStorage.getItem("bcs_sheets_url")||""; }catch(e){}
+if(!SHEETS_URL) SHEETS_URL = "https://script.google.com/macros/s/AKfycbxKZVJcjgBSVUK7MXcH1ZuKY8-YhmidlTN-olcmLJ0T4ar9fPE05-iZbqJ4KUfHMgovRA/exec";
+
+var AREA_ICONS = {
+  "Esporte":"⚽","Tecnologia":"💻","Música":"🎵",
+  "Arte":"🎨","Saúde & Bem-estar":"❤️","Educação":"📚","Outro":"🌱"
+};
+var STATUS_COR = {
+  "Ativo":"#22c55e","Em breve":"#f59e0b","Pausado":"#6b7280","Encerrado":"#ef4444"
+};
+
+var _todos = [];
+var _filtroAtual = "todos";
+
+function filtrar(area, btn){
+  _filtroAtual = area;
+  document.querySelectorAll(".filtro-btn").forEach(function(b){b.classList.remove("ativo");});
+  if(btn) btn.classList.add("ativo");
+  renderGrid();
+}
+
+function renderGrid(){
+  var grid = document.getElementById("grid-projetos");
+  var lista = _filtroAtual==="todos" ? _todos : _todos.filter(function(p){return p.area===_filtroAtual;});
+  var ativos = lista.filter(function(p){return p.status==="Ativo";});
+
+  if(!lista.length){
+    grid.innerHTML="<div style='grid-column:1/-1;text-align:center;padding:40px;color:#4a3a7a'><div style='font-size:36px;margin-bottom:12px'>🔍</div><p>Nenhum projeto nesta área.</p></div>";
+    return;
+  }
+
+  grid.innerHTML = lista.map(function(p){
+    var icon = AREA_ICONS[p.area]||"🌱";
+    var scor = STATUS_COR[p.status]||"#6b7280";
+    var link = BASE_URL+"candidatura.html"
+      +"?id="+encodeURIComponent(p.id)
+      +"&nome="+encodeURIComponent(p.nome)
+      +"&sheets="+encodeURIComponent(SHEETS_URL)
+      +"&token="+encodeURIComponent(SHEETS_TOKEN);
+
+    var metaHtml = "";
+    if(p.instrutor) metaHtml += "<div class='proj-meta-row'><span>👨‍🏫</span><span>"+esc(p.instrutor)+"</span></div>";
+    if(p.diasSemana&&p.diasSemana!=="A definir"&&p.diasSemana!=="—") metaHtml += "<div class='proj-meta-row'><span>📅</span><span>"+esc(p.diasSemana)+(p.horario&&p.horario!=="A definir"?" · "+esc(p.horario):"")+"</span></div>";
+    if(p.faixaEtaria) metaHtml += "<div class='proj-meta-row'><span>👥</span><span>"+esc(p.faixaEtaria)+"</span></div>";
+    if(p.parceria) metaHtml += "<div class='proj-meta-row'><span>🤝</span><span>Parceria: "+esc(p.parceria)+"</span></div>";
+    if(p.vagas) metaHtml += "<div class='proj-meta-row'><span>🎯</span><span>"+p.vagas+" vaga(s)</span></div>";
+
+    return "<div class='proj-card'>"
+      +"<div class='proj-card-top'>"
+      +"<div class='proj-area-badge'>"+icon+" "+esc(p.area||"")+"</div>"
+      +"<h2>"+esc(p.nome)+"</h2>"
+      +"<p class='proj-desc'>"+esc(p.descricao||"")+"</p>"
+      +(metaHtml?"<div class='proj-meta'>"+metaHtml+"</div>":"")
+      +"</div>"
+      +"<div class='proj-card-bottom'>"
+      +"<span class='proj-status' style='background:"+scor+"22;color:"+scor+";border:1px solid "+scor+"44'>"+esc(p.status)+"</span>"
+      +(p.status==="Ativo"
+        ?"<button class='btn-candidatura' onclick='abrirCandidatura(\""+encodeURIComponent(JSON.stringify({id:p.id,nome:p.nome,link:link}))+"\")'>📝 Candidatar-se</button>"
+        :"<span style='color:#3a2a5a;font-size:11px'>Inscrições não abertas</span>")
+      +"</div>"
+      +"</div>";
+  }).join("");
+
+  document.getElementById("stat-projetos").textContent=ativos.length;
+}
+
+function abrirCandidatura(encoded){
+  var p = JSON.parse(decodeURIComponent(encoded));
+  document.getElementById("modal-titulo").textContent = p.nome;
+  document.getElementById("modal-info").textContent = "Escaneie o QR Code ou toque no botão para preencher a candidatura.";
+  var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=6&data="+encodeURIComponent(p.link);
+  document.getElementById("modal-qr-img").src = qrUrl;
+  document.getElementById("modal-link").textContent = p.link;
+  document.getElementById("modal-btn").href = p.link;
+  document.getElementById("modal-qr").style.display = "flex";
+}
+
+function fecharModal(){
+  document.getElementById("modal-qr").style.display = "none";
+}
+
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// Carrega projetos do localStorage (mesmo dispositivo) ou Sheets
+function carregarProjetos(){
+  // Tenta localStorage do IARA primeiro
+  try{
+    var local = JSON.parse(localStorage.getItem("bcs_projetos_sociais")||"[]");
+    if(local.length){
+      _todos = local.filter(function(p){return p.status!=="Encerrado";});
+      renderGrid();
+    }
+  }catch(e){}
+
+  // Busca atualização do Sheets
+  if(!SHEETS_URL) return;
+  var cb = "cb_ps_"+Date.now();
+  window[cb] = function(resp){
+    delete window[cb];
+    if(resp&&resp.ok&&Array.isArray(resp.dados)&&resp.dados.length){
+      _todos = resp.dados.filter(function(p){return p.status!=="Encerrado";});
+      renderGrid();
+      // Conta áreas distintas
+      var areas = {};
+      _todos.forEach(function(p){if(p.area)areas[p.area]=1;});
+      document.getElementById("stat-areas").textContent=Object.keys(areas).length;
+    }
+  };
+  var sc = document.createElement("script");
+  sc.src = SHEETS_URL+"?acao=listar&tipo=projetos_sociais&token="+encodeURIComponent(SHEETS_TOKEN)+"&callback="+cb;
+  sc.onerror = function(){ delete window[cb]; };
+  document.head.appendChild(sc);
+}
+
+carregarProjetos();
+</script>
+</body>
+</html>

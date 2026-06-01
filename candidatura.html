@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Candidatura — Projetos Sociais · 77ª CIPM BCS</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f0;min-height:100vh;padding-bottom:40px}
+.topo{background:linear-gradient(135deg,#1a0a2e,#2a1040);border-bottom:2px solid #6a3a9a44;padding:16px 20px;text-align:center}
+.topo h1{font-size:16px;font-weight:800;color:#e0d0ff;margin:0 0 3px}
+.topo p{font-size:11px;color:#7060a0;margin:0}
+.card{background:#130d24;border:1px solid #2a1a4a;border-radius:14px;max-width:520px;margin:20px auto;padding:22px}
+.secao-titulo{color:#a78bfa;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #2a1a4a;display:flex;align-items:center;gap:6px}
+.campo{margin-bottom:12px}
+.campo label{color:#8a6ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px}
+.campo input,.campo select,.campo textarea{width:100%;background:#1a0a28;border:1px solid #3a1a58;color:#e0d0ff;padding:10px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit}
+.campo input:focus,.campo select:focus,.campo textarea:focus{border-color:#8a4aba}
+.campo textarea{resize:vertical;min-height:70px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.foto-label{display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #3a1a58;border-radius:10px;padding:20px;cursor:pointer;text-align:center;background:#1a0a28;transition:border-color .2s;min-height:90px}
+.foto-label:hover{border-color:#8a4aba}
+.foto-label img{max-width:100%;max-height:120px;border-radius:6px;margin-top:8px}
+.assin-wrap{border:2px solid #3a1a58;border-radius:10px;background:#fff;position:relative;overflow:hidden}
+.assin-wrap canvas{display:block;width:100%;height:140px;cursor:crosshair;touch-action:none}
+.btn-limpar-assin{position:absolute;top:6px;right:8px;background:rgba(240,240,240,.9);border:1px solid #ccc;color:#555;padding:3px 10px;border-radius:5px;font-size:10px;cursor:pointer}
+.btn-enviar{width:100%;background:linear-gradient(135deg,#6a2a9a,#4a1a7a);border:2px solid #8a4aba;color:#e8d0ff;padding:14px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;margin-top:8px;letter-spacing:.3px}
+.btn-enviar:disabled{opacity:.5;cursor:not-allowed}
+.badge-projeto{display:inline-flex;align-items:center;gap:8px;background:#2a1250;border:1px solid #6a3a9a44;border-radius:10px;padding:10px 16px;margin-bottom:16px}
+.erro-msg{color:#ef4444;font-size:11px;margin-top:4px;display:none}
+.sucesso{display:none;text-align:center;padding:40px 16px}
+.sucesso .icon{font-size:60px;margin-bottom:14px}
+.sucesso h2{color:#a78bfa;font-size:20px;margin-bottom:8px}
+.sucesso p{color:#7060a0;font-size:13px;line-height:1.7}
+.status-envio{display:none;margin-top:12px;background:#1a0a28;border:1px solid #3a1a58;border-radius:8px;padding:10px 14px;color:#a78bfa;font-size:12px;font-weight:700}
+.obrig{color:#ef4444}
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <h1>🌱 Projetos Sociais — 77ª CIPM BCS</h1>
+  <p>Base Comunitária de Segurança Nova Cidade · Vitória da Conquista / BA</p>
+</div>
+
+<div class="card" id="form-card">
+
+  <!-- Badge do projeto -->
+  <div class="badge-projeto">
+    <span style="font-size:22px">🌱</span>
+    <div>
+      <p style="color:#e0d0ff;font-size:14px;font-weight:700;margin:0" id="nome-projeto">Carregando...</p>
+      <p style="color:#7060a0;font-size:11px;margin:2px 0 0" id="info-projeto">Candidatura a vaga</p>
+    </div>
+  </div>
+
+  <!-- 1. Dados pessoais -->
+  <div class="secao-titulo">👤 Dados do Candidato</div>
+
+  <div class="campo">
+    <label>Nome completo <span class="obrig">*</span></label>
+    <input id="f-nome" type="text" placeholder="Nome completo do candidato"/>
+    <div class="erro-msg" id="erro-nome">Informe o nome</div>
+  </div>
+
+  <div class="grid2">
+    <div class="campo">
+      <label>Data de nascimento <span class="obrig">*</span></label>
+      <input id="f-nasc" type="date"/>
+    </div>
+    <div class="campo">
+      <label>Sexo</label>
+      <select id="f-sexo">
+        <option value="">Selecione</option>
+        <option>Masculino</option>
+        <option>Feminino</option>
+        <option>Outro</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="campo">
+    <label>Endereço completo <span class="obrig">*</span></label>
+    <input id="f-end" type="text" placeholder="Rua, número, complemento"/>
+  </div>
+
+  <div class="grid2">
+    <div class="campo">
+      <label>Bairro <span class="obrig">*</span></label>
+      <input id="f-bairro" type="text" placeholder="Bairro"/>
+    </div>
+    <div class="campo">
+      <label>Telefone / WhatsApp</label>
+      <input id="f-tel" type="tel" placeholder="(77) 9 xxxx-xxxx"/>
+    </div>
+  </div>
+
+  <div class="campo">
+    <label>Escola que frequenta (se estudante)</label>
+    <input id="f-escola" type="text" placeholder="Nome da escola"/>
+  </div>
+
+  <div class="campo">
+    <label>Série / Ano (se estudante)</label>
+    <input id="f-serie" type="text" placeholder="Ex: 7º ano, 2º médio"/>
+  </div>
+
+  <!-- 2. Responsável -->
+  <div class="secao-titulo" style="margin-top:20px">👨‍👩‍👧 Responsável / Autorização</div>
+  <p style="color:#5a4a80;font-size:11px;margin-bottom:14px">Preencha os dados do responsável e assine abaixo autorizando a participação.</p>
+
+  <div class="campo">
+    <label>Nome do responsável <span class="obrig">*</span></label>
+    <input id="f-resp-nome" type="text" placeholder="Nome completo do pai, mãe ou responsável"/>
+  </div>
+
+  <div class="grid2">
+    <div class="campo">
+      <label>Parentesco</label>
+      <select id="f-resp-parent">
+        <option>Mãe</option>
+        <option>Pai</option>
+        <option>Avó/Avô</option>
+        <option>Tia/Tio</option>
+        <option>O próprio candidato</option>
+        <option>Outro</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Telefone do responsável</label>
+      <input id="f-resp-tel" type="tel" placeholder="(77) 9 xxxx-xxxx"/>
+    </div>
+  </div>
+
+  <div class="campo">
+    <label>Assinatura do Responsável <span class="obrig">*</span> <span style="color:#7060a0;font-size:9px">(assine com o dedo ou mouse)</span></label>
+    <div class="assin-wrap">
+      <canvas id="assin-resp" width="480" height="140"></canvas>
+      <button type="button" class="btn-limpar-assin" onclick="limparAssinatura()">Limpar</button>
+    </div>
+    <div class="erro-msg" id="erro-assin">Assinatura do responsável obrigatória</div>
+  </div>
+
+  <!-- 3. Comprovante de residência -->
+  <div class="secao-titulo" style="margin-top:20px">🏠 Comprovante de Residência</div>
+  <p style="color:#5a4a80;font-size:11px;margin-bottom:14px">Tire uma foto do comprovante (conta de luz, água, gás ou IPTU) no nome do responsável.</p>
+
+  <div class="campo">
+    <label for="f-comprovante">Foto do comprovante <span class="obrig">*</span></label>
+    <label class="foto-label" id="label-comprovante">
+      <span style="font-size:28px">📄</span>
+      <span style="color:#7060a0;font-size:12px;margin-top:6px">Toque para fotografar ou selecionar</span>
+      <img id="prev-comprovante" style="display:none"/>
+      <input type="file" id="f-comprovante" accept="image/*" style="display:none" onchange="onFotoComprovante(this)"/>
+    </label>
+    <div class="erro-msg" id="erro-comp">Comprovante de residência obrigatório</div>
+  </div>
+
+  <!-- 4. Motivação -->
+  <div class="secao-titulo" style="margin-top:20px">✍️ Motivação</div>
+
+  <div class="campo">
+    <label>Por que deseja participar deste projeto?</label>
+    <textarea id="f-motivo" placeholder="Conte um pouco sobre sua motivação e expectativas..."></textarea>
+  </div>
+
+  <div class="campo">
+    <label>Tem alguma experiência anterior na área?</label>
+    <textarea id="f-exp" rows="2" placeholder="Descreva brevemente (opcional)"></textarea>
+  </div>
+
+  <!-- Enviar -->
+  <div class="erro-msg" id="erro-geral" style="font-size:12px;padding:8px;background:#2a0808;border-radius:6px;border:1px solid #ef444455"></div>
+  <div class="status-envio" id="status-envio"></div>
+  <button class="btn-enviar" id="btn-enviar" onclick="enviarCandidatura()">✅ Enviar Candidatura</button>
+
+</div><!-- /form-card -->
+
+<div class="sucesso card" id="bloco-sucesso">
+  <div class="icon">✅</div>
+  <h2>Candidatura enviada!</h2>
+  <p id="msg-sucesso">Sua candidatura foi registrada com sucesso.<br>O instrutor do projeto analisará e entrará em contato.</p>
+  <div id="protocolo-cand" style="margin-top:16px;background:#1a0a28;border:1px solid #3a1a58;border-radius:10px;padding:14px;font-size:13px;color:#a78bfa;font-family:monospace;word-break:break-all"></div>
+</div>
+
+<script>
+var params      = new URLSearchParams(location.search);
+var PROJETO_ID  = params.get("id")   || "";
+var PROJETO_NOME= params.get("nome") || "Projeto";
+var SHEETS_URL  = params.get("sheets") || "";
+var TOKEN       = params.get("token")  || "bcs-token-secreto-2025";
+
+// Fallback: usa URL salva no localStorage do IARA (mesmo dispositivo)
+if(!SHEETS_URL){ try{ SHEETS_URL=localStorage.getItem("bcs_sheets_url")||""; }catch(e){} }
+if(!SHEETS_URL) SHEETS_URL="https://script.google.com/macros/s/AKfycbxKZVJcjgBSVUK7MXcH1ZuKY8-YhmidlTN-olcmLJ0T4ar9fPE05-iZbqJ4KUfHMgovRA/exec";
+
+document.getElementById("nome-projeto").textContent = decodeURIComponent(PROJETO_NOME);
+document.getElementById("info-projeto").textContent  = "Candidatura a vaga · 77ª CIPM BCS";
+
+// ── Canvas de assinatura ─────────────────────────────────────
+var _assinData = null;
+(function(){
+  var cv  = document.getElementById("assin-resp");
+  var ctx = cv.getContext("2d");
+  var painting = false;
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.strokeStyle="#1a0a28"; ctx.lineWidth=2.5; ctx.lineCap="round"; ctx.lineJoin="round";
+
+  function pos(e){
+    var r=cv.getBoundingClientRect();
+    var s=e.touches?e.touches[0]:e;
+    return {x:(s.clientX-r.left)*(cv.width/r.width), y:(s.clientY-r.top)*(cv.height/r.height)};
+  }
+  function salvarSnap(){ _assinData = cv.toDataURL("image/jpeg",0.85); }
+
+  cv.addEventListener("mousedown",function(e){painting=true;ctx.beginPath();var p=pos(e);ctx.moveTo(p.x,p.y);});
+  cv.addEventListener("mousemove",function(e){if(!painting)return;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+  cv.addEventListener("mouseup",function(){painting=false;salvarSnap();});
+  cv.addEventListener("mouseleave",function(){painting=false;salvarSnap();});
+  cv.addEventListener("touchstart",function(e){e.preventDefault();painting=true;ctx.beginPath();var p=pos(e);ctx.moveTo(p.x,p.y);},{passive:false});
+  cv.addEventListener("touchmove",function(e){e.preventDefault();if(!painting)return;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();},{passive:false});
+  cv.addEventListener("touchend",function(){painting=false;salvarSnap();},{passive:false});
+})();
+
+function limparAssinatura(){
+  var cv=document.getElementById("assin-resp");
+  var ctx=cv.getContext("2d");
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.strokeStyle="#1a0a28"; ctx.lineWidth=2.5; ctx.lineCap="round"; ctx.lineJoin="round";
+  _assinData=null;
+}
+
+// ── Foto comprovante ─────────────────────────────────────────
+var _compData = null;
+function onFotoComprovante(inp){
+  var file=inp.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    // Comprime para 800x600 max
+    var img=new Image();
+    img.onload=function(){
+      var W=Math.min(800,img.width), H=Math.round(img.height*W/img.width);
+      var c=document.createElement("canvas"); c.width=W; c.height=H;
+      c.getContext("2d").drawImage(img,0,0,W,H);
+      _compData=c.toDataURL("image/jpeg",0.75);
+      var prev=document.getElementById("prev-comprovante");
+      prev.src=_compData; prev.style.display="block";
+      document.querySelector("#label-comprovante span:first-child").textContent="✅";
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Envio ─────────────────────────────────────────────────────
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function enviarCandidatura(){
+  // Limpa erros
+  document.querySelectorAll(".erro-msg").forEach(function(e){e.style.display="none";});
+  var erros=[];
+
+  var nome  = document.getElementById("f-nome").value.trim();
+  var nasc  = document.getElementById("f-nasc").value;
+  var end   = document.getElementById("f-end").value.trim();
+  var bairro= document.getElementById("f-bairro").value.trim();
+  var rNome = document.getElementById("f-resp-nome").value.trim();
+
+  if(!nome)  { document.getElementById("erro-nome").style.display="block"; erros.push("nome"); }
+  if(!nasc)  erros.push("nasc");
+  if(!end)   erros.push("end");
+  if(!bairro)erros.push("bairro");
+  if(!rNome) erros.push("resp");
+  if(!_assinData){ document.getElementById("erro-assin").style.display="block"; erros.push("assin"); }
+  if(!_compData) { document.getElementById("erro-comp").style.display="block"; erros.push("comp"); }
+
+  if(erros.length){
+    var eg=document.getElementById("erro-geral");
+    eg.textContent="⚠️ Preencha todos os campos obrigatórios."; eg.style.display="block";
+    return;
+  }
+
+  var btn=document.getElementById("btn-enviar");
+  btn.disabled=true; btn.textContent="Enviando...";
+
+  var protocolo="CAND-"+Date.now();
+  var dados={
+    id: protocolo,
+    protocolo: protocolo,
+    projeto_id: PROJETO_ID,
+    projeto_nome: decodeURIComponent(PROJETO_NOME),
+    // Candidato
+    nome: nome,
+    data_nascimento: nasc,
+    sexo: document.getElementById("f-sexo").value,
+    endereco: end,
+    bairro: bairro,
+    telefone: document.getElementById("f-tel").value.trim(),
+    escola: document.getElementById("f-escola").value.trim(),
+    serie_ano: document.getElementById("f-serie").value.trim(),
+    motivacao: document.getElementById("f-motivo").value.trim(),
+    experiencia: document.getElementById("f-exp").value.trim(),
+    // Responsável
+    responsavel_nome: rNome,
+    responsavel_parentesco: document.getElementById("f-resp-parent").value,
+    responsavel_telefone: document.getElementById("f-resp-tel").value.trim(),
+    responsavel_assinatura: _assinData||"",
+    // Comprovante
+    comprovante_residencia: _compData||"",
+    // Meta
+    status: "pendente",
+    data_candidatura: new Date().toISOString(),
+    origem: "qr_candidatura"
+  };
+
+  // Salva no localStorage
+  try{
+    var chave="bcs_candidaturas";
+    var local=JSON.parse(localStorage.getItem(chave)||"[]");
+    local.push(dados);
+    localStorage.setItem(chave,JSON.stringify(local));
+  }catch(er){}
+
+  // Envia ao Sheets via POST
+  function mostrarSucesso(msg){
+    document.getElementById("form-card").style.display="none";
+    document.getElementById("bloco-sucesso").style.display="block";
+    document.getElementById("protocolo-cand").textContent="Protocolo: "+protocolo;
+    document.getElementById("status-envio").textContent=msg||"";
+    document.getElementById("msg-sucesso").innerHTML=
+      "Candidatura de <strong style='color:#e0d0ff'>"+esc(nome)+"</strong> registrada!<br>"
+      +"O instrutor do projeto <strong>"+esc(decodeURIComponent(PROJETO_NOME))+"</strong> analisará e entrará em contato.";
+  }
+
+  if(SHEETS_URL){
+    // Prepara versão para Sheets (comprime comprovante)
+    var dadosSheets=Object.assign({},dados);
+    if(dadosSheets.comprovante_residencia&&dadosSheets.comprovante_residencia.length>5000){
+      try{
+        var img2=new Image(); img2.src=dadosSheets.comprovante_residencia;
+        var c2=document.createElement("canvas"); c2.width=300; c2.height=200;
+        c2.getContext("2d").drawImage(img2,0,0,300,200);
+        dadosSheets.comprovante_residencia=c2.toDataURL("image/jpeg",0.5);
+      }catch(e){ dadosSheets.comprovante_residencia="[foto_local]"; }
+    }
+    if(dadosSheets.responsavel_assinatura&&dadosSheets.responsavel_assinatura.length>5000){
+      try{
+        var img3=new Image(); img3.src=dadosSheets.responsavel_assinatura;
+        var c3=document.createElement("canvas"); c3.width=200; c3.height=65;
+        var ctx3=c3.getContext("2d");
+        ctx3.fillStyle="#fff"; ctx3.fillRect(0,0,200,65);
+        ctx3.drawImage(img3,0,0,200,65);
+        dadosSheets.responsavel_assinatura=c3.toDataURL("image/jpeg",0.7);
+      }catch(e){}
+    }
+
+    var payload=JSON.stringify({token:TOKEN,tipo:"candidatura",registro:dadosSheets});
+    if(window.fetch){
+      fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:payload})
+        .then(function(){mostrarSucesso("✅ Candidatura registrada no sistema!");})
+        .catch(function(){mostrarSucesso("⚠️ Salvo localmente (sem internet)");});
+    } else {
+      mostrarSucesso("✅ Candidatura registrada!");
+    }
+  } else {
+    setTimeout(function(){mostrarSucesso("✅ Candidatura registrada!");},600);
+  }
+}
+</script>
+</body>
+</html>
