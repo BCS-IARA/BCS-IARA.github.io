@@ -349,27 +349,6 @@ function carregarLocal() {
       db.visitas = l.visitas||[];
       db.agendamentos = l.agendamentos||[];
     }
-    // IDs excluídos (tombstone) — persistidos para não voltar no sync
-    try {
-      var agExRaw = localStorage.getItem("bcs_ag_excluidos");
-      state.agExcluidos = agExRaw ? new Set(JSON.parse(agExRaw)) : new Set();
-    } catch(e){ state.agExcluidos = new Set(); }
-    try {
-      var evExRaw = localStorage.getItem("bcs_ev_excluidos");
-      state._deletedEvIds = evExRaw ? new Set(JSON.parse(evExRaw)) : new Set();
-    } catch(e){ state._deletedEvIds = new Set(); }
-    try {
-      var prExRaw = localStorage.getItem("bcs_proj_excluidos");
-      state._deletedProjIds = prExRaw ? new Set(JSON.parse(prExRaw)) : new Set();
-    } catch(e){ state._deletedProjIds = new Set(); }
-    try {
-      var matExRaw = localStorage.getItem("bcs_mat_excluidos");
-      state._deletedMatIds = matExRaw ? new Set(JSON.parse(matExRaw)) : new Set();
-    } catch(e){ state._deletedMatIds = new Set(); }
-    try {
-      var polExRaw = localStorage.getItem("bcs_pol_excluidos");
-      state._deletedPolIds = polExRaw ? new Set(JSON.parse(polExRaw)) : new Set();
-    } catch(e){ state._deletedPolIds = new Set(); }
     // 🔒 Restaurar backup SIGESPOL (imune ao Sheets — chave separada)
     try {
       const spRaw = localStorage.getItem("bcs_sigespol_backup");
@@ -1193,6 +1172,13 @@ if(!state.db.ocorrencias) state.db.ocorrencias = [];
 if(!state.db.atendimentos) state.db.atendimentos = [];
 if(!state.db.visitas) state.db.visitas = [];
 if(!state.db.agendamentos) state.db.agendamentos = [];
+
+// IDs excluídos (tombstone) — carregados AQUI pois carregarLocal() é chamado antes de state existir
+try{ var _agEx=localStorage.getItem("bcs_ag_excluidos"); state.agExcluidos=_agEx?new Set(JSON.parse(_agEx)):new Set(); }catch(e){ state.agExcluidos=new Set(); }
+try{ var _evEx=localStorage.getItem("bcs_ev_excluidos"); state._deletedEvIds=_evEx?new Set(JSON.parse(_evEx)):new Set(); }catch(e){ state._deletedEvIds=new Set(); }
+try{ var _prEx=localStorage.getItem("bcs_proj_excluidos"); state._deletedProjIds=_prEx?new Set(JSON.parse(_prEx)):new Set(); }catch(e){ state._deletedProjIds=new Set(); }
+try{ var _mtEx=localStorage.getItem("bcs_mat_excluidos"); state._deletedMatIds=_mtEx?new Set(JSON.parse(_mtEx)):new Set(); }catch(e){ state._deletedMatIds=new Set(); }
+try{ var _plEx=localStorage.getItem("bcs_pol_excluidos"); state._deletedPolIds=_plEx?new Set(JSON.parse(_plEx)):new Set(); }catch(e){ state._deletedPolIds=new Set(); }
 
 // Normalizar datas e horas dos agendamentos
 function _normDataStr(d){
