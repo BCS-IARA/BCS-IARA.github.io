@@ -1039,10 +1039,13 @@ async function carregarDoSheets() {
     function _temValor(v){ if(v===null||v===undefined||v==='') return false; if(Array.isArray(v)) return v.length>0; return true; }
 
     // ✅ MERGE HÍBRIDO:
-    // • Registros em ambos (local + Sheets): Sheets como base, campos LOCAL não-nulos prevalecem
-    //   → corrige dados locais incompletos usando Sheets, preserva edições locais
+    // • Registros em ambos (local + Sheets): local é SEMPRE autoritativo
+    //   → Sheets como base para campos ausentes, local sobrepõe QUALQUER campo definido
+    //     (inclusive strings vazias "": se o usuário limpou um campo, local "" prevalece)
     // • Registros só no Sheets (genuinamente novos): usa Sheets como veio
     // • Registros só no local: preservados integralmente (não estão no Sheets)
+    var _agora = Date.now();
+    var _10MIN = 10 * 60 * 1000;
     var ocMescladas = ocDeduplicadas
       .filter(function(o){
         var k = String(o.id).trim();
@@ -1052,9 +1055,21 @@ async function carregarDoSheets() {
         var k = String(o.id).trim();
         var loc = _localFullMap[k];
         if(!loc) return o; // novo do Sheets: usa como veio
-        // Existe no local: Sheets como base, local preenche/sobrepõe campos não-nulos
+        // Sheets como base; local sobrepõe qualquer campo não-nulo/undefined
+        // (fix: campos "" e [] locais também prevalecem sobre Sheets antigo)
         var merged = Object.assign({}, o);
-        Object.keys(loc).forEach(function(f){ if(_temValor(loc[f])) merged[f] = loc[f]; });
+        Object.keys(loc).forEach(function(f){ if(loc[f]!==null&&loc[f]!==undefined) merged[f]=loc[f]; });
+        // 🔒 Proteção extra: se editado recentemente, garante que campos-chave do local vençam
+        var _recente = loc._editadoLocal || (loc._editadoEm && (_agora - loc._editadoEm) < _10MIN);
+        if(_recente){
+          var _camposChave = ["tipo","data","hora","zona","local","bairro","referencia",
+            "vitima_nome","vitima_sexo","vitima_idade","vitima_telefone","vitima_endereco",
+            "suspeito_nome","suspeito_sexo","suspeito_idade","suspeito_endereco",
+            "vitimas","autores","solicitante","objetos","armas_apreendidas",
+            "drogas_apreendidas","envolvidos","policiais","descricao","descricao_dinamica",
+            "medidas","numero","relatorio","posto","classificacao"];
+          _camposChave.forEach(function(f){ if(loc[f]!==undefined) merged[f]=loc[f]; });
+        }
         return merged;
       });
 
@@ -16436,6 +16451,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
         var vd = /maria da penha|violência doméstica|violencia domestica|\bvd\b/i.test(narrativa);
         if(vd){ ocM.violencia_domestica=true; ocM.requer_visita=true; ocM.medida_protetiva=ocM.medida_protetiva||"Sim"; }
         ocM._editadoLocal = true;
+        ocM._editadoEm = Date.now();
         salvarLocal();
         // Enviar edição ao servidor via fetch POST (sem limite de URL)
         if(SHEETS_URL){
