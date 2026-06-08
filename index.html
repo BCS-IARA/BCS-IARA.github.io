@@ -7919,6 +7919,7 @@ function _renderCandidaturas(main){
         if(c.data_decisao) h.push("<span style='color:#4a3a6a;font-size:10px'>"+new Date(c.data_decisao).toLocaleDateString("pt-BR")+"</span>");
         h.push("<button onclick='_pdfCandidatura(\""+c.id+"\")' style='background:#2a1e08;border:1px solid #d4a87a;color:#d4a87a;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer'>📄 Ficha PDF</button>");
         h.push("</div>");
+        if(c.gestor_assinatura) h.push("<div style='margin-top:8px;display:flex;align-items:center;gap:8px'><span style='color:#5a4a80;font-size:10px'>Assinatura do Gestor:</span><img src='"+c.gestor_assinatura+"' style='height:36px;max-width:180px;object-fit:contain;border:1px solid #3a1a58;border-radius:4px;background:#fff'></div>");
       }
       h.push("</div>");
     });
@@ -8040,17 +8041,19 @@ function _pdfCandidatura(candId){
   h+="</div></div>";
 
   // 5. Campo decisão (para impressão)
-  if(c.status==="pendente"){
-    h+="<div class='secao'><div class='secao-titulo'>✅ Decisão do Instrutor</div><div class='secao-body'>";
-    h+="<div class='grid2'>";
-    h+="<div class='campo'><label>Decisão</label><p style='height:24px'></p></div>";
-    h+="<div class='campo'><label>Data</label><p style='height:24px'></p></div>";
-    h+="</div>";
-    h+="<div style='margin-top:12px'><p style='font-size:9px;font-weight:700;text-transform:uppercase;color:#6a4a88;margin-bottom:6px'>Assinatura do Instrutor</p>";
+  h+="<div class='secao'><div class='secao-titulo'>✅ Decisão do Instrutor</div><div class='secao-body'>";
+  h+="<div class='grid2'>";
+  h+="<div class='campo'><label>Decisão</label><p>"+(c.status==="pendente"?"&nbsp;":c.status==="aprovado"?"✅ Aprovado":"❌ Recusado")+"</p></div>";
+  h+="<div class='campo'><label>Data</label><p>"+(c.data_decisao?new Date(c.data_decisao).toLocaleDateString("pt-BR"):"&nbsp;")+"</p></div>";
+  h+="</div>";
+  h+="<div style='margin-top:12px'><p style='font-size:9px;font-weight:700;text-transform:uppercase;color:#6a4a88;margin-bottom:6px'>Assinatura do Gestor</p>";
+  if(c.gestor_assinatura){
+    h+="<img src='"+c.gestor_assinatura+"' style='height:55px;max-width:260px;object-fit:contain;border-bottom:1px solid #333;display:block;margin-bottom:4px'>";
+  } else {
     h+="<div style='width:260px;height:55px;border-bottom:1px solid #333;margin-bottom:4px'></div>";
-    h+="<p style='font-size:10px;color:#555'>Instrutor responsável pelo projeto</p></div>";
-    h+="</div></div>";
   }
+  h+="<p style='font-size:10px;color:#555'>Gestor responsável pela aprovação</p></div>";
+  h+="</div></div>";
 
   h+="<div class='rodape'>Documento gerado pelo Sistema IARA · 77ª CIPM BCS · "+new Date().toLocaleString("pt-BR")+"</div>";
   h+="</body></html>";
@@ -8087,11 +8090,70 @@ function _decidirCandidatura(id, decisao){
   if(!state.candidaturas) return;
   var idx=state.candidaturas.findIndex(function(c){return c.id===id;});
   if(idx<0) return;
+  // Aprovação exige assinatura do gestor
+  if(decisao==="aprovado"){
+    _modalAssinaturaGestor(id); return;
+  }
+  // Recusa: direto
+  _confirmarDecisaoCandidatura(id,"recusado","");
+}
+
+function _modalAssinaturaGestor(id){
+  var existing=document.getElementById("modal-assin-gestor");
+  if(existing) existing.remove();
+  var m=document.createElement("div");
+  m.id="modal-assin-gestor";
+  m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
+  m.innerHTML="<div style='background:#130d24;border:1px solid #6a3a9a;border-radius:14px;padding:24px;max-width:420px;width:100%'>"
+    +"<h3 style='color:#a78bfa;font-size:15px;font-weight:700;margin:0 0 6px'>✅ Aprovar Candidatura</h3>"
+    +"<p style='color:#6a5a90;font-size:11px;margin:0 0 16px'>Assine abaixo para confirmar a aprovação</p>"
+    +"<div style='border:2px solid #6a3a9a;border-radius:8px;background:#fff;position:relative'>"
+    +"<canvas id='canvas-assin-gestor' width='370' height='120' style='display:block;width:100%;height:120px;cursor:crosshair;touch-action:none'></canvas>"
+    +"<button onclick='(function(){var c=document.getElementById(\"canvas-assin-gestor\");var ctx=c.getContext(\"2d\");ctx.clearRect(0,0,c.width,c.height);window._agDes=false;})()' style='position:absolute;top:6px;right:8px;background:rgba(240,240,240,.9);border:1px solid #ccc;color:#555;padding:3px 10px;border-radius:5px;font-size:10px;cursor:pointer'>Limpar</button>"
+    +"</div>"
+    +"<p id='erro-assin-gestor' style='color:#ef4444;font-size:11px;margin:6px 0 0;display:none'>⚠️ Assine antes de confirmar</p>"
+    +"<div style='display:flex;gap:10px;margin-top:16px'>"
+    +"<button onclick='document.getElementById(\"modal-assin-gestor\").remove()' style='flex:1;background:#1a0a28;border:1px solid #4a2a68;color:#7a6a90;padding:10px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>"
+    +"<button onclick='_confirmarAssinaturaGestor(\""+id+"\")' style='flex:1;background:linear-gradient(135deg,#166534,#14532d);border:1px solid #22c55e;color:#22c55e;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✅ Confirmar</button>"
+    +"</div></div>";
+  document.body.appendChild(m);
+  m.onclick=function(e){if(e.target===this)this.remove();};
+  // Canvas de assinatura
+  var canvas=document.getElementById("canvas-assin-gestor");
+  var ctx=canvas.getContext("2d");
+  window._agDes=false;
+  function pos(e){
+    var r=canvas.getBoundingClientRect();
+    var scaleX=canvas.width/r.width, scaleY=canvas.height/r.height;
+    var src=e.touches?e.touches[0]:e;
+    return {x:(src.clientX-r.left)*scaleX, y:(src.clientY-r.top)*scaleY};
+  }
+  function start(e){ e.preventDefault(); ctx.beginPath(); var p=pos(e); ctx.moveTo(p.x,p.y); canvas._dn=true; }
+  function move(e){ e.preventDefault(); if(!canvas._dn) return; window._agDes=true; ctx.lineWidth=2; ctx.strokeStyle="#1a0a6a"; var p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); }
+  function end(){ canvas._dn=false; }
+  canvas.addEventListener("mousedown",start); canvas.addEventListener("mousemove",move); canvas.addEventListener("mouseup",end);
+  canvas.addEventListener("touchstart",start,{passive:false}); canvas.addEventListener("touchmove",move,{passive:false}); canvas.addEventListener("touchend",end);
+}
+
+function _confirmarAssinaturaGestor(id){
+  if(!window._agDes){
+    document.getElementById("erro-assin-gestor").style.display="block"; return;
+  }
+  var canvas=document.getElementById("canvas-assin-gestor");
+  var assinatura=canvas.toDataURL("image/png");
+  document.getElementById("modal-assin-gestor").remove();
+  _confirmarDecisaoCandidatura(id,"aprovado",assinatura);
+}
+
+function _confirmarDecisaoCandidatura(id, decisao, assinaturaGestor){
+  if(!state.candidaturas) return;
+  var idx=state.candidaturas.findIndex(function(c){return c.id===id;});
+  if(idx<0) return;
   state.candidaturas[idx].status=decisao;
   state.candidaturas[idx].data_decisao=new Date().toISOString();
+  if(assinaturaGestor) state.candidaturas[idx].gestor_assinatura=assinaturaGestor;
   localStorage.setItem("bcs_candidaturas",JSON.stringify(state.candidaturas));
   salvarLocal();
-  // Sincroniza decisão com Sheets
   _invEnviarSheets("candidatura", state.candidaturas[idx]);
   showToast(decisao==="aprovado"?"✅ Candidatura aprovada!":"❌ Candidatura recusada.");
   _renderCandidaturas(document.getElementById("main")||document.getElementById("main-content"));
