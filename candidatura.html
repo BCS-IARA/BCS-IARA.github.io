@@ -108,10 +108,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f
 
   <!-- 2. Responsável -->
   <div class="secao-titulo" style="margin-top:20px">👨‍👩‍👧 Responsável / Autorização</div>
-  <p style="color:#5a4a80;font-size:11px;margin-bottom:14px">Preencha os dados do responsável e assine abaixo autorizando a participação.</p>
+  <div id="aviso-menor" style="display:none;background:#2a1250;border:1px solid #a78bfa44;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#a78bfa">
+    ⚠️ <strong>Candidato menor de idade</strong> — a assinatura do responsável legal é <strong>obrigatória</strong>.
+  </div>
+  <p style="color:#5a4a80;font-size:11px;margin-bottom:14px" id="txt-resp-info">Preencha os dados do responsável e assine abaixo autorizando a participação.</p>
 
   <div class="campo">
-    <label>Nome do responsável <span class="obrig">*</span></label>
+    <label id="lbl-resp-nome">Nome do responsável <span class="obrig">*</span></label>
     <input id="f-resp-nome" type="text" placeholder="Nome completo do pai, mãe ou responsável"/>
   </div>
 
@@ -134,12 +137,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f
   </div>
 
   <div class="campo">
-    <label>Assinatura do Responsável <span class="obrig">*</span> <span style="color:#7060a0;font-size:9px">(assine com o dedo ou mouse)</span></label>
+    <label id="lbl-assin">Assinatura do Responsável <span class="obrig">*</span> <span style="color:#7060a0;font-size:9px">(assine com o dedo ou mouse)</span></label>
     <div class="assin-wrap">
       <canvas id="assin-resp" width="480" height="140"></canvas>
       <button type="button" class="btn-limpar-assin" onclick="limparAssinatura()">Limpar</button>
     </div>
-    <div class="erro-msg" id="erro-assin">Assinatura do responsável obrigatória</div>
+    <div id="assin-ok" style="display:none;color:#22c55e;font-size:11px;font-weight:700;margin-top:4px">✅ Assinatura registrada</div>
+    <div class="erro-msg" id="erro-assin">Assinatura obrigatória — assine no campo acima</div>
   </div>
 
   <!-- 3. Comprovante de residência -->
@@ -198,28 +202,53 @@ if(!SHEETS_URL) SHEETS_URL="https://script.google.com/macros/s/AKfycbxKZVJcjgBSV
 document.getElementById("nome-projeto").textContent = decodeURIComponent(PROJETO_NOME);
 document.getElementById("info-projeto").textContent  = "Candidatura a vaga · 77ª CIPM BCS";
 
+// ── Detecta menor de idade ────────────────────────────────────
+document.getElementById("f-nasc").addEventListener("change", function(){
+  var nasc = this.value;
+  if(!nasc) return;
+  var idade = Math.floor((new Date() - new Date(nasc)) / (365.25*864e5));
+  var menor = idade < 18;
+  document.getElementById("aviso-menor").style.display = menor ? "block" : "none";
+  document.getElementById("lbl-resp-nome").innerHTML = menor
+    ? "Nome do responsável legal <span class='obrig'>*</span>"
+    : "Nome do responsável / candidato <span class='obrig'>*</span>";
+  document.getElementById("lbl-assin").innerHTML = menor
+    ? "Assinatura do Responsável Legal <span class='obrig'>*</span> <span style='color:#7060a0;font-size:9px'>(assine com o dedo ou mouse)</span>"
+    : "Assinatura do Candidato ou Responsável <span class='obrig'>*</span> <span style='color:#7060a0;font-size:9px'>(assine com o dedo ou mouse)</span>";
+  if(menor){
+    document.getElementById("f-resp-parent").value = "Mãe";
+  }
+});
+
 // ── Canvas de assinatura ─────────────────────────────────────
 var _assinData = null;
+var _assinDesenhada = false;
 (function(){
   var cv  = document.getElementById("assin-resp");
   var ctx = cv.getContext("2d");
   var painting = false;
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
-  ctx.strokeStyle="#1a0a28"; ctx.lineWidth=2.5; ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.strokeStyle="#1a0a28"; ctx.lineWidth=2.8; ctx.lineCap="round"; ctx.lineJoin="round";
 
   function pos(e){
     var r=cv.getBoundingClientRect();
     var s=e.touches?e.touches[0]:e;
     return {x:(s.clientX-r.left)*(cv.width/r.width), y:(s.clientY-r.top)*(cv.height/r.height)};
   }
-  function salvarSnap(){ _assinData = cv.toDataURL("image/jpeg",0.85); }
+  function salvarSnap(){
+    if(!_assinDesenhada) return; // ignora se nada foi desenhado
+    _assinData = cv.toDataURL("image/png");
+    document.getElementById("assin-ok").style.display = "block";
+    document.getElementById("erro-assin").style.display = "none";
+  }
 
   cv.addEventListener("mousedown",function(e){painting=true;ctx.beginPath();var p=pos(e);ctx.moveTo(p.x,p.y);});
-  cv.addEventListener("mousemove",function(e){if(!painting)return;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+  cv.addEventListener("mousemove",function(e){if(!painting)return;_assinDesenhada=true;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
   cv.addEventListener("mouseup",function(){painting=false;salvarSnap();});
-  cv.addEventListener("mouseleave",function(){painting=false;salvarSnap();});
+  // mouseleave SEM salvarSnap — evita capturar canvas em branco ao passar o mouse
+  cv.addEventListener("mouseleave",function(){painting=false;});
   cv.addEventListener("touchstart",function(e){e.preventDefault();painting=true;ctx.beginPath();var p=pos(e);ctx.moveTo(p.x,p.y);},{passive:false});
-  cv.addEventListener("touchmove",function(e){e.preventDefault();if(!painting)return;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();},{passive:false});
+  cv.addEventListener("touchmove",function(e){e.preventDefault();if(!painting)return;_assinDesenhada=true;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();},{passive:false});
   cv.addEventListener("touchend",function(){painting=false;salvarSnap();},{passive:false});
 })();
 
@@ -227,8 +256,10 @@ function limparAssinatura(){
   var cv=document.getElementById("assin-resp");
   var ctx=cv.getContext("2d");
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
-  ctx.strokeStyle="#1a0a28"; ctx.lineWidth=2.5; ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.strokeStyle="#1a0a28"; ctx.lineWidth=2.8; ctx.lineCap="round"; ctx.lineJoin="round";
   _assinData=null;
+  _assinDesenhada=false;
+  document.getElementById("assin-ok").style.display="none";
 }
 
 // ── Foto comprovante ─────────────────────────────────────────
@@ -344,24 +375,32 @@ function enviarCandidatura(){
         dadosSheets.comprovante_residencia=c2.toDataURL("image/jpeg",0.5);
       }catch(e){ dadosSheets.comprovante_residencia="[foto_local]"; }
     }
-    if(dadosSheets.responsavel_assinatura&&dadosSheets.responsavel_assinatura.length>5000){
-      try{
-        var img3=new Image(); img3.src=dadosSheets.responsavel_assinatura;
-        var c3=document.createElement("canvas"); c3.width=200; c3.height=65;
-        var ctx3=c3.getContext("2d");
-        ctx3.fillStyle="#fff"; ctx3.fillRect(0,0,200,65);
-        ctx3.drawImage(img3,0,0,200,65);
-        dadosSheets.responsavel_assinatura=c3.toDataURL("image/jpeg",0.7);
-      }catch(e){}
+    function enviarParaSheets(){
+      var payload=JSON.stringify({token:TOKEN,tipo:"candidatura",registro:dadosSheets});
+      if(window.fetch){
+        fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:payload})
+          .then(function(){mostrarSucesso("✅ Candidatura registrada no sistema!");})
+          .catch(function(){mostrarSucesso("⚠️ Salvo localmente (sem internet)");});
+      } else {
+        mostrarSucesso("✅ Candidatura registrada!");
+      }
     }
 
-    var payload=JSON.stringify({token:TOKEN,tipo:"candidatura",registro:dadosSheets});
-    if(window.fetch){
-      fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:payload})
-        .then(function(){mostrarSucesso("✅ Candidatura registrada no sistema!");})
-        .catch(function(){mostrarSucesso("⚠️ Salvo localmente (sem internet)");});
+    // Comprime assinatura mantendo proporção correta com onload
+    if(dadosSheets.responsavel_assinatura && dadosSheets.responsavel_assinatura.length > 5000){
+      var img3=new Image();
+      img3.onload=function(){
+        var c3=document.createElement("canvas"); c3.width=300; c3.height=100;
+        var ctx3=c3.getContext("2d");
+        ctx3.fillStyle="#fff"; ctx3.fillRect(0,0,300,100);
+        ctx3.drawImage(img3,0,0,300,100);
+        dadosSheets.responsavel_assinatura=c3.toDataURL("image/jpeg",0.8);
+        enviarParaSheets();
+      };
+      img3.onerror=function(){ enviarParaSheets(); };
+      img3.src=dadosSheets.responsavel_assinatura;
     } else {
-      mostrarSucesso("✅ Candidatura registrada!");
+      enviarParaSheets();
     }
   } else {
     setTimeout(function(){mostrarSucesso("✅ Candidatura registrada!");},600);

@@ -243,6 +243,13 @@ function setup() {
   ]]).setFontWeight("bold").setBackground("#1a0a3a").setFontColor("#c89ae8");
   insc.setFrozenRows(1);
 
+  // Aba Eventos Avulsos do Calendário
+  var evav = ss.insertSheet("eventos_avulsos");
+  evav.getRange(1,1,1,10).setValues([[
+    "id","data","hora","tipo","titulo","descricao","cor","status","resultado","criadoEm"
+  ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#fbbf24");
+  evav.setFrozenRows(1);
+
   try { ss.deleteSheet(planPadrao); } catch(e) {}
 
   Logger.log("✓ Planilha criada com sucesso!");
@@ -1294,6 +1301,8 @@ function doPost(e) {
       if (d.acao==="deletar"&&d.tipo&&d.id) return saida(deletarRegistro(ss,d.tipo,d.id),cb);
       if (d.acao==="editar"&&d.id&&d.campos) return saida(editarOc(ss,d.id,d.campos),cb);
       if (d.acao==="ia"&&d.messages&&d.system) return saida(chamarIA(d.system,d.messages),cb);
+      // ── Upload de foto para Google Drive ────────────────────────
+      if (d.acao==="uploadFoto"&&d.id&&d.foto) return saida(uploadFotoInventario(d.id,d.foto,d.nome||""),cb);
       // ── Tipos especiais que têm funções próprias ────────────────
       if (d.tipo==="carga_armamento"&&d.registro) return saida(salvarCargaArmamento(ss,d.registro),cb);
       if (d.tipo==="candidatura"&&d.registro) return saida(salvarCandidatura(ss,d.registro),cb);
@@ -1311,15 +1320,10 @@ function doPost(e) {
       return saida({ok:false,erro:"Payload sem tipo/registro"},cb);
     }
     if (e.parameter&&e.parameter.token===t&&e.parameter.dados) {
-      var d=JSON.parse(e.parameter.dados);
-      if (d.tipo&&d.registro) return saida(salvar(ss,d.tipo,d.registro),cb);
+      var dp=JSON.parse(e.parameter.dados);
+      if (dp.tipo&&dp.registro) return saida(salvar(ss,dp.tipo,dp.registro),cb);
       return saida({ok:false,erro:"Payload inválido"},cb);
     }
-    // ── UPLOAD DE FOTO PARA GOOGLE DRIVE ───────────────────────────
-    if (d.acao==="uploadFoto" && d.id && d.foto) {
-      return saida(uploadFotoInventario(d.id, d.foto, d.nome||""), cb);
-    }
-
     return saida({ok:false,erro:"Nenhum dado recebido"},cb);
   } catch(err){ return saida({ok:false,erro:"Erro doPost: "+err.toString()}); }
 }
@@ -1594,7 +1598,7 @@ function salvarCandidatura(ss, dados) {
   // Comprovante e assinatura já vêm comprimidos do cliente — mas garantimos limite
   if (copia.comprovante_residencia && copia.comprovante_residencia.length > 20000)
     copia.comprovante_residencia = "[foto_grande_local]";
-  if (copia.responsavel_assinatura && copia.responsavel_assinatura.length > 10000)
+  if (copia.responsavel_assinatura && copia.responsavel_assinatura.length > 50000)
     copia.responsavel_assinatura = "[assin_local]";
   return _salvarJson(ss, "candidaturas", "#1a0a3a", "#c89ae8", copia);
 }

@@ -579,6 +579,15 @@ async function lerDadoAppSheets(chave){
   try{ return JSON.parse(json); } catch(e){ return null; }
 }
 
+// Merge por ID: mantém local quando já existe, adiciona novos do remoto
+function _mergeById(local, remoto){
+  if(!remoto || !Array.isArray(remoto) || !remoto.length) return local||[];
+  var ids = new Set((local||[]).map(function(x){ return String(x.id); }));
+  var merged = (local||[]).slice();
+  remoto.forEach(function(x){ if(!ids.has(String(x.id))) merged.push(x); });
+  return merged;
+}
+
 async function sincronizarSheets(){
   if(!SHEETS_URL) return;
   try{
@@ -590,11 +599,29 @@ async function sincronizarSheets(){
     await salvarDadoAppSheets("bcs_inscricoes_proj",   state.inscricoesProjetos||[]);
     await salvarDadoAppSheets("bcs_policiais",         state.policiais||[]);
     await salvarDadoAppSheets("bcs_vcm_casos",         state.vcmCasos||{});
+    await salvarDadoAppSheets("bcs_vcm_enc",           state.vcmEncaminhamentos||[]);
     await salvarDadoAppSheets("bcs_agendamentos",     state.db.agendamentos||[]);
     await salvarDadoAppSheets("bcs_visitas",          state.db.visitas||[]);
     await salvarDadoAppSheets("bcs_atendimentos",     state.db.atendimentos||[]);
     await salvarDadoAppSheets("bcs_escolas",          state.escolas||[]);
     await salvarDadoAppSheets("bcs_atividades_esc",   state.atividadesEscolares||[]);
+    await salvarDadoAppSheets("bcs_chamadas",          state.chamadas||[]);
+    await salvarDadoAppSheets("bcs_cargas_armamento",  state.cargasArmamento||[]);
+    await salvarDadoAppSheets("bcs_inv_itens",         state.invItens||[]);
+    await salvarDadoAppSheets("bcs_inv_mov",           state.invMovimentacoes||[]);
+    await salvarDadoAppSheets("bcs_inv_conf",          state.invConferencias||[]);
+    await salvarDadoAppSheets("bcs_visitas_escolares", state.visitasEscolares||[]);
+    await salvarDadoAppSheets("bcs_candidaturas",      state.candidaturas||[]);
+    await salvarDadoAppSheets("bcs_instrutores_cad",   state.cadastroInstrutores||[]);
+    await salvarDadoAppSheets("bcs_oc_complementos",   state.ocComplementos||[]);
+    await salvarDadoAppSheets("bcs_oc_pendentes",      state.ocorrenciasPendentes||[]);
+    await salvarDadoAppSheets("bcs_oc_arquivadas",     state.ocorrenciasArquivadas||[]);
+    await salvarDadoAppSheets("bcs_oc_encerradas",     state.ocorrenciasEncerradas||[]);
+    await salvarDadoAppSheets("bcs_alertas_graves",    state.alertasGraves||[]);
+    await salvarDadoAppSheets("bcs_devolutivas_crav_blob", state.devolutivasCrav||[]);
+    await salvarDadoAppSheets("bcs_conselho_atas",     state.conselho_atas||[]);
+    await salvarDadoAppSheets("bcs_conselho_associados",state.conselho_associados||[]);
+    await salvarDadoAppSheets("bcs_conselho_diretoria", state.conselho_diretoria||[]);
     try{ var _mods=JSON.parse(localStorage.getItem("bcs_oc_modulos")||"{}"); if(Object.keys(_mods).length>0) await salvarDadoAppSheets("bcs_oc_modulos",_mods); }catch(e2){}
     console.log("[BCS] Sync Sheets OK — projetos:"+(state.projetos||[]).length+" agendamentos:"+(state.db.agendamentos||[]).length);
   } catch(e){
@@ -648,6 +675,23 @@ function _salvarLocalSemSync(){
     if(state.alertasCrescimento) localStorage.setItem("bcs_alertas_crescimento",JSON.stringify(state.alertasCrescimento));
     if(state.escolas) localStorage.setItem("bcs_escolas",JSON.stringify(state.escolas));
     if(state.atividadesEscolares) localStorage.setItem("bcs_atividades_escolares",JSON.stringify(state.atividadesEscolares));
+    if(state.cargasArmamento)     localStorage.setItem("bcs_cargas_armamento",   JSON.stringify(state.cargasArmamento));
+    if(state.invItens)            localStorage.setItem("bcs_inv_itens",           JSON.stringify(state.invItens));
+    if(state.invMovimentacoes)    localStorage.setItem("bcs_inv_mov",             JSON.stringify(state.invMovimentacoes));
+    if(state.invConferencias)     localStorage.setItem("bcs_inv_conf",            JSON.stringify(state.invConferencias));
+    if(state.visitasEscolares)    localStorage.setItem("bcs_visitas_escolares",   JSON.stringify(state.visitasEscolares));
+    if(state.candidaturas)        localStorage.setItem("bcs_candidaturas",        JSON.stringify(state.candidaturas));
+    if(state.cadastroInstrutores) localStorage.setItem("bcs_instrutores_cad",     JSON.stringify(state.cadastroInstrutores));
+    if(state.ocComplementos)      localStorage.setItem("bcs_oc_complementos",     JSON.stringify(state.ocComplementos));
+    if(state.ocorrenciasPendentes)  localStorage.setItem("bcs_oc_pendentes",      JSON.stringify(state.ocorrenciasPendentes));
+    if(state.ocorrenciasArquivadas) localStorage.setItem("bcs_oc_arquivadas",     JSON.stringify(state.ocorrenciasArquivadas));
+    if(state.ocorrenciasEncerradas) localStorage.setItem("bcs_oc_encerradas",     JSON.stringify(state.ocorrenciasEncerradas));
+    if(state.alertasGraves)       localStorage.setItem("bcs_alertas_graves",      JSON.stringify(state.alertasGraves));
+    if(state.devolutivasCrav)     localStorage.setItem("bcs_devolutivas_crav",    JSON.stringify(state.devolutivasCrav));
+    if(state.vcmEncaminhamentos)  localStorage.setItem("bcs_vcm_enc",             JSON.stringify(state.vcmEncaminhamentos));
+    if(state.conselho_atas)       localStorage.setItem("bcs_conselho_atas",       JSON.stringify(state.conselho_atas));
+    if(state.conselho_associados) localStorage.setItem("bcs_conselho_associados", JSON.stringify(state.conselho_associados));
+    if(state.conselho_diretoria)  localStorage.setItem("bcs_conselho_diretoria",  JSON.stringify(state.conselho_diretoria));
     _salvarModulos(); // garante que bcs_oc_modulos reflita o estado atual após merge do Sheets
   }catch(e){ console.error("[BCS] _salvarLocalSemSync:",e); }
 }
@@ -667,19 +711,30 @@ async function carregarDadosAppDoSheets(){
     var projSociaisSheets = await lerDadoAppSheets("bcs_projetos_sociais");
     var inscricoesSheets  = await lerDadoAppSheets("bcs_inscricoes_proj");
     var policiaisSheets   = await lerDadoAppSheets("bcs_policiais");
-    var vcmCasosSheets    = await lerDadoAppSheets("bcs_vcm_casos");
+    var vcmCasosSheets       = await lerDadoAppSheets("bcs_vcm_casos");
+    var vcmEncsSheets        = await lerDadoAppSheets("bcs_vcm_enc");
+    var chamadasSheets       = await lerDadoAppSheets("bcs_chamadas");
+    var cargasSheets         = await lerDadoAppSheets("bcs_cargas_armamento");
+    var invItensSheets       = await lerDadoAppSheets("bcs_inv_itens");
+    var invMovSheets         = await lerDadoAppSheets("bcs_inv_mov");
+    var invConfSheets        = await lerDadoAppSheets("bcs_inv_conf");
+    var visEscSheets         = await lerDadoAppSheets("bcs_visitas_escolares");
+    var candidaturasSheets   = await lerDadoAppSheets("bcs_candidaturas");
+    var instrutoresSheets    = await lerDadoAppSheets("bcs_instrutores_cad");
+    var ocComplSheets        = await lerDadoAppSheets("bcs_oc_complementos");
+    var ocPendSheets         = await lerDadoAppSheets("bcs_oc_pendentes");
+    var ocArqSheets          = await lerDadoAppSheets("bcs_oc_arquivadas");
+    var ocEncSheets          = await lerDadoAppSheets("bcs_oc_encerradas");
+    var alertasGravesSheets  = await lerDadoAppSheets("bcs_alertas_graves");
+    var devolutivasSheets    = await lerDadoAppSheets("bcs_devolutivas_crav_blob");
+    var conselhoAtasSheets   = await lerDadoAppSheets("bcs_conselho_atas");
+    var conselhoAssocSheets  = await lerDadoAppSheets("bcs_conselho_associados");
+    var conselhoDirSheets    = await lerDadoAppSheets("bcs_conselho_diretoria");
 
     var localProj  = state.projetos||[];
     var localEv    = state.eventosAvulsos||[];
 
-    // Merge: mantém local quando ID já existe (preserva edições locais), adiciona novos do Sheets
-    function _mergeById(local, remoto){
-      if(!remoto || !Array.isArray(remoto) || !remoto.length) return local||[];
-      var ids = new Set((local||[]).map(function(x){ return String(x.id); }));
-      var merged = (local||[]).slice();
-      remoto.forEach(function(x){ if(!ids.has(String(x.id))) merged.push(x); });
-      return merged;
-    }
+    // Merge delegado à função global _mergeById
 
     if(projetos && Array.isArray(projetos) && projetos.length > 0){
       var _projDel = state._deletedProjIds || new Set();
@@ -729,6 +784,47 @@ async function carregarDadosAppDoSheets(){
         else if((rem.atualizadoEm||"")>(loc.atualizadoEm||"")){ state.vcmCasos[k]=rem; }
       });
     }
+
+    // 📤 Encaminhamentos VCM (merge por id)
+    state.vcmEncaminhamentos = _mergeById(state.vcmEncaminhamentos||[], vcmEncsSheets);
+    localStorage.setItem("bcs_vcm_enc", JSON.stringify(state.vcmEncaminhamentos));
+
+    // 📋 Módulos sem sync anterior — merge por id
+    state.chamadas            = _mergeById(state.chamadas||[],            chamadasSheets);
+    state.cargasArmamento     = _mergeById(state.cargasArmamento||[],     cargasSheets);
+    state.invItens            = _mergeById(state.invItens||[],            invItensSheets);
+    state.invMovimentacoes    = _mergeById(state.invMovimentacoes||[],    invMovSheets);
+    state.invConferencias     = _mergeById(state.invConferencias||[],     invConfSheets);
+    state.visitasEscolares    = _mergeById(state.visitasEscolares||[],    visEscSheets);
+    state.candidaturas        = _mergeById(state.candidaturas||[],        candidaturasSheets);
+    state.cadastroInstrutores = _mergeById(state.cadastroInstrutores||[], instrutoresSheets);
+    state.ocComplementos      = _mergeById(state.ocComplementos||[],      ocComplSheets);
+    state.ocorrenciasPendentes  = _mergeById(state.ocorrenciasPendentes||[],  ocPendSheets);
+    state.ocorrenciasArquivadas = _mergeById(state.ocorrenciasArquivadas||[], ocArqSheets);
+    state.ocorrenciasEncerradas = _mergeById(state.ocorrenciasEncerradas||[], ocEncSheets);
+    state.alertasGraves       = _mergeById(state.alertasGraves||[],       alertasGravesSheets);
+    state.devolutivasCrav     = _mergeById(state.devolutivasCrav||[],     devolutivasSheets);
+    state.conselho_atas       = _mergeById(state.conselho_atas||[],       conselhoAtasSheets);
+    state.conselho_associados = _mergeById(state.conselho_associados||[], conselhoAssocSheets);
+    state.conselho_diretoria  = _mergeById(state.conselho_diretoria||[],  conselhoDirSheets);
+    // Reflete tudo no localStorage para ficar em sincronia
+    localStorage.setItem("bcs_chamadas",           JSON.stringify(state.chamadas||[]));
+    localStorage.setItem("bcs_cargas_armamento",   JSON.stringify(state.cargasArmamento||[]));
+    localStorage.setItem("bcs_inv_itens",          JSON.stringify(state.invItens||[]));
+    localStorage.setItem("bcs_inv_mov",            JSON.stringify(state.invMovimentacoes||[]));
+    localStorage.setItem("bcs_inv_conf",           JSON.stringify(state.invConferencias||[]));
+    localStorage.setItem("bcs_visitas_escolares",  JSON.stringify(state.visitasEscolares||[]));
+    localStorage.setItem("bcs_candidaturas",       JSON.stringify(state.candidaturas||[]));
+    localStorage.setItem("bcs_instrutores_cad",    JSON.stringify(state.cadastroInstrutores||[]));
+    localStorage.setItem("bcs_oc_complementos",    JSON.stringify(state.ocComplementos||[]));
+    localStorage.setItem("bcs_oc_pendentes",       JSON.stringify(state.ocorrenciasPendentes||[]));
+    localStorage.setItem("bcs_oc_arquivadas",      JSON.stringify(state.ocorrenciasArquivadas||[]));
+    localStorage.setItem("bcs_oc_encerradas",      JSON.stringify(state.ocorrenciasEncerradas||[]));
+    localStorage.setItem("bcs_alertas_graves",     JSON.stringify(state.alertasGraves||[]));
+    localStorage.setItem("bcs_devolutivas_crav",   JSON.stringify(state.devolutivasCrav||[]));
+    localStorage.setItem("bcs_conselho_atas",      JSON.stringify(state.conselho_atas||[]));
+    localStorage.setItem("bcs_conselho_associados",JSON.stringify(state.conselho_associados||[]));
+    localStorage.setItem("bcs_conselho_diretoria", JSON.stringify(state.conselho_diretoria||[]));
 
     // 🏫 Restaurar classificacao/escolaNome de outros dispositivos via Sheets
     try{
@@ -3327,9 +3423,10 @@ function verEventoAvulso(evId){
     ev.status    = document.getElementById("ev-edit-status").value;
     ev.resultado = document.getElementById("ev-edit-resultado").value.trim();
     salvarLocal();
+    _syncEventoAvulsoSheets(ev);
+    salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).catch(function(){});
     modal.remove();
     renderCalendar();
-    // Reabre o modal com dados atualizados
     verEventoAvulso(evId);
   };
   document.getElementById("btn-excluir-ev").onclick = function(){
@@ -3603,7 +3700,8 @@ function _renderVcmEncaminhamentos(main){
   // Relê localStorage para capturar encaminhamentos adicionados pelo monitor VCM
   try{
     var _locEnc=JSON.parse(localStorage.getItem("bcs_vcm_enc")||"[]");
-    if(_locEnc.length>(state.vcmEncaminhamentos||[]).length){
+    if(_locEnc.length>0){
+      // Sempre usa localStorage como fonte de verdade para encaminhamentos
       state.vcmEncaminhamentos=_locEnc;
     }
   }catch(e){}
@@ -7789,24 +7887,37 @@ function _renderCandidaturas(main){
       h.push("<div style='flex:1;min-width:0'>");
       h.push("<p style='color:#e0d0ff;font-size:14px;font-weight:700;margin:0'>"+esc(c.nome||"—")+"</p>");
       h.push("<p style='color:#7060a0;font-size:11px;margin:3px 0 0'>"+esc(c.projeto_nome||"—")+" · "+dt+"</p>");
-      if(c.data_nascimento){ var idade=Math.floor((new Date()-new Date(c.data_nascimento))/(365.25*864e5)); h.push("<p style='color:#6a5a90;font-size:11px;margin:2px 0 0'>"+idade+" anos · "+esc(c.bairro||"—")+"</p>"); }
-      if(c.responsavel_nome) h.push("<p style='color:#6a5a90;font-size:10px;margin:2px 0 0'>Responsável: "+esc(c.responsavel_nome)+" ("+esc(c.responsavel_parentesco||"—")+")</p>");
-      if(c.motivacao) h.push("<p style='color:#8a7aaa;font-size:11px;margin:6px 0 0;font-style:italic;border-left:2px solid #3a1a58;padding-left:8px'>\""+esc(c.motivacao.slice(0,120))+(c.motivacao.length>120?"...":"")+"\"</p>");
+      if(c.data_nascimento){ var idade=Math.floor((new Date()-new Date(c.data_nascimento))/(365.25*864e5)); h.push("<p style='color:#6a5a90;font-size:11px;margin:2px 0 0'>"+idade+" anos · "+esc(c.sexo||"")+(c.bairro?" · "+esc(c.bairro):"")+"</p>"); }
+      if(c.telefone) h.push("<p style='color:#6a5a90;font-size:11px;margin:2px 0 0'>📞 "+esc(c.telefone)+"</p>");
+      if(c.endereco) h.push("<p style='color:#6a5a90;font-size:11px;margin:2px 0 0'>📍 "+esc(c.endereco)+(c.bairro?" — "+esc(c.bairro):"")+"</p>");
+      if(c.escola) h.push("<p style='color:#6a5a90;font-size:11px;margin:2px 0 0'>🏫 "+esc(c.escola)+(c.serie_ano?" · "+esc(c.serie_ano):"")+"</p>");
+      if(c.responsavel_nome) h.push("<p style='color:#6a5a90;font-size:10px;margin:4px 0 0;padding-top:4px;border-top:1px solid #2a1a4a'>👤 Resp.: "+esc(c.responsavel_nome)+" ("+esc(c.responsavel_parentesco||"—")+")"+(c.responsavel_telefone?" · "+esc(c.responsavel_telefone):"")+"</p>");
+      if(c.motivacao) h.push("<p style='color:#8a7aaa;font-size:11px;margin:6px 0 0;font-style:italic;border-left:2px solid #3a1a58;padding-left:8px'>\""+esc(c.motivacao)+"\"</p>");
+      if(c.experiencia) h.push("<p style='color:#7a6a9a;font-size:10px;margin:4px 0 0'><b>Exp.:</b> "+esc(c.experiencia)+"</p>");
       h.push("</div>");
       h.push("<div style='display:flex;flex-direction:column;gap:6px;flex-shrink:0'>");
       // Assinatura
-      if(c.responsavel_assinatura) h.push("<div style='text-align:center'><img src='"+c.responsavel_assinatura+"' style='max-width:120px;height:40px;object-fit:contain;border:1px solid #3a1a58;border-radius:4px;background:#fff'><br><span style='color:#5a4a80;font-size:9px'>Assinatura</span></div>");
+      if(c.responsavel_assinatura && c.responsavel_assinatura!=="[assin_local]" && c.responsavel_assinatura!=="[foto_local]"){
+        h.push("<div style='text-align:center'><img src='"+c.responsavel_assinatura+"' style='max-width:120px;height:40px;object-fit:contain;border:1px solid #3a1a58;border-radius:4px;background:#fff'><br><span style='color:#5a4a80;font-size:9px'>Assinatura</span></div>");
+      } else if(c.responsavel_assinatura){
+        h.push("<div style='text-align:center;max-width:120px'><div style='height:40px;border:1px dashed #3a1a58;border-radius:4px;display:flex;align-items:center;justify-content:center'><span style='color:#4a3a6a;font-size:9px'>✍️ no<br>dispositivo</span></div><span style='color:#5a4a80;font-size:9px'>Assinatura</span></div>");
+      }
       // Comprovante
       if(c.comprovante_residencia&&c.comprovante_residencia!=="[foto_local]") h.push("<div style='text-align:center'><img src='"+c.comprovante_residencia+"' style='max-width:80px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #3a1a58;cursor:pointer' onclick='window.open(this.src,\"_blank\")'><br><span style='color:#5a4a80;font-size:9px'>Comprovante</span></div>");
       h.push("</div></div>");
-      // Botões de decisão
+      // Botões de decisão + PDF
       if(c.status==="pendente"){
         h.push("<div style='display:flex;gap:8px;margin-top:12px;flex-wrap:wrap'>");
+        h.push("<button onclick='_pdfCandidatura(\""+c.id+"\")' style='background:#2a1e08;border:1px solid #d4a87a;color:#d4a87a;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>📄 Ficha PDF</button>");
         h.push("<button onclick='_decidirCandidatura(\""+c.id+"\",\"aprovado\")' style='background:#0a2a1a;border:1px solid #22c55e;color:#22c55e;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>✅ Aprovar</button>");
         h.push("<button onclick='_decidirCandidatura(\""+c.id+"\",\"recusado\")' style='background:#2a0a0a;border:1px solid #ef4444;color:#ef4444;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>❌ Recusar</button>");
         h.push("</div>");
       } else {
-        h.push("<div style='margin-top:8px'><span style='background:"+scor+"22;color:"+scor+";padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700'>"+esc(c.status.charAt(0).toUpperCase()+c.status.slice(1))+"</span>"+(c.data_decisao?"<span style='color:#4a3a6a;font-size:10px;margin-left:8px'>"+new Date(c.data_decisao).toLocaleDateString("pt-BR")+"</span>":"")+"</div>");
+        h.push("<div style='display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap'>");
+        h.push("<span style='background:"+scor+"22;color:"+scor+";padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700'>"+esc(c.status.charAt(0).toUpperCase()+c.status.slice(1))+"</span>");
+        if(c.data_decisao) h.push("<span style='color:#4a3a6a;font-size:10px'>"+new Date(c.data_decisao).toLocaleDateString("pt-BR")+"</span>");
+        h.push("<button onclick='_pdfCandidatura(\""+c.id+"\")' style='background:#2a1e08;border:1px solid #d4a87a;color:#d4a87a;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer'>📄 Ficha PDF</button>");
+        h.push("</div>");
       }
       h.push("</div>");
     });
@@ -7814,6 +7925,140 @@ function _renderCandidaturas(main){
   }
   h.push("</div>");
   main.innerHTML=h.join("");
+}
+
+function _pdfCandidatura(candId){
+  var c=(state.candidaturas||[]).find(function(x){return x.id===candId;});
+  if(!c){ showToast("Candidatura não encontrada","error"); return; }
+
+  var statusLabel={pendente:"⏳ Pendente",aprovado:"✅ Aprovado",recusado:"❌ Recusado"}[c.status]||c.status;
+  var statusCor  ={pendente:"#f59e0b", aprovado:"#22c55e", recusado:"#ef4444"}[c.status]||"#888";
+  var dtCand=c.data_candidatura?new Date(c.data_candidatura).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";
+  var dtDecis=c.data_decisao?new Date(c.data_decisao).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";
+  var idade="";
+  if(c.data_nascimento){ var a=Math.floor((new Date()-new Date(c.data_nascimento))/(365.25*864e5)); idade=a+" anos"; }
+
+  var h="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Ficha de Candidatura</title><style>";
+  h+="*{box-sizing:border-box;margin:0;padding:0}";
+  h+="body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#111;padding:24px;background:#fff}";
+  h+=".header{display:flex;align-items:center;gap:16px;border-bottom:3px solid #1a0a3a;padding-bottom:12px;margin-bottom:18px}";
+  h+=".header-text h1{font-size:14px;color:#1a0a3a;font-weight:800;margin:0}";
+  h+=".header-text p{font-size:10px;color:#5a4a80;margin:2px 0 0}";
+  h+=".titulo{text-align:center;font-size:15px;font-weight:900;color:#1a0a3a;text-transform:uppercase;letter-spacing:1px;border:2px solid #1a0a3a;padding:8px;border-radius:6px;margin-bottom:16px}";
+  h+=".status-badge{display:inline-block;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:700;margin-bottom:16px}";
+  h+=".secao{border:1px solid #ddd;border-radius:8px;margin-bottom:14px;overflow:hidden}";
+  h+=".secao-titulo{background:#f5f0ff;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#5a4a80;border-bottom:1px solid #ddd}";
+  h+=".secao-body{padding:12px}";
+  h+=".grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}";
+  h+=".grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}";
+  h+=".campo{margin-bottom:8px}";
+  h+=".campo label{display:block;font-size:9px;font-weight:700;color:#6a4a88;text-transform:uppercase;margin-bottom:2px}";
+  h+=".campo p{font-size:12px;color:#111;font-weight:600;border-bottom:1px solid #eee;padding-bottom:3px;min-height:18px}";
+  h+=".campo-txt label{display:block;font-size:9px;font-weight:700;color:#6a4a88;text-transform:uppercase;margin-bottom:4px}";
+  h+=".campo-txt p{font-size:11px;color:#333;line-height:1.6;background:#fafafa;border:1px solid #eee;border-radius:4px;padding:8px;min-height:40px}";
+  h+=".assin-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px}";
+  h+=".assin-bloco{text-align:center;border:1px solid #ddd;border-radius:6px;padding:10px}";
+  h+=".assin-bloco img{max-width:100%;max-height:70px;object-fit:contain;border:1px solid #eee;border-radius:4px;background:#fff;display:block;margin:0 auto 6px}";
+  h+=".assin-bloco .linha{height:50px;border-bottom:1px solid #333;margin-bottom:6px}";
+  h+=".comp-img{max-width:180px;max-height:140px;object-fit:cover;border-radius:6px;border:1px solid #ddd;display:block;margin-top:8px}";
+  h+=".rodape{margin-top:20px;border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:9px;color:#888}";
+  h+="@media print{body{padding:10px}@page{size:A4;margin:1.5cm}}";
+  h+="</style></head><body>";
+
+  // Cabeçalho
+  h+="<div class='header'>";
+  h+="<div class='header-text'>";
+  h+="<h1>Polícia Militar da Bahia — 77ª CIPM · Base Comunitária de Segurança Nova Cidade</h1>";
+  h+="<p>Sistema IARA · Projetos Sociais</p>";
+  h+="</div></div>";
+
+  h+="<div class='titulo'>Ficha de Candidatura — "+esc(c.projeto_nome||"Projeto Social")+"</div>";
+
+  // Status + protocolo
+  h+="<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px'>";
+  h+="<div>";
+  h+="<span class='status-badge' style='background:"+statusCor+"22;color:"+statusCor+";border:1px solid "+statusCor+"'>"+statusLabel+"</span>";
+  if(c.status!=="pendente") h+=" <span style='font-size:11px;color:#888'>"+dtDecis+"</span>";
+  h+="</div>";
+  h+="<div style='text-align:right'>";
+  h+="<p style='font-size:9px;color:#888;margin:0'>Protocolo</p>";
+  h+="<p style='font-size:12px;font-weight:700;font-family:monospace;color:#1a0a3a;margin:0'>"+esc(c.protocolo||c.id||"—")+"</p>";
+  h+="<p style='font-size:9px;color:#888;margin:2px 0 0'>Enviado em "+dtCand+"</p>";
+  h+="</div></div>";
+
+  // 1. Dados do candidato
+  h+="<div class='secao'><div class='secao-titulo'>👤 Dados do Candidato</div><div class='secao-body'>";
+  h+="<div class='campo' style='margin-bottom:12px'><label>Nome completo</label><p style='font-size:14px;font-weight:800'>"+esc(c.nome||"—")+"</p></div>";
+  h+="<div class='grid3'>";
+  h+="<div class='campo'><label>Data de Nascimento</label><p>"+esc(c.data_nascimento||"—")+(idade?" ("+idade+")":"")+"</p></div>";
+  h+="<div class='campo'><label>Sexo</label><p>"+esc(c.sexo||"—")+"</p></div>";
+  h+="<div class='campo'><label>Telefone / WhatsApp</label><p>"+esc(c.telefone||"—")+"</p></div>";
+  h+="</div>";
+  h+="<div class='grid2'>";
+  h+="<div class='campo'><label>Endereço</label><p>"+esc(c.endereco||"—")+"</p></div>";
+  h+="<div class='campo'><label>Bairro</label><p>"+esc(c.bairro||"—")+"</p></div>";
+  h+="</div>";
+  h+="<div class='grid2'>";
+  h+="<div class='campo'><label>Escola</label><p>"+esc(c.escola||"—")+"</p></div>";
+  h+="<div class='campo'><label>Série / Ano</label><p>"+esc(c.serie_ano||"—")+"</p></div>";
+  h+="</div>";
+  h+="</div></div>";
+
+  // 2. Responsável + Autorização
+  h+="<div class='secao'><div class='secao-titulo'>👨‍👩‍👧 Responsável / Autorização</div><div class='secao-body'>";
+  h+="<div class='grid3'>";
+  h+="<div class='campo'><label>Nome do Responsável</label><p>"+esc(c.responsavel_nome||"—")+"</p></div>";
+  h+="<div class='campo'><label>Parentesco</label><p>"+esc(c.responsavel_parentesco||"—")+"</p></div>";
+  h+="<div class='campo'><label>Telefone</label><p>"+esc(c.responsavel_telefone||"—")+"</p></div>";
+  h+="</div>";
+  // Assinatura do responsável
+  h+="<div style='margin-top:10px'><p style='font-size:9px;font-weight:700;text-transform:uppercase;color:#6a4a88;margin-bottom:6px'>Assinatura do Responsável</p>";
+  if(c.responsavel_assinatura&&c.responsavel_assinatura!=="[assin_local]"){
+    h+="<img src='"+c.responsavel_assinatura+"' style='max-width:250px;max-height:70px;object-fit:contain;border:1px solid #ddd;border-radius:4px;background:#fff;display:block'/>";
+  } else {
+    h+="<div style='width:250px;height:60px;border-bottom:1px solid #333'></div>";
+  }
+  h+="<p style='font-size:10px;color:#555;margin-top:4px'>"+esc((c.responsavel_nome||"Responsável")+" ("+esc(c.responsavel_parentesco||"")+")")+"</p>";
+  h+="</div></div></div>";
+
+  // 3. Motivação
+  if(c.motivacao||c.experiencia){
+    h+="<div class='secao'><div class='secao-titulo'>✍️ Motivação e Experiência</div><div class='secao-body'>";
+    if(c.motivacao){ h+="<div class='campo-txt' style='margin-bottom:10px'><label>Por que deseja participar?</label><p>"+esc(c.motivacao)+"</p></div>"; }
+    if(c.experiencia){ h+="<div class='campo-txt'><label>Experiência anterior</label><p>"+esc(c.experiencia)+"</p></div>"; }
+    h+="</div></div>";
+  }
+
+  // 4. Comprovante de residência
+  h+="<div class='secao'><div class='secao-titulo'>🏠 Comprovante de Residência</div><div class='secao-body'>";
+  if(c.comprovante_residencia&&c.comprovante_residencia!=="[foto_local]"&&c.comprovante_residencia!=="[foto_grande_local]"){
+    h+="<img src='"+c.comprovante_residencia+"' class='comp-img'/>";
+  } else {
+    h+="<p style='color:#888;font-size:11px'>Comprovante armazenado localmente no dispositivo de origem.</p>";
+  }
+  h+="</div></div>";
+
+  // 5. Campo decisão (para impressão)
+  if(c.status==="pendente"){
+    h+="<div class='secao'><div class='secao-titulo'>✅ Decisão do Instrutor</div><div class='secao-body'>";
+    h+="<div class='grid2'>";
+    h+="<div class='campo'><label>Decisão</label><p style='height:24px'></p></div>";
+    h+="<div class='campo'><label>Data</label><p style='height:24px'></p></div>";
+    h+="</div>";
+    h+="<div style='margin-top:12px'><p style='font-size:9px;font-weight:700;text-transform:uppercase;color:#6a4a88;margin-bottom:6px'>Assinatura do Instrutor</p>";
+    h+="<div style='width:260px;height:55px;border-bottom:1px solid #333;margin-bottom:4px'></div>";
+    h+="<p style='font-size:10px;color:#555'>Instrutor responsável pelo projeto</p></div>";
+    h+="</div></div>";
+  }
+
+  h+="<div class='rodape'>Documento gerado pelo Sistema IARA · 77ª CIPM BCS · "+new Date().toLocaleString("pt-BR")+"</div>";
+  h+="</body></html>";
+
+  var blob=new Blob([h],{type:"text/html;charset=utf-8"});
+  var url=URL.createObjectURL(blob);
+  var w=window.open(url,"_blank");
+  if(w){ w.addEventListener("load",function(){ setTimeout(function(){ w.print(); URL.revokeObjectURL(url); },400); }); }
+  else { showToast("Permita popups para gerar o PDF","error"); }
 }
 
 function _qrCandidatura(projId, projNome){
@@ -7860,16 +8105,21 @@ function _sincCandidaturasSheets(){
     clearTimeout(tmout); delete window[cb];
     if(!resp||!resp.ok||!Array.isArray(resp.dados)||!resp.dados.length) return;
     if(!state.candidaturas) state.candidaturas=[];
-    var novas=0;
+    var alterou=false;
     resp.dados.forEach(function(c){
       var ex=state.candidaturas.find(function(x){return x.id===c.id;});
-      if(!ex){ state.candidaturas.push(c); novas++; }
+      if(!ex){ state.candidaturas.push(c); alterou=true; }
       else if(c.data_decisao&&(!ex.data_decisao||c.data_decisao>ex.data_decisao)){
-        // Sheets tem decisão mais recente — atualiza local
         Object.assign(ex,{status:c.status,data_decisao:c.data_decisao,obs_decisao:c.obs_decisao});
+        alterou=true;
       }
     });
-    if(novas>0){ localStorage.setItem("bcs_candidaturas",JSON.stringify(state.candidaturas)); salvarLocal(); }
+    if(alterou){
+      localStorage.setItem("bcs_candidaturas",JSON.stringify(state.candidaturas));
+      salvarLocal();
+      var _m=document.getElementById("main");
+      if(_m && state._psTab==="candidaturas") _renderCandidaturas(_m);
+    }
   };
   var sc=document.createElement("script");
   sc.src=SHEETS_URL+"?acao=listar&tipo=candidaturas&token="+encodeURIComponent(BCS_TOKEN)+"&callback="+cb;
@@ -17647,8 +17897,9 @@ function _invEnviarSheets(tipo, dados){
   // Remove foto e assinaturas grandes para não estourar a URL
   var copia=Object.assign({},dados);
   if(copia.foto&&copia.foto.length>500) copia.foto="[foto_local]";
+  if(copia.comprovante_residencia&&copia.comprovante_residencia.length>500) copia.comprovante_residencia="[foto_local]";
   ["carga_assinatura","carga_liberador_assinatura",
-   "autorizador_assinatura","receptor_assinatura","assin1","assin2"]
+   "autorizador_assinatura","receptor_assinatura","assin1","assin2","responsavel_assinatura"]
     .forEach(function(k){ if(copia[k]&&copia[k].length>500) copia[k]="[assin_local]"; });
   var cb="cb_inv_"+Date.now()+"_"+Math.random().toString(36).slice(2,5);
   window[cb]=function(){ delete window[cb]; };
