@@ -679,7 +679,19 @@ async function carregarDadosAppDoSheets(){
   if(!SHEETS_URL) return;
   try{
     var projetos          = await lerDadoAppSheets("bcs_projetos");
-    var eventos           = await lerDadoAppSheets("bcs_eventos_avulsos");
+    // Carrega eventos avulsos da aba da planilha (fonte primária) + ScriptProperties (fallback)
+    var _evAba = await _sheetsGet({acao:"listar",tipo:"eventos_avulsos"});
+    var _evAbaArr = (_evAba && _evAba.ok && Array.isArray(_evAba.dados)) ? _evAba.dados : null;
+    var _evProps = await lerDadoAppSheets("bcs_eventos_avulsos");
+    var eventos = _evAbaArr || _evProps;
+    // Normalizar data/hora vindas da planilha (Google Sheets devolve Date em ISO)
+    if(eventos && Array.isArray(eventos)){
+      eventos = eventos.filter(function(e){ return e && e.id; }).map(function(e){
+        e.data = _normDataStr(e.data);
+        e.hora = _normHoraStr(e.hora);
+        return e;
+      });
+    }
     var alertas           = await lerDadoAppSheets("bcs_alertas_projetos");
     var agendamentos      = await lerDadoAppSheets("bcs_agendamentos");
     var visitas           = await lerDadoAppSheets("bcs_visitas");
@@ -717,18 +729,39 @@ async function carregarDadosAppDoSheets(){
 
     if(projetos && Array.isArray(projetos) && projetos.length > 0){
       var _projDel = state._deletedProjIds || new Set();
-      var _localProjIds = new Set(localProj.map(function(p){ return String(p.id); }));
-      var _novosPrj = projetos.filter(function(p){ return !_localProjIds.has(String(p.id)) && !_projDel.has(String(p.id)); });
+      var _localProjMap = {};
+      localProj.forEach(function(p){ _localProjMap[String(p.id)] = p; });
+      var _novosPrj = [];
+      projetos.forEach(function(remoto){
+        var k = String(remoto.id);
+        if(_projDel.has(k)) return;
+        if(!_localProjMap[k]){
+          _novosPrj.push(remoto); // projeto novo vindo do Sheets
+        } else {
+          var local = _localProjMap[k];
+          // remoto é mais recente: atualizar campos mutáveis
+          if((remoto._editadoEm||"") > (local._editadoEm||"")){
+            Object.assign(local, remoto);
+          }
+        }
+      });
       state.projetos = localProj.concat(_novosPrj);
     } else if(projetos === null){
       if(localProj.length > 0) sincronizarSheets();
     }
 
-    if(eventos && Array.isArray(eventos) && eventos.length > 0){
+    if(eventos && Array.isArray(eventos)){
       var _evDel = state._deletedEvIds || new Set();
       var _localEvIds = new Set(localEv.map(function(e){ return String(e.id); }));
       var _novosEv = eventos.filter(function(e){ return !_localEvIds.has(String(e.id)) && !_evDel.has(String(e.id)); });
-      state.eventosAvulsos = localEv.concat(_novosEv);
+      if(_novosEv.length > 0) state.eventosAvulsos = localEv.concat(_novosEv);
+      // Se há eventos locais que não estão na planilha, enviá-los à ABA (recuperação de dados antigos)
+      var _sheetsEvIds = new Set(eventos.map(function(e){ return String(e.id); }));
+      var _localNaoNoSheets = localEv.filter(function(e){ return !_sheetsEvIds.has(String(e.id)); });
+      if(_localNaoNoSheets.length > 0){
+        _localNaoNoSheets.forEach(function(e){ _syncEventoAvulsoSheets(e); });
+        salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos||localEv).catch(function(){});
+      }
     } else if(eventos === null && localEv.length > 0){
       sincronizarSheets();
     }
@@ -3190,9 +3223,9 @@ function renderCalendar() {
     _visByDate[d].push(v);
   });
   (state.eventosAvulsos||[]).forEach(function(e){
-    if(!e.data) return;
-    if(!_evAvByDate[e.data]) _evAvByDate[e.data]=[];
-    _evAvByDate[e.data].push(e);
+    var d=normData(e.data); if(!d) return;
+    if(!_evAvByDate[d]) _evAvByDate[d]=[];
+    _evAvByDate[d].push(e);
   });
   // Atividades escolares (rondas/visitas a escolas)
   (state.atividadesEscolares||[]).forEach(function(a){
@@ -3361,13 +3394,12 @@ function abrirModalEventoAvulso(dataPreench){
     };
     if(!state.eventosAvulsos) state.eventosAvulsos = [];
     state.eventosAvulsos.push(ev);
-    _syncEventoAvulsoSheets(ev);
     // Navegar para o mês do evento
     var partes = data.split("-");
     state.calMes = new Date(parseInt(partes[0]), parseInt(partes[1])-1, 1);
     state.calDia = parseInt(partes[2]);
     salvarLocal();
-    salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).catch(function(){});
+    salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).then(function(){ _syncEventoAvulsoSheets(ev); }).catch(function(){ _syncEventoAvulsoSheets(ev); });
     modal.remove();
     renderCalendar();
   };
@@ -3425,8 +3457,7 @@ function verEventoAvulso(evId){
     ev.status    = document.getElementById("ev-edit-status").value;
     ev.resultado = document.getElementById("ev-edit-resultado").value.trim();
     salvarLocal();
-    _syncEventoAvulsoSheets(ev);
-    salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).catch(function(){});
+    salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).then(function(){ _syncEventoAvulsoSheets(ev); }).catch(function(){ _syncEventoAvulsoSheets(ev); });
     modal.remove();
     renderCalendar();
     verEventoAvulso(evId);
@@ -6562,8 +6593,10 @@ function abrirModalNovoProjeto(editId){
       edit.dataInicio=document.getElementById("pdinicio").value;
       edit.dataFim=document.getElementById("pdfim").value;
       edit.objetivo=document.getElementById("pobj").value.trim();
+      edit._editadoEm=new Date().toISOString();
     } else {
       state.projetos.push({id:"PRJ_"+Date.now(),criadoEm:new Date().toISOString(),
+        _editadoEm:new Date().toISOString(),
         nome:nome,tipo:document.getElementById("ptipo").value,
         status:document.getElementById("pstatus").value,
         responsavel:document.getElementById("presp").value.trim(),
@@ -6572,7 +6605,9 @@ function abrirModalNovoProjeto(editId){
         objetivo:document.getElementById("pobj").value.trim(),
         tarefas:[],resultado:""});
     }
-    salvarLocal(); modal.remove();
+    salvarLocal();
+    salvarDadoAppSheets("bcs_projetos", state.projetos||[]).catch(function(){});
+    modal.remove();
     _reRenderProjetos();
     showToast(edit?"Projeto atualizado!":"Projeto criado!");
   };
@@ -6629,8 +6664,8 @@ function abrirModalNovaTarefa(projId){
       descricao:"Projeto: "+proj.nome+(resp?"\nResponsável: "+resp:""),
       cor:tcor,status:"Pendente",projetoId:proj.id,tarefaId:tarefa.id};
     state.eventosAvulsos.push(_evTrf);
-    _syncEventoAvulsoSheets(_evTrf);
     salvarLocal(); modal.remove();
+    salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).then(function(){ _syncEventoAvulsoSheets(_evTrf); }).catch(function(){ _syncEventoAvulsoSheets(_evTrf); });
     showToast("Tarefa salva e lançada no calendário!");
     verProjeto(projId);
   };
@@ -6880,7 +6915,9 @@ function mudarStatusProjeto(projId, novoStatus){
   var proj=(state.projetos||[]).find(function(p){return p.id===projId;});
   if(!proj) return;
   proj.status=novoStatus;
+  proj._editadoEm=new Date().toISOString();
   salvarLocal();
+  salvarDadoAppSheets("bcs_projetos", state.projetos||[]).catch(function(){});
   verProjeto(projId);
   if(state.tela==="projetos"||state.tela==="dashcomandante") _reRenderProjetos();
   showToast("Status atualizado: "+novoStatus);
@@ -6891,7 +6928,9 @@ function salvarResultadoProjeto(projId){
   if(!proj) return;
   var txt=document.getElementById("proj-resultado-txt");
   if(txt) proj.resultado=txt.value.trim();
+  proj._editadoEm=new Date().toISOString();
   salvarLocal();
+  salvarDadoAppSheets("bcs_projetos", state.projetos||[]).catch(function(){});
   showToast("Resultado salvo!");
 }
 
@@ -10579,9 +10618,8 @@ function salvarVisitaEscolar(){
   if(!state.eventosAvulsos) state.eventosAvulsos=[];
   var _evEsc={id:"CAL_VES_"+vis.id,titulo:"🏫 Visita "+tipo+" — "+escNome,data:data,hora:hora||"08:00",tipo:"Visita Escolar",cor:"#22c55e",visitaEscolarId:vis.id,criadoEm:new Date().toISOString()};
   state.eventosAvulsos.push(_evEsc);
-  _syncEventoAvulsoSheets(_evEsc);
   salvarLocal();
-  salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).catch(function(){});
+  salvarDadoAppSheets("bcs_eventos_avulsos", state.eventosAvulsos).then(function(){ _syncEventoAvulsoSheets(_evEsc); }).catch(function(){ _syncEventoAvulsoSheets(_evEsc); });
   showToast("✅ Visita salva e adicionada ao Calendário!");
   var m=document.getElementById("modal-visita-esc"); if(m) m.remove();
   var mf=document.getElementById("modal-ficha-escola"); if(mf) mf.remove();
