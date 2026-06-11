@@ -681,7 +681,7 @@ async function carregarDadosAppDoSheets(){
     var projetos          = await lerDadoAppSheets("bcs_projetos");
     // Carrega eventos avulsos da aba da planilha (fonte primária) + ScriptProperties (fallback)
     var _evAba = await _sheetsGet({acao:"listar",tipo:"eventos_avulsos"});
-    var _evAbaArr = (_evAba && _evAba.ok && Array.isArray(_evAba.dados)) ? _evAba.dados : null;
+    var _evAbaArr = (_evAba && _evAba.ok && Array.isArray(_evAba.dados) && _evAba.dados.length > 0) ? _evAba.dados : null;
     var _evProps = await lerDadoAppSheets("bcs_eventos_avulsos");
     var eventos = _evAbaArr || _evProps;
     // Normalizar data/hora vindas da planilha (Google Sheets devolve Date em ISO)
@@ -754,7 +754,7 @@ async function carregarDadosAppDoSheets(){
       var _evDel = state._deletedEvIds || new Set();
       var _localEvIds = new Set(localEv.map(function(e){ return String(e.id); }));
       var _novosEv = eventos.filter(function(e){ return !_localEvIds.has(String(e.id)) && !_evDel.has(String(e.id)); });
-      if(_novosEv.length > 0) state.eventosAvulsos = localEv.concat(_novosEv);
+      if(_novosEv.length > 0 || localEv.length === 0) state.eventosAvulsos = localEv.concat(_novosEv);
       // Se há eventos locais que não estão na planilha, enviá-los à ABA (recuperação de dados antigos)
       var _sheetsEvIds = new Set(eventos.map(function(e){ return String(e.id); }));
       var _localNaoNoSheets = localEv.filter(function(e){ return !_sheetsEvIds.has(String(e.id)); });
@@ -857,6 +857,24 @@ async function carregarDadosAppDoSheets(){
     render();
     console.log("[BCS] Dados app Sheets — projetos:"+(state.projetos||[]).length+" agendamentos:"+(state.db.agendamentos||[]).length);
 
+    // Backup de eventos avulsos via _sincSheets — garante carga mesmo se _sheetsGet falhou acima
+    _sincSheets("eventos_avulsos", "id", function(dados){
+      if(!dados || !dados.length) return;
+      var _evDel2 = state._deletedEvIds || new Set();
+      var localEv2 = state.eventosAvulsos || [];
+      var _localEvIds2 = new Set(localEv2.map(function(e){ return String(e.id); }));
+      var novos = dados.filter(function(e){
+        return e && e.id && !_localEvIds2.has(String(e.id)) && !_evDel2.has(String(e.id));
+      }).map(function(e){
+        e.data = _normDataStr(e.data); e.hora = _normHoraStr(e.hora); return e;
+      });
+      if(novos.length > 0 || localEv2.length === 0){
+        state.eventosAvulsos = localEv2.concat(novos);
+        _salvarLocalSemSync();
+        if(state.tela==="calendario" && document.getElementById("cal-container")) renderCalendar();
+      }
+    });
+
     // Sincronizar solicitações, policiais e materiais em background
     _sincSheets("solicitacoes", "protocolo", function(dados){
       state.solicitacoes = dados;
@@ -943,6 +961,7 @@ async function carregarDoSheets() {
     _carregando = false;
   }
   _carregando = true;
+  state.sincronizando = true;
   _carregandoSince = Date.now();
   const setS=function(html){document.querySelectorAll("#sheets-status").forEach(function(d){d.innerHTML=html;});};
 
@@ -1126,7 +1145,10 @@ async function carregarDoSheets() {
     salvarLocal();
     const n = state.db.ocorrencias.length;
     showToast(n+" oc · "+(_nNovas>0?"+"+_nNovas+" novas do Sheets":"sem novas do Sheets"));
-    setS("<span style='color:#6b8c42'>✓ "+n+" ocorrências"+(_nNovas?" ("+_nNovas+" novas)":"")+" · "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</span>");
+    state.ultimaSinc = new Date();
+    state.sincronizando = false;
+    var _sincHora = state.ultimaSinc.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    setS("<span style='color:#6b8c42'>✓ "+n+" ocorrências"+(_nNovas?" ("+_nNovas+" novas)":"")+" · atualizado às "+_sincHora+"</span>");
     _carregando = false;
 
     // Carregar projetos / calendário / alertas do Sheets
@@ -1139,7 +1161,11 @@ async function carregarDoSheets() {
 
   } catch(e) {
     _carregando = false;
-    setS("<span style='color:#ef4444'>⚠ "+e.message+"</span>");
+    state.sincronizando = false;
+    var _offlineMsg = navigator.onLine
+      ? "<span style='color:#ef4444'>⚠ "+e.message+"</span>"
+      : "<span style='color:#f59e0b'>📵 Dados locais — reconectando…</span>";
+    document.querySelectorAll("#sheets-status").forEach(function(d){ d.innerHTML=_offlineMsg; });
   }
 }
 
@@ -1198,6 +1224,12 @@ let state = {
   candidaturas: JSON.parse(localStorage.getItem("bcs_candidaturas")||"[]"),
   cadastroInstrutores: JSON.parse(localStorage.getItem("bcs_instrutores_cad")||"[]"),
   ocComplementos: JSON.parse(localStorage.getItem("bcs_oc_complementos")||"[]"),
+  // Fase 1 — entidades novas
+  vitimas: JSON.parse(localStorage.getItem("bcs_vitimas")||"[]"),
+  encaminhamentos: JSON.parse(localStorage.getItem("bcs_encaminhamentos")||"[]"),
+  // Controle de sync
+  ultimaSinc: null,
+  sincronizando: false,
 };
 
 // Inicializar arrays vazios se undefined
@@ -19865,6 +19897,13 @@ if(SHEETS_URL){
     carregarDoSheets(); // sempre busca tudo do Sheets
     sincronizarDevolutivasCrav(); // sincroniza devolutivas do CRAV
   }, 300);
+
+  // Polling silencioso a cada 2 minutos — mantém dados frescos sem interação manual
+  setInterval(function(){
+    if(!_carregando && !state.sincronizando && document.visibilityState !== "hidden"){
+      carregarDoSheets();
+    }
+  }, 2 * 60 * 1000);
 }
 </script>
 
