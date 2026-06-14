@@ -378,6 +378,7 @@ function salvarLocal() {
     if(state.projetosSociais) localStorage.setItem("bcs_projetos_sociais",JSON.stringify(state.projetosSociais));
     if(state.inscricoesProjetos) localStorage.setItem("bcs_inscricoes_projetos",JSON.stringify(state.inscricoesProjetos));
     if(state.chamadas) localStorage.setItem("bcs_chamadas",JSON.stringify(state.chamadas));
+    if(state.acoesPatrulha) localStorage.setItem("bcs_acoes_patrulha",JSON.stringify(state.acoesPatrulha));
     if(state.cargasArmamento) localStorage.setItem("bcs_cargas_armamento",JSON.stringify(state.cargasArmamento));
     if(state.materiaisPatrimonio) localStorage.setItem("bcs_materiais_patrimonio",JSON.stringify(state.materiaisPatrimonio));
     if(state.invItens) localStorage.setItem("bcs_inv_itens",JSON.stringify(state.invItens));
@@ -720,6 +721,7 @@ function _salvarLocalSemSync(){
     if(state.projetosSociais) localStorage.setItem("bcs_projetos_sociais",JSON.stringify(state.projetosSociais));
     if(state.inscricoesProjetos) localStorage.setItem("bcs_inscricoes_projetos",JSON.stringify(state.inscricoesProjetos));
     if(state.chamadas) localStorage.setItem("bcs_chamadas",JSON.stringify(state.chamadas));
+    if(state.acoesPatrulha) localStorage.setItem("bcs_acoes_patrulha",JSON.stringify(state.acoesPatrulha));
     if(state.alertasCrescimento) localStorage.setItem("bcs_alertas_crescimento",JSON.stringify(state.alertasCrescimento));
     if(state.escolas) localStorage.setItem("bcs_escolas",JSON.stringify(state.escolas));
     if(state.atividadesEscolares) localStorage.setItem("bcs_atividades_escolares",JSON.stringify(state.atividadesEscolares));
@@ -1241,6 +1243,7 @@ let state = {
   projetosSociais: JSON.parse(localStorage.getItem("bcs_projetos_sociais")||"[]"),
   inscricoesProjetos: JSON.parse(localStorage.getItem("bcs_inscricoes_projetos")||"[]"),
   chamadas: JSON.parse(localStorage.getItem("bcs_chamadas")||"[]"),
+  acoesPatrulha: JSON.parse(localStorage.getItem("bcs_acoes_patrulha")||"[]"),
   cargasArmamento: JSON.parse(localStorage.getItem("bcs_cargas_armamento")||"[]"),
   materiaisPatrimonio: JSON.parse(localStorage.getItem("bcs_materiais_patrimonio")||"[]"),
   invItens: JSON.parse(localStorage.getItem("bcs_inv_itens")||"[]"),
@@ -8531,7 +8534,7 @@ function renderCursosComunitarios(main){
   var _tab=state._psTab||"cursos";
   var _nCandPend=(state.candidaturas||[]).filter(function(c){return c.status==="pendente";}).length;
   h.push("<div style='display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap'>");
-  [["monitoramento","📊 Monitoramento"],["cursos","📚 Projetos"],["candidaturas","📋 Candidaturas"],["instrutores","👨‍🏫 Instrutores"],["relatorio","📋 Relatório"],["portfolio","🌐 Portfólio"]].forEach(function(t){
+  [["monitoramento","📊 Monitoramento"],["cursos","📚 Projetos"],["candidaturas","📋 Candidaturas"],["instrutores","👨‍🏫 Instrutores"],["acoes","🗒️ Ações"],["relatorio","📋 Relatório"],["portfolio","🌐 Portfólio"]].forEach(function(t){
     var ativo=_tab===t[0];
     var extra=t[0]==="candidaturas"&&_nCandPend>0?" <span style='background:#6B5236;color:#EAD9B8;border-radius:8px;padding:1px 6px;font-size:10px'>"+_nCandPend+"</span>":"";
     h.push("<button onclick=\"state._psTab='"+t[0]+"';renderProjetosSociais(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:"+(ativo?"2px solid #6B5236":"1px solid #A87B22")+";background:"+(ativo?"#6B523622":"#F2E4C8")+";color:"+(ativo?"#6B5236":"#6B5236")+"'>"+t[1]+extra+"</button>");
@@ -9308,6 +9311,135 @@ function _computarRelatorio(mes, ano, periodo){
 var MESES_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
                 "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
+function _renderAcoesPatrulha(main){
+  if(!state.acoesPatrulha) state.acoesPatrulha=[];
+  var _nCandPend=(state.candidaturas||[]).filter(function(c){return c.status==="pendente";}).length;
+  var h=[];
+  h.push("<div style='max-width:800px;margin:0 auto;padding:16px 20px 40px'>");
+  // tabs
+  var _tab="acoes";
+  h.push("<div style='display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap'>");
+  [["monitoramento","📊 Monitoramento"],["cursos","📚 Projetos"],["candidaturas","📋 Candidaturas"],["instrutores","👨‍🏫 Instrutores"],["acoes","🗒️ Ações"],["relatorio","📋 Relatório"],["portfolio","🌐 Portfólio"]].forEach(function(t){
+    var ativo=_tab===t[0];
+    var extra=t[0]==="candidaturas"&&_nCandPend>0?" <span style='background:#6B5236;color:#EAD9B8;border-radius:8px;padding:1px 6px;font-size:10px'>"+_nCandPend+"</span>":"";
+    h.push("<button onclick=\"state._psTab='"+t[0]+"';renderProjetosSociais(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:"+(ativo?"2px solid #6B5236":"1px solid #A87B22")+";background:"+(ativo?"#6B523622":"#F2E4C8")+";color:#6B5236'>"+t[1]+extra+"</button>");
+  });
+  h.push("</div>");
+  h.push("<h2 style='color:#3D2B1A;font-size:16px;font-weight:700;margin:0 0 4px'>🗒️ Ações da Patrulha Comunitária</h2>");
+  h.push("<p style='color:#8B6914;font-size:11px;margin:0 0 18px'>Registre o relato diário — a IA extrai os indicadores automaticamente.</p>");
+  // Formulário
+  h.push("<div style='background:#EAD9B8;border:1px solid #A87B22;border-radius:10px;padding:20px;margin-bottom:20px'>");
+  h.push("<div style='margin-bottom:12px'>");
+  h.push("<label style='color:#3D2B1A;font-size:12px;font-weight:700;display:block;margin-bottom:4px'>Data</label>");
+  h.push("<input id='ap-data' type='date' value='"+hoje()+"' style='background:#F8F0DC;border:1px solid #A87B22;border-radius:6px;padding:7px 10px;color:#3D2B1A;font-size:12px;width:180px'>");
+  h.push("</div>");
+  h.push("<label style='color:#3D2B1A;font-size:12px;font-weight:700;display:block;margin-bottom:4px'>Relato do dia (texto livre)</label>");
+  h.push("<textarea id='ap-relato' rows='5' placeholder='Ex: Realizamos palestra sobre segurança na E.E. Dom Pedro com 45 alunos. Distribuímos 30 cestas básicas no Panorama. Atendemos 12 famílias em situação de vulnerabilidade.' style='width:100%;box-sizing:border-box;background:#F8F0DC;border:1px solid #A87B22;border-radius:6px;padding:10px;color:#3D2B1A;font-size:12px;resize:vertical'></textarea>");
+  h.push("<button onclick='_apExtrair()' style='margin-top:10px;background:#6B5236;border:none;border-radius:7px;color:#EAD9B8;padding:9px 20px;font-size:12px;font-weight:700;cursor:pointer'>✦ Extrair com IA</button>");
+  h.push("</div>");
+  // Área de extração
+  h.push("<div id='ap-extracao' style='display:none;background:#F8F0DC;border:1px solid #A87B22;border-radius:10px;padding:16px;margin-bottom:20px'>");
+  h.push("<p style='color:#3D2B1A;font-size:12px;font-weight:700;margin:0 0 12px'>Números extraídos pela IA — confirme ou ajuste:</p>");
+  h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>");
+  var _campos=[["ap-palestras","Palestras realizadas","0"],["ap-pessoas-palestra","Pessoas em palestras","0"],["ap-cestas","Cestas/alimentos distribuídos","0"],["ap-familias","Famílias/pessoas atendidas","0"]];
+  _campos.forEach(function(c){
+    h.push("<div><label style='color:#6B5236;font-size:11px;font-weight:700;display:block;margin-bottom:3px'>"+c[1]+"</label><input id='"+c[0]+"' type='number' value='"+c[2]+"' min='0' style='width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;border-radius:5px;padding:6px 8px;font-size:13px;font-weight:700;color:#3D2B1A'></div>");
+  });
+  h.push("</div>");
+  h.push("<div style='margin-top:10px'><label style='color:#6B5236;font-size:11px;font-weight:700;display:block;margin-bottom:3px'>Locais visitados</label><input id='ap-locais' type='text' placeholder='E.E. Dom Pedro · Bairro Panorama' style='width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;border-radius:5px;padding:6px 8px;font-size:12px;color:#3D2B1A'></div>");
+  h.push("<button onclick='_apSalvar()' style='margin-top:12px;background:#22c55e;border:none;border-radius:7px;color:#fff;padding:9px 24px;font-size:12px;font-weight:700;cursor:pointer'>✓ Confirmar e Salvar</button>");
+  h.push("</div>");
+  // Histórico
+  var acs=[].concat(state.acoesPatrulha||[]).sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;});
+  if(acs.length){
+    h.push("<div style='background:#EAD9B8;border:1px solid #A87B22;border-radius:10px;overflow:hidden'>");
+    h.push("<div style='background:#DBC79E;padding:10px 16px;border-bottom:1px solid #A87B22'><p style='color:#3D2B1A;font-size:12px;font-weight:700;margin:0'>Histórico — "+acs.length+" registros</p></div>");
+    acs.slice(0,15).forEach(function(a){
+      h.push("<div style='padding:10px 16px;border-bottom:1px solid #C8A070'>");
+      h.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:4px'>");
+      h.push("<span style='color:#3D2B1A;font-size:12px;font-weight:700'>"+fmtData(a.data)+"</span>");
+      h.push("<button onclick=\"_apExcluir('"+a.id+"')\" style='background:none;border:none;color:#ef4444;font-size:10px;cursor:pointer'>✕</button>");
+      h.push("</div>");
+      h.push("<p style='color:#6B5236;font-size:11px;margin:0 0 4px'>"+esc(a.relato||"").slice(0,120)+(a.relato&&a.relato.length>120?"…":"")+"</p>");
+      h.push("<div style='display:flex;gap:12px;flex-wrap:wrap'>");
+      if(a.palestras) h.push("<span style='color:#8B6914;font-size:10px'>📢 "+a.palestras+" palestra(s)</span>");
+      if(a.pessoasPalestra) h.push("<span style='color:#8B6914;font-size:10px'>👥 "+a.pessoasPalestra+" pessoas</span>");
+      if(a.cestas) h.push("<span style='color:#8B6914;font-size:10px'>🧺 "+a.cestas+" cestas</span>");
+      if(a.familias) h.push("<span style='color:#8B6914;font-size:10px'>🏠 "+a.familias+" famílias</span>");
+      if(a.locais) h.push("<span style='color:#8B6914;font-size:10px'>📍 "+esc(a.locais)+"</span>");
+      h.push("</div></div>");
+    });
+    h.push("</div>");
+  } else {
+    h.push("<p style='color:#A87B22;font-size:12px;text-align:center;padding:24px'>Nenhuma ação registrada ainda. Registre o primeiro relato acima.</p>");
+  }
+  h.push("</div>");
+  main.innerHTML=h.join("");
+
+  window._apExtrair=function(){
+    var relato=(document.getElementById("ap-relato")||{}).value||"";
+    if(!relato.trim()){showToast("Digite o relato do dia primeiro.","error");return;}
+    var key=localStorage.getItem("bcs_anthropic_key");
+    if(!key){
+      // Extração por regex sem IA
+      var nums=relato.match(/\d+/g)||[];
+      document.getElementById("ap-extracao").style.display="block";
+      showToast("Sem chave IA — extração manual. Preencha os campos.","warn");
+      return;
+    }
+    var btn=document.querySelector("[onclick='_apExtrair()']");
+    if(btn){btn.disabled=true;btn.textContent="Extraindo...";}
+    fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",headers:{"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},
+      body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:300,messages:[{role:"user",content:"Extraia do relato a seguir SOMENTE os números em JSON com os campos: palestras (int), pessoasPalestra (int), cestas (int), familias (int), locais (string com vírgula). Responda APENAS o JSON, sem explicação.\n\nRelato: "+relato}]})
+    }).then(function(r){return r.json();}).then(function(data){
+      try{
+        var txt=(data.content[0].text||"").trim();
+        var parsed=JSON.parse(txt.replace(/```json|```/g,""));
+        if(document.getElementById("ap-palestras")) document.getElementById("ap-palestras").value=parsed.palestras||0;
+        if(document.getElementById("ap-pessoas-palestra")) document.getElementById("ap-pessoas-palestra").value=parsed.pessoasPalestra||0;
+        if(document.getElementById("ap-cestas")) document.getElementById("ap-cestas").value=parsed.cestas||0;
+        if(document.getElementById("ap-familias")) document.getElementById("ap-familias").value=parsed.familias||0;
+        if(document.getElementById("ap-locais")) document.getElementById("ap-locais").value=parsed.locais||"";
+      }catch(e){}
+      document.getElementById("ap-extracao").style.display="block";
+    }).catch(function(){
+      document.getElementById("ap-extracao").style.display="block";
+      showToast("Erro na IA — preencha manualmente.","error");
+    }).finally(function(){
+      if(btn){btn.disabled=false;btn.innerHTML="✦ Extrair com IA";}
+    });
+  };
+
+  window._apSalvar=function(){
+    var relato=(document.getElementById("ap-relato")||{}).value||"";
+    var data=(document.getElementById("ap-data")||{}).value||hoje();
+    if(!relato.trim()){showToast("Escreva o relato antes de salvar.","error");return;}
+    var acao={
+      id:"ap_"+Date.now(),
+      data:data,
+      relato:relato,
+      palestras:parseInt((document.getElementById("ap-palestras")||{}).value||0),
+      pessoasPalestra:parseInt((document.getElementById("ap-pessoas-palestra")||{}).value||0),
+      cestas:parseInt((document.getElementById("ap-cestas")||{}).value||0),
+      familias:parseInt((document.getElementById("ap-familias")||{}).value||0),
+      locais:(document.getElementById("ap-locais")||{}).value||"",
+      criadoEm:new Date().toISOString()
+    };
+    if(!state.acoesPatrulha) state.acoesPatrulha=[];
+    state.acoesPatrulha.push(acao);
+    salvarLocal();
+    showToast("✓ Ação salva!");
+    renderProjetosSociais(document.getElementById("main"));
+  };
+
+  window._apExcluir=function(id){
+    state.acoesPatrulha=(state.acoesPatrulha||[]).filter(function(a){return a.id!==id;});
+    salvarLocal();
+    renderProjetosSociais(document.getElementById("main"));
+  };
+}
+
 function _renderRelatorioMensal(main){
   var agora = new Date();
   if(!state._relTipo) state._relTipo="mes";
@@ -9333,7 +9465,7 @@ function _renderRelatorioMensal(main){
   var h=[];
   h.push("<div style='max-width:800px;margin:0 auto;padding:16px 20px 40px'>");
   h.push("<div style='display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap'>");
-  [["monitoramento","📊 Monitoramento"],["cursos","📚 Projetos"],["candidaturas","📋 Candidaturas"],["instrutores","👨‍🏫 Instrutores"],["relatorio","📋 Relatório"],["portfolio","🌐 Portfólio"]].forEach(function(t){
+  [["monitoramento","📊 Monitoramento"],["cursos","📚 Projetos"],["candidaturas","📋 Candidaturas"],["instrutores","👨‍🏫 Instrutores"],["acoes","🗒️ Ações"],["relatorio","📋 Relatório"],["portfolio","🌐 Portfólio"]].forEach(function(t){
     var ativo=t[0]==="relatorio";
     var extra=t[0]==="candidaturas"&&_nCandPend>0?" <span style='background:#6B5236;color:#EAD9B8;border-radius:8px;padding:1px 6px;font-size:10px'>"+_nCandPend+"</span>":"";
     h.push("<button onclick=\"state._psTab='"+t[0]+"';renderProjetosSociais(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:"+(ativo?"2px solid #6B5236":"1px solid #A87B22")+";background:"+(ativo?"#6B523622":"#F2E4C8")+";color:"+(ativo?"#6B5236":"#6B5236")+"'>"+t[1]+extra+"</button>");
@@ -9628,6 +9760,10 @@ function renderProjetosSociais(main){
   }
   if(state._psTab==="relatorio"){
     _renderRelatorioMensal(main);
+    return;
+  }
+  if(state._psTab==="acoes"){
+    _renderAcoesPatrulha(main);
     return;
   }
   if(state._psTab==="portfolio"){
@@ -14830,6 +14966,7 @@ function render(){
       <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:8px 0 2px">Gestão Comunitária</p>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" data-tela="projetossociais" onclick="setTela('projetossociais')" style="color:${state.tela==='projetossociais'?'#6B5236':'#6B523688'};border-color:${state.tela==='projetossociais'?'#6B5236':'transparent'}">🌱 Projetos Sociais</button>
       <button class="nav-btn${state.tela==="escolas"?" active":""}" data-tela="escolas" onclick="setTela('escolas')" style="color:${state.tela==="escolas"?"#38bdf8":"#38bdf888"};border-color:${state.tela==="escolas"?"#38bdf8":"transparent"}">🏫 Módulo Escolar</button>
+      <button class="nav-btn${state.tela==="conselho"?" active":""}" data-tela="conselho" onclick="setTela('conselho')" style="color:${state.tela==="conselho"?"#22c55e":"#22c55e66"};border-color:${state.tela==="conselho"?"#22c55e":"transparent"}">👥 Conselho Comunitário</button>
       <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:8px 0 2px">Módulos</p>
       <button class="nav-btn${state.tela==="armamento"?" active":""}" data-tela="armamento" onclick="setTela('armamento')" style="color:${state.tela==='armamento'?'#60a5fa':'#60a5fa66'};border-color:${state.tela==='armamento'?'#60a5fa':'transparent'}">🔫 Livro de Parte</button>
       <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#10b981':'#10b98166'};border-color:${state.tela==='inventario'?'#10b981':'transparent'}">📦 Inventário</button>
