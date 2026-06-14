@@ -16117,7 +16117,7 @@ function _armImportarCodigosParaPatrimonio(){
 function _armConsultarInventario(codigo){
   if(!codigo) return null;
   var cod=codigo.toUpperCase();
-  return (state.inventarioPatrimonio||[]).find(function(x){
+  return (state.invItens||[]).find(function(x){
     return x.numero_serie&&x.numero_serie.toUpperCase()===cod;
   });
 }
@@ -16126,7 +16126,7 @@ function _armConsultarInventario(codigo){
 function _armStatusInventario(codigo){
   if(!codigo) return null;
   var cod=codigo.toUpperCase();
-  return (state.inventarioPatrimonio||[]).find(function(x){
+  return (state.invItens||[]).find(function(x){
     return x.numero_serie&&x.numero_serie.toUpperCase()===cod;
   })||(state.materiaisPatrimonio||[]).find(function(x){
     return x.codigo&&x.codigo.toUpperCase()===cod;
@@ -21154,12 +21154,12 @@ function _invAbrirConferencia(confId){
   html+="<div><label style='color:#6B5236;font-size:11px'>Observações da Comissão</label><input id='conf-parecer-obs' value='"+esc(conf.parecer_obs||"")+"' placeholder='Observações, ressalvas, prazos...' style='"+ISc+"'></div>";
   html+="</div>";
   // Busca + barra de progresso
-  var _totalConf=Object.values(conf.itens||{}).filter(function(v){return v==="ok"||v==="divergencia"||v==="ausente";}).length;
+  var _totalConf=Object.values(conf.itens||{}).filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok"||s==="divergencia"||s==="ausente";}).length;
   var _totalItens=itensAtivos.length;
   var _pct=_totalItens?Math.round(_totalConf/_totalItens*100):0;
   html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:10px 14px'>";
-  html+="<div style='display:flex;justify-content:space-between;margin-bottom:6px'><span style='color:#6B5236;font-size:11px;font-weight:700'>Progresso</span><span style='color:#3D2B1A;font-size:11px;font-weight:700'>"+_totalConf+"/"+_totalItens+" itens · "+_pct+"%</span></div>";
-  html+="<div style='background:#EAD9B8;border-radius:4px;height:6px'><div style='background:"+(_pct===100?"#3a7a4a":_pct>50?"#d4a87a":"#4a9fd4")+";width:"+_pct+"%;height:6px;border-radius:4px;transition:width 0.3s'></div></div>";
+  html+="<div style='display:flex;justify-content:space-between;margin-bottom:6px'><span style='color:#6B5236;font-size:11px;font-weight:700'>Progresso</span><span class='inv-conf-bar-lbl' style='color:#3D2B1A;font-size:11px;font-weight:700'>"+_totalConf+"/"+_totalItens+" itens · "+_pct+"%</span></div>";
+  html+="<div style='background:#DBC79E;border-radius:4px;height:6px'><div class='inv-conf-bar' style='background:"+(_pct===100?"#3a7a4a":_pct>50?"#d4a87a":"#4a9fd4")+";width:"+_pct+"%;height:6px;border-radius:4px;transition:width 0.3s'></div></div>";
   html+="</div>";
   html+="<input id='inv-conf-busca' type='text' placeholder='🔍 Buscar por nome, n.º série ou categoria…' oninput='_invConfFiltrar()' style='width:100%;box-sizing:border-box;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px 12px;border-radius:7px;font-size:13px'>";
   // Lista de itens por categoria
@@ -21171,15 +21171,36 @@ function _invAbrirConferencia(confId){
     html+="<span style='color:"+INV_CATS[cat].cor+";font-size:12px;font-weight:700'>"+INV_CATS[cat].icon+" "+INV_CATS[cat].label+" ("+catItens.length+")</span>";
     html+="</div><div style='padding:8px 14px'>";
     catItens.forEach(function(item){
-      var status=conf.itens[item.id]||"pendente";
-      html+="<div class='inv-conf-item' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' style='display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #DBC79E'>";
-      html+="<span style='flex:1;color:#3D2B1A;font-size:12px'>"+esc(item.descricao)+(item.tombamento?" <span style='color:#a07c58;font-size:10px'>#"+esc(item.tombamento)+"</span>":"")+"</span>";
-      html+="<span style='color:#6B5236;font-size:11px'>"+esc(item.localizacao||"—")+"</span>";
-      html+="<div style='display:flex;gap:4px'>";
-      html+="<button type='button' onclick='_invConfItens(\""+item.id+"\",\"ok\")' style='padding:3px 8px;border-radius:4px;font-size:11px;border:1px solid #3a7a4a;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer'>✓ OK</button>";
-      html+="<button type='button' onclick='_invConfItens(\""+item.id+"\",\"divergencia\")' style='padding:3px 8px;border-radius:4px;font-size:11px;border:1px solid #f59e0b;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer'>⚠ Divergência</button>";
-      html+="<button type='button' onclick='_invConfItens(\""+item.id+"\",\"ausente\")' style='padding:3px 8px;border-radius:4px;font-size:11px;border:1px solid #ef4444;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer'>✗ Ausente</button>";
+      var raw=conf.itens[item.id];
+      var det=(raw&&typeof raw==="object")?raw:{status:raw||"pendente"};
+      var status=det.status||"pendente";
+      var iid=item.id;
+      html+="<div class='inv-conf-item' id='inv-ci-"+iid+"' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' style='flex-direction:column;padding:6px 0;border-bottom:1px solid #DBC79E'>";
+      // row topo
+      html+="<div style='display:flex;align-items:center;gap:8px;width:100%'>";
+      html+="<span style='flex:1;color:#3D2B1A;font-size:12px'>"+esc(item.descricao)+(item.tombamento?" <span style='color:#a07c58;font-size:10px'>#"+esc(item.tombamento)+"</span>":"")+(item.numero_serie?" <span style='color:#a07c58;font-size:10px'>S/N:"+esc(item.numero_serie)+"</span>":"")+"</span>";
+      html+="<div style='display:flex;gap:3px'>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ok\")' style='padding:2px 7px;border-radius:4px;font-size:11px;border:1px solid #3a7a4a;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer'>✓ OK</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"divergencia\")' style='padding:2px 7px;border-radius:4px;font-size:11px;border:1px solid #f59e0b;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer'>⚠</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ausente\")' style='padding:2px 7px;border-radius:4px;font-size:11px;border:1px solid #ef4444;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer'>✗</button>";
+      html+="<button type='button' onclick='_invConfExpandir(\""+iid+"\")' style='padding:2px 7px;border-radius:4px;font-size:11px;border:1px solid #5e4636;color:#a07c58;background:transparent;cursor:pointer'>⋯</button>";
       html+="</div></div>";
+      // painel de detalhes (colapsado por padrão)
+      var ISci="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:5px 8px;border-radius:5px;font-size:12px;box-sizing:border-box";
+      html+="<div id='inv-ci-det-"+iid+"' style='display:none;flex-direction:column;gap:6px;margin-top:6px;padding:8px;background:#EAD9B8;border-radius:7px;border:1px solid #DBC79E'>";
+      html+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:6px'>";
+      html+="<div><label style='color:#6B5236;font-size:10px'>Localização</label><input id='inv-ci-loc-"+iid+"' value='"+esc(det.localizacao||"")+"' placeholder='Ex.: Armário 2, Prateleira B' oninput='_invConfDetalhe(\""+iid+"\",\"localizacao\",this.value)' style='"+ISci+"'></div>";
+      html+="<div><label style='color:#6B5236;font-size:10px'>Estado de conservação</label><select id='inv-ci-est-"+iid+"' onchange='_invConfDetalhe(\""+iid+"\",\"estado\",this.value)' style='"+ISci+"'>";
+      ["","bom","regular","danificado"].forEach(function(v){html+="<option value='"+v+"'"+(det.estado===v?" selected":"")+">"+(v||"— selecione —")+"</option>";});
+      html+="</select></div></div>";
+      html+="<div><label style='color:#6B5236;font-size:10px'>Observações</label><input id='inv-ci-obs-"+iid+"' value='"+esc(det.observacoes||"")+"' placeholder='Observações, desgastes, irregularidades…' oninput='_invConfDetalhe(\""+iid+"\",\"observacoes\",this.value)' style='"+ISci+"'></div>";
+      // foto
+      html+="<div style='display:flex;align-items:center;gap:8px'>";
+      if(det.foto_link){html+="<a href='"+esc(det.foto_link)+"' target='_blank' style='color:#D9A53C;font-size:11px'>📷 Ver foto</a>";}
+      html+="<label style='cursor:pointer;padding:3px 10px;background:transparent;border:1px solid #5e4636;border-radius:5px;color:#a07c58;font-size:11px'>📷 Anexar foto<input type='file' accept='image/*' capture='environment' style='display:none' onchange='_invConfFoto(\""+iid+"\",this)'></label>";
+      html+="</div>";
+      html+="</div>";
+      html+="</div>";
     });
     html+="</div></div>";
   });
@@ -21214,19 +21235,58 @@ function _invAbrirConferencia(confId){
 
 function _invConfItens(itemId, status){
   if(!window._invConfAtual) return;
-  window._invConfAtual.itens[itemId]=status;
-  // Re-render buttons without full modal reload
-  var btns=["ok","divergencia","ausente"];
-  var cores={ok:"#22c55e",divergencia:"#f59e0b",ausente:"#ef4444"};
-  btns.forEach(function(s){
-    var selector="[onclick='_invConfItens(\""+itemId+"\",\""+s+"\")']";
+  var cur=window._invConfAtual.itens[itemId];
+  var det=(cur&&typeof cur==="object")?cur:{};
+  det.status=status;
+  if(!det.conferido_em) det.conferido_em=new Date().toISOString();
+  window._invConfAtual.itens[itemId]=det;
+  // Update buttons
+  var cores={ok:"#3a7a4a",divergencia:"#f59e0b",ausente:"#ef4444"};
+  ["ok","divergencia","ausente"].forEach(function(s){
     try{
-      var btn=document.querySelector(selector);
-      if(btn){
-        btn.style.background=status===s?cores[s]:"transparent";
-        btn.style.color=status===s?"#fff":cores[s];
-      }
+      var btn=document.querySelector("[onclick='_invConfItens(\""+itemId+"\",\""+s+"\")']");
+      if(btn){btn.style.background=status===s?cores[s]:"transparent";btn.style.color=status===s?"#fff":cores[s];}
     }catch(e){}
+  });
+  // Update progress bar
+  var conf=window._invConfAtual;
+  var total=(state.invItens||[]).filter(function(x){return x.ativo!==false;}).length;
+  var done=Object.values(conf.itens||{}).filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok"||s==="divergencia"||s==="ausente";}).length;
+  var pct=total?Math.round(done/total*100):0;
+  var bar=document.querySelector("#modal-inv-conf .inv-conf-bar");
+  if(bar){bar.style.width=pct+"%";bar.style.background=pct===100?"#3a7a4a":pct>50?"#d4a87a":"#4a9fd4";}
+  var barLbl=document.querySelector("#modal-inv-conf .inv-conf-bar-lbl");
+  if(barLbl) barLbl.textContent=done+"/"+total+" itens · "+pct+"%";
+}
+
+function _invConfDetalhe(itemId, field, value){
+  if(!window._invConfAtual) return;
+  var cur=window._invConfAtual.itens[itemId];
+  var det=(cur&&typeof cur==="object")?cur:{status:"pendente"};
+  det[field]=value;
+  window._invConfAtual.itens[itemId]=det;
+}
+
+function _invConfExpandir(itemId){
+  var el=document.getElementById("inv-ci-det-"+itemId);
+  if(!el) return;
+  el.style.display=el.style.display==="none"?"flex":"none";
+}
+
+function _invConfFoto(itemId, input){
+  if(!input.files||!input.files[0]) return;
+  _invComprimirFoto(input.files[0], function(blob){
+    _invUploadFoto(blob, "conf_"+itemId, function(link){
+      if(!link) return;
+      _invConfDetalhe(itemId,"foto_link",link);
+      var panel=document.getElementById("inv-ci-det-"+itemId);
+      if(panel){
+        var old=panel.querySelector("a[href]");
+        var lbl='<a href="'+link+'" target="_blank" style="color:#D9A53C;font-size:11px">📷 Ver foto</a>';
+        if(old) old.outerHTML=lbl; else panel.insertAdjacentHTML("beforeend",lbl);
+      }
+      showToast("✓ Foto anexada!");
+    });
   });
 }
 
@@ -21275,7 +21335,7 @@ window._invConfFiltrar=function(){
   if(!inp) return;
   var q=inp.value.toLowerCase().trim();
   document.querySelectorAll(".inv-conf-item").forEach(function(el){
-    el.style.display=(q&&!el.dataset.busca.includes(q))?"none":"flex";
+    el.style.display=(q&&!el.dataset.busca.includes(q))?"none":"block";
   });
 };
 
@@ -22491,9 +22551,9 @@ function _invGerarPDFConferencia(confId){
   var dt=new Date(conf.criadoEm).toLocaleString("pt-BR");
   var dtConc=conf.concluidaEm?new Date(conf.concluidaEm).toLocaleString("pt-BR"):"—";
   var vals=Object.values(conf.itens||{});
-  var nOk=vals.filter(function(v){return v==="ok";}).length;
-  var nDiv=vals.filter(function(v){return v==="divergencia";}).length;
-  var nAus=vals.filter(function(v){return v==="ausente";}).length;
+  var nOk=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok";}).length;
+  var nDiv=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="divergencia";}).length;
+  var nAus=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ausente";}).length;
   var h="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Conferência de Inventário</title><style>";
   h+="body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:0;padding:20px}";
   h+="h1{font-size:16px;margin-bottom:4px}h2{font-size:13px;margin:12px 0 6px}";
@@ -22529,12 +22589,17 @@ function _invGerarPDFConferencia(confId){
     if(conf.parecer_obs) h+="<p style='margin:6px 0 0;font-size:11px;color:#333'>"+esc(conf.parecer_obs)+"</p>";
     h+="</div>";
   }
-  h+="<table><tr><th>#</th><th>Tombamento</th><th>Descrição</th><th>Localização</th><th>Estado</th><th>Resultado</th><th>Obs</th></tr>";
+  h+="<table><tr><th>#</th><th>Tombamento</th><th>S/N</th><th>Descrição</th><th>Localização</th><th>Conservação</th><th>Resultado</th><th>Observações</th></tr>";
   itens.forEach(function(item,i){
-    var res=conf.itens[item.id]||"pendente";
+    var raw=conf.itens[item.id];
+    var det=(raw&&typeof raw==="object")?raw:{status:raw||"pendente"};
+    var res=det.status||"pendente";
     var resLabel={ok:"✓ OK",divergencia:"⚠ Divergência",ausente:"✗ Ausente",pendente:"— Pendente"}[res]||res;
     var resCls={ok:"ok",divergencia:"div",ausente:"aus",pendente:"pend"}[res]||"";
-    h+="<tr><td>"+(i+1)+"</td><td>"+esc(item.tombamento||"—")+"</td><td>"+esc(item.descricao)+"</td><td>"+esc(item.localizacao||"—")+"</td><td>"+esc((INV_ESTADOS[item.estado]||{}).label||item.estado||"—")+"</td><td class='"+resCls+"'>"+resLabel+"</td><td></td></tr>";
+    var loc=det.localizacao||item.localizacao||"—";
+    var est={bom:"Bom",regular:"Regular",danificado:"Danificado"}[det.estado]||"—";
+    var obs=det.observacoes||"";
+    h+="<tr><td>"+(i+1)+"</td><td>"+esc(item.tombamento||"—")+"</td><td>"+esc(item.numero_serie||"—")+"</td><td>"+esc(item.descricao)+"</td><td>"+esc(loc)+"</td><td>"+esc(est)+"</td><td class='"+resCls+"'>"+resLabel+"</td><td>"+esc(obs)+"</td></tr>";
   });
   h+="</table>";
   // Assinaturas
