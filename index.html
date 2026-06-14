@@ -398,6 +398,7 @@ function salvarLocal() {
     if(state._deletedMatIds) localStorage.setItem("bcs_mat_excluidos",JSON.stringify([...state._deletedMatIds]));
     if(state._deletedPolIds) localStorage.setItem("bcs_pol_excluidos",JSON.stringify([...state._deletedPolIds]));
     if(state._deletedProjIds) localStorage.setItem("bcs_proj_excluidos",JSON.stringify([...state._deletedProjIds]));
+    if(state.db.avisos) localStorage.setItem("bcs_db_avisos",JSON.stringify(state.db.avisos));
     console.log("[BCS] Salvado - OC:",light.ocorrencias.length,"Agendamentos:",light.agendamentos.length,"Visitas:",light.visitas.length);
     agendarSyncSheets();
   } catch(e){
@@ -408,7 +409,7 @@ function carregarLocal() {
   try {
     localStorage.removeItem("bcs_db");
     const saved=localStorage.getItem("bcs_db_light");
-    const db = {ocorrencias:[],atendimentos:[],visitas:[],agendamentos:[]};
+    const db = {ocorrencias:[],atendimentos:[],visitas:[],agendamentos:[],avisos:JSON.parse(localStorage.getItem("bcs_db_avisos")||"[]")};
     if(saved){
       const l=JSON.parse(saved);
       db.ocorrencias = l.ocorrencias||[];
@@ -4914,7 +4915,7 @@ function renderDashComandante(main){
 
   // ── Tabs principais ───────────────────────────────
   h.push("<div style='display:flex;gap:4px;margin-bottom:18px;flex-wrap:wrap'>");
-  [['crime','📊 Criminalidade'],['visitas','🤝 Visitas Solidárias'],['escolar','🏫 Ronda Escolar'],['vcm','🌸 Monitor VCM'],['projetos','🟢 Projetos'],['instrutores','👨‍🏫 Instrutores']].forEach(function(tb){
+  [['crime','📊 Criminalidade'],['visitas','🤝 Visitas Solidárias'],['escolar','🏫 Ronda Escolar'],['vcm','🌸 Monitor VCM'],['projetos','🟢 Projetos'],['instrutores','👨‍🏫 Instrutores'],['auditoria','🔍 Auditoria']].forEach(function(tb){
     var ativ=tabAtiva===tb[0];
     h.push("<button onclick=\"state._cmdTab='"+tb[0]+"';renderDashComandante(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid "+(ativ?"#d4a87a":"#5e4636")+";background:"+(ativ?"#d4a87a22":"#2a1c10")+";color:"+(ativ?"#d4a87a":"#8a6a4a")+"'>"+tb[1]+"</button>");
   });
@@ -5330,8 +5331,187 @@ function renderDashComandante(main){
     h.push("<div id='instrutores-cmd-embed'></div>");
   }
 
+  // ══════════════════════════════════════════════════
+  // ABA: AUDITORIA DO COMANDANTE
+  // ══════════════════════════════════════════════════
+  if(tabAtiva==="auditoria"){
+    var _aud_ocs   = state.db.ocorrencias||[];
+    var _aud_ags   = state.db.agendamentos||[];
+    var _aud_avi   = state.db.avisos||[];
+    var _aud_fri   = state.db.frida||[];
+    var _aud_enc   = state.encaminhamentos||[];
+    var _aud_hoje  = hoje();
+    var _aud_hd    = new Date();
+
+    // Semáforo 1 — Triagem: OCs "nova" há >48h
+    var _s1_novas = _aud_ocs.filter(function(o){ return (o.situacao||"nova")==="nova"; });
+    var _s1_atras = _s1_novas.filter(function(o){
+      var dt = _pdLocal(o.data); return dt && ((_aud_hd - dt) > 48*3600*1000);
+    });
+    var _s1_cor = _s1_atras.length===0?"#22c55e":_s1_atras.length<=3?"#f59e0b":"#ef4444";
+    var _s1_ico = _s1_atras.length===0?"🟢":_s1_atras.length<=3?"🟡":"🔴";
+    var _s1_txt = _s1_atras.length===0
+      ? "Triagem em dia"
+      : _s1_atras.length+" OC(s) sem triagem há mais de 48h";
+    var _s1_dica = "OCs novas há mais de 48h sem triagem. Ideal: zero.";
+    var _s1_cobrar = "Triagem pendente há mais de 48h: "+_s1_atras.length+" OC(s) aguardando triagem. Verificar e concluir triagem das ocorrências em aberto.";
+    var _s1_ind = "triagem";
+
+    // Semáforo 2 — FRIDA: cobertura em VDs
+    var _s2_vds = _aud_ocs.filter(function(o){ return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||""); });
+    var _s2_comFrida = _s2_vds.filter(function(o){
+      return _aud_fri.some(function(f){ return f.ocorrenciaId===o.id && f.nivel && f.nivel!=="?"; });
+    });
+    var _s2_pct = _s2_vds.length ? Math.round(_s2_comFrida.length/_s2_vds.length*100) : 100;
+    var _s2_cor = _s2_pct>=80?"#22c55e":_s2_pct>=50?"#f59e0b":"#ef4444";
+    var _s2_ico = _s2_pct>=80?"🟢":_s2_pct>=50?"🟡":"🔴";
+    var _s2_txt = "FRIDA aplicado em "+_s2_pct+"% das VDs ("+_s2_comFrida.length+"/"+_s2_vds.length+")";
+    var _s2_dica = "Instrumento de avaliação de risco em VDs. Meta: ≥80%.";
+    var _s2_cobrar = "Cobertura FRIDA em "+_s2_pct+"%. Aplicar instrumento FRIDA em todas as ocorrências de violência doméstica cadastradas.";
+    var _s2_ind = "frida";
+
+    // Semáforo 3 — Visitas: agendamentos de visita vencidos sem resultado
+    var _s3_vis = _aud_ags.filter(function(a){ return (a.tipo||"").toLowerCase().includes("visita") && a.data < _aud_hoje && (a.status||"Agendado")==="Agendado"; });
+    var _s3_cor = _s3_vis.length===0?"#22c55e":_s3_vis.length<=2?"#f59e0b":"#ef4444";
+    var _s3_ico = _s3_vis.length===0?"🟢":_s3_vis.length<=2?"🟡":"🔴";
+    var _s3_txt = _s3_vis.length===0?"Visitas em dia":_s3_vis.length+" visita(s) vencida(s) sem registro";
+    var _s3_dica = "Agendamentos de visita já passados sem lançamento de resultado.";
+    var _s3_cobrar = "Há "+_s3_vis.length+" visita(s) agendada(s) e vencida(s) sem registro de resultado. Registrar as visitas realizadas ou reagendar.";
+    var _s3_ind = "visitas";
+
+    // Semáforo 4 — Encaminhamentos: pendentes há >7 dias
+    var _s4_enc = _aud_enc.filter(function(e){
+      return (e.status==="pendente"||e.status==="a_encaminhar") && e.data && ((_aud_hd - new Date(e.data+"T12:00")) > 7*864e5);
+    });
+    var _s4_cor = _s4_enc.length===0?"#22c55e":_s4_enc.length<=2?"#f59e0b":"#ef4444";
+    var _s4_ico = _s4_enc.length===0?"🟢":_s4_enc.length<=2?"🟡":"🔴";
+    var _s4_txt = _s4_enc.length===0?"Encaminhamentos em dia":_s4_enc.length+" encaminhamento(s) pendente(s) há >7 dias";
+    var _s4_dica = "Encaminhamentos para órgãos externos (CRAM, DEAM, CT…) sem conclusão há mais de 7 dias.";
+    var _s4_cobrar = ""+_s4_enc.length+" encaminhamento(s) pendente(s) há mais de 7 dias. Verificar situação junto aos órgãos e atualizar o status no sistema.";
+    var _s4_ind = "encaminhamentos";
+
+    // Semáforo 5 — Calendário: agendamentos vencidos (exceto visitas) sem resultado
+    var _s5_cal = _aud_ags.filter(function(a){ return !(a.tipo||"").toLowerCase().includes("visita") && a.data < _aud_hoje && (a.status||"Agendado")==="Agendado"; });
+    var _s5_cor = _s5_cal.length===0?"#22c55e":_s5_cal.length<=3?"#f59e0b":"#ef4444";
+    var _s5_ico = _s5_cal.length===0?"🟢":_s5_cal.length<=3?"🟡":"🔴";
+    var _s5_txt = _s5_cal.length===0?"Calendário em dia":_s5_cal.length+" item(ns) no calendário sem registro";
+    var _s5_dica = "Ações agendadas (reuniões, diligências, prazos) já vencidas sem lançamento.";
+    var _s5_cobrar = ""+_s5_cal.length+" item(ns) no calendário vencido(s) sem registro de resultado. Registrar ou justificar cada pendência.";
+    var _s5_ind = "calendario";
+
+    // Semáforo 6 — Qualidade dos lançamentos: OCs sem bairro ou tipo
+    var _s6_inc = _aud_ocs.filter(function(o){ return !o.bairro||!o.tipo; });
+    var _s6_pct = _aud_ocs.length ? Math.round(_s6_inc.length/_aud_ocs.length*100) : 0;
+    var _s6_cor = _s6_pct<=5?"#22c55e":_s6_pct<=20?"#f59e0b":"#ef4444";
+    var _s6_ico = _s6_pct<=5?"🟢":_s6_pct<=20?"🟡":"🔴";
+    var _s6_txt = _s6_inc.length===0?"Lançamentos completos":_s6_inc.length+" OC(s) com dados incompletos ("+_s6_pct+"%)";
+    var _s6_dica = "OCs sem bairro ou tipo preenchidos comprometem as análises estatísticas.";
+    var _s6_cobrar = ""+_s6_inc.length+" OC(s) com dados incompletos (sem bairro ou tipo). Completar os campos obrigatórios de cada ocorrência.";
+    var _s6_ind = "lancamentos";
+
+    var _auds = [
+      {n:1,titulo:"Esteira de Triagem",    ico:_s1_ico,cor:_s1_cor,txt:_s1_txt,dica:_s1_dica,cobrar:_s1_cobrar,ind:_s1_ind,qtd:_s1_atras.length,tela:"triagem"},
+      {n:2,titulo:"Cobertura FRIDA (VD)",  ico:_s2_ico,cor:_s2_cor,txt:_s2_txt,dica:_s2_dica,cobrar:_s2_cobrar,ind:_s2_ind,qtd:_s2_vds.length-_s2_comFrida.length,tela:"vcm"},
+      {n:3,titulo:"Visitas Solidárias",    ico:_s3_ico,cor:_s3_cor,txt:_s3_txt,dica:_s3_dica,cobrar:_s3_cobrar,ind:_s3_ind,qtd:_s3_vis.length,tela:"calendario"},
+      {n:4,titulo:"Encaminhamentos",       ico:_s4_ico,cor:_s4_cor,txt:_s4_txt,dica:_s4_dica,cobrar:_s4_cobrar,ind:_s4_ind,qtd:_s4_enc.length,tela:"encaminhamentos"},
+      {n:5,titulo:"Calendário de Ações",   ico:_s5_ico,cor:_s5_cor,txt:_s5_txt,dica:_s5_dica,cobrar:_s5_cobrar,ind:_s5_ind,qtd:_s5_cal.length,tela:"calendario"},
+      {n:6,titulo:"Qualidade Lançamentos", ico:_s6_ico,cor:_s6_cor,txt:_s6_txt,dica:_s6_dica,cobrar:_s6_cobrar,ind:_s6_ind,qtd:_s6_inc.length,tela:"ocorrencias"}
+    ];
+
+    // Resumo geral
+    var _nVerm = _auds.filter(function(a){return a.cor==="#ef4444";}).length;
+    var _nAmar = _auds.filter(function(a){return a.cor==="#f59e0b";}).length;
+    var _nVerd = _auds.filter(function(a){return a.cor==="#22c55e";}).length;
+    var _corGeral = _nVerm>0?"#ef4444":_nAmar>0?"#f59e0b":"#22c55e";
+    var _txtGeral = _nVerm>0?_nVerm+" indicador(es) em alerta":_nAmar>0?_nAmar+" indicador(es) em atenção":"Todos os indicadores em dia";
+
+    h.push("<div style='margin-bottom:18px;background:#1a1008;border:1px solid "+_corGeral+"44;border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px'>");
+    h.push("<div style='width:14px;height:14px;border-radius:50%;background:"+_corGeral+";flex-shrink:0;box-shadow:0 0 8px "+_corGeral+"88'></div>");
+    h.push("<div style='flex:1'><p style='color:"+_corGeral+";font-size:13px;font-weight:800;margin:0'>"+_txtGeral+"</p><p style='color:#6a5030;font-size:10px;margin:2px 0 0'>Avaliado em: "+new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})+"</p></div>");
+    h.push("<div style='display:flex;gap:8px'>");
+    h.push("<span style='background:#22c55e22;color:#22c55e;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700'>🟢 "+_nVerd+"</span>");
+    h.push("<span style='background:#f59e0b22;color:#f59e0b;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700'>🟡 "+_nAmar+"</span>");
+    h.push("<span style='background:#ef444422;color:#ef4444;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700'>🔴 "+_nVerm+"</span>");
+    h.push("</div></div>");
+
+    // Cards dos indicadores
+    h.push("<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px'>");
+    _auds.forEach(function(a){
+      var _temAviso = _aud_avi.some(function(v){ return v.indicador===a.ind && v.origem==="auditoria_comandante" && !v.resolvido; });
+      h.push("<div style='background:#1a1008;border:1px solid "+a.cor+"44;border-left:4px solid "+a.cor+";border-radius:10px;padding:14px 16px'>");
+      h.push("<div style='display:flex;align-items:flex-start;gap:10px'>");
+      h.push("<span style='font-size:22px;line-height:1;flex-shrink:0'>"+a.ico+"</span>");
+      h.push("<div style='flex:1'>");
+      h.push("<p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 2px'>Indicador "+a.n+"</p>");
+      h.push("<p style='color:#f5ede0;font-size:13px;font-weight:800;margin:0 0 4px'>"+a.titulo+"</p>");
+      h.push("<p style='color:"+a.cor+";font-size:12px;font-weight:600;margin:0 0 2px'>"+a.txt+"</p>");
+      h.push("<p style='color:#6a5030;font-size:10px;margin:0 0 10px'>"+a.dica+"</p>");
+      h.push("<div style='display:flex;gap:8px;flex-wrap:wrap'>");
+      if(a.tela) h.push("<button onclick=\"state.tela='"+a.tela+"';render()\" style='background:#2a1c10;border:1px solid #5e4636;color:#d4a87a;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>Ver fila →</button>");
+      if(a.qtd>0 && !_temAviso){
+        h.push("<button onclick=\"_cobrarAuxiliar('"+a.ind.replace(/'/g,"\\'")+
+          "','"+a.cobrar.replace(/'/g,"\\'")+"')\" "+
+          "style='background:#3c1818;border:1px solid #7a3a3a;color:#f87171;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>📣 Cobrar auxiliar</button>");
+      } else if(_temAviso){
+        h.push("<span style='background:#22c55e22;color:#22c55e;padding:5px 10px;border-radius:5px;font-size:10px;font-weight:700'>✓ Aviso enviado</span>");
+      }
+      h.push("</div>");
+      h.push("</div></div></div>");
+    });
+    h.push("</div>"); // fim grid indicadores
+
+    // Histórico de avisos enviados
+    var _aviHist = _aud_avi.filter(function(v){ return v.origem==="auditoria_comandante"; }).slice(-10).reverse();
+    if(_aviHist.length){
+      h.push("<div style='margin-top:18px;background:#0f0a04;border:1px solid #3a2810;border-radius:10px;padding:14px 16px'>");
+      h.push("<p style='color:#6a4a28;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 10px'>Histórico de Cobranças</p>");
+      _aviHist.forEach(function(v){
+        var _rsl = v.resolvido?"✓ Resolvido":"⏳ Pendente";
+        var _rslC = v.resolvido?"#22c55e":"#f59e0b";
+        h.push("<div style='display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #2a1c10'>");
+        h.push("<span style='color:"+_rslC+";font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px'>"+_rsl+"</span>");
+        h.push("<div style='flex:1'><p style='color:#ddd2c0;font-size:11px;margin:0'>"+esc(v.texto||"")+"</p><p style='color:#5a3a18;font-size:9px;margin:2px 0 0'>"+esc(v.criadoEm||"")+"</p></div>");
+        if(!v.resolvido) h.push("<button onclick=\"_resolverAvisoAuditoria('"+v.id+"')\" style='background:transparent;border:1px solid #3a5a3a;color:#4a8a4a;padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;cursor:pointer;flex-shrink:0'>Resolver</button>");
+        h.push("</div>");
+      });
+      h.push("</div>");
+    }
+  } // fim aba auditoria
+
   h.push("</div>"); // fim max-width
   main.innerHTML = h.join("");
+  // ── Função global: cobrar auxiliar (cria aviso no state.db.avisos) ──
+  window._cobrarAuxiliar = function(indicador, texto){
+    if(!state.db.avisos) state.db.avisos = [];
+    // Remover aviso anterior não resolvido do mesmo indicador
+    state.db.avisos = state.db.avisos.filter(function(v){
+      return !(v.origem==="auditoria_comandante" && v.indicador===indicador && !v.resolvido);
+    });
+    var expira = new Date(); expira.setHours(18,0,0,0);
+    var av = {
+      id: "aud_"+indicador+"_"+Date.now(),
+      origem: "auditoria_comandante",
+      indicador: indicador,
+      texto: texto,
+      expira: expira.toISOString().slice(0,10),
+      prioridade: "alta",
+      criadoEm: new Date().toLocaleString("pt-BR"),
+      resolvido: false,
+      lido: false
+    };
+    state.db.avisos.push(av);
+    salvarLocal();
+    enviarSheets("avisos", av);
+    // Feedback visual
+    if(confirm("Aviso enviado à auxiliar!\n\n\""+texto+"\"")) {}
+    renderDashComandante(document.getElementById("main"));
+  };
+  window._resolverAvisoAuditoria = function(id){
+    var av = (state.db.avisos||[]).find(function(v){ return v.id===id; });
+    if(av){ av.resolvido=true; av.resolvidoEm=new Date().toLocaleString("pt-BR"); }
+    salvarLocal();
+    renderDashComandante(document.getElementById("main"));
+  };
 
   // Projetos — renderizar no container embutido
   if(tabAtiva==="projetos"){
@@ -11328,7 +11508,7 @@ function renderFilaAuxiliar(main) {
 }
 
 window._avisoAbrirFila = function(indicador) {
-  var mapa = {triagem:"triagem",frida:"dashvcm",visitas:"calendario",encaminhamentos:"encaminhamentos"};
+  var mapa = {triagem:"triagem",frida:"dashvcm",visitas:"calendario",encaminhamentos:"encaminhamentos",calendario:"calendario",lancamentos:"ocorrencias"};
   setTela(mapa[indicador]||"dashboard");
 };
 
