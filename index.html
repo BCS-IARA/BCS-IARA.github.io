@@ -3371,7 +3371,7 @@ function renderCalendar() {
     <button class="btn btn-ghost" onclick="calNav(-1)" style="padding:8px 16px;font-size:16px">‹</button>
     <div style="text-align:center"><h3 style="color:#f5ede0;font-size:17px;font-weight:700;text-transform:capitalize;margin:0">${nomeMes}</h3>${_sincBadge}</div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button onclick="abrirModalEventoAvulso()" style="background:linear-gradient(135deg,#3a5a28,#2a4a18);border:none;color:#a8d890;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ Evento</button>
+      <button onclick="abrirModalEventoAvulso()" style="background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#C8A84B;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ Evento</button>
       <button class="btn btn-ghost" onclick="calNav(1)" style="padding:8px 16px;font-size:16px">›</button>
     </div>
   </div>
@@ -3418,7 +3418,7 @@ function renderCalendar() {
     html+=`<div class="card" style="margin-top:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <h4 style="color:#f5ede0;font-size:15px;font-weight:700;margin:0">${String(state.calDia).padStart(2,"0")}/${String(mn+1).padStart(2,"0")}/${ano}</h4>
-        <button onclick="abrirModalEventoAvulso('${diaSel}')" style="background:#1a2810;border:1px solid #6a8a50;color:#a8d890;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">+ Evento neste dia</button>
+        <button onclick="abrirModalEventoAvulso('${diaSel}')" style="background:#2a1c10;border:1px solid #C8A84B;color:#C8A84B;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">+ Evento neste dia</button>
       </div>`;
     if(!totalEvs) html+=`<div style="text-align:center;padding:24px 0"><p style="font-size:20px;margin-bottom:6px">✓</p><p style="color:#5e4636;font-size:13px;font-weight:600">Nenhum evento neste dia — tudo em dia</p></div>`;
     ev.ags.forEach(a=>{
@@ -3531,6 +3531,7 @@ function abrirModalEventoAvulso(dataPreench){
     var ev = {
       id:"ev_"+Date.now(),
       criadoEm:new Date().toISOString(),
+      _editadoEm:new Date().toISOString(),
       tipo:tipo, titulo:titulo, data:data, hora:hora,
       descricao:desc, cor:cores[tipo]||"#8b5cf6",
       status:status, resultado:resultado
@@ -19998,7 +19999,7 @@ window.abrirModalEventoConselho=function(){
     var titulo=(document.getElementById("cev-titulo")||{value:""}).value.trim();
     var data=(document.getElementById("cev-data")||{value:""}).value;
     if(!titulo||!data){showToast("Preencha título e data","error");return;}
-    var ev={id:"CEV_"+Date.now(),criadoEm:new Date().toISOString(),
+    var ev={id:"CEV_"+Date.now(),criadoEm:new Date().toISOString(),_editadoEm:new Date().toISOString(),
       tipo:"Conselho",titulo:titulo,data:data,
       hora:(document.getElementById("cev-hora")||{value:""}).value,
       local:(document.getElementById("cev-local")||{value:""}).value.trim(),
