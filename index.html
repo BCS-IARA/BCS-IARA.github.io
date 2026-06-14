@@ -965,32 +965,8 @@ async function carregarDadosAppDoSheets(){
       state.policiais = merged.concat(soPLocal);
       salvarLocal();
     });
-    _sincSheets("materiais_patrimonio", "id", function(dados){
-      var local = state.materiaisPatrimonio || [];
-      var deletados = state._deletedMatIds || new Set();
-      // Filtra do Sheets itens que o usuário excluiu localmente
-      var dadosFiltrados = dados.filter(function(d){ return !deletados.has(d.id) && (d.status||"ativo")!=="excluido"; });
-      var idsSheets = dadosFiltrados.map(function(d){ return d.id; });
-      // Itens só locais (não excluídos)
-      var soMLocal = local.filter(function(l){ return idsSheets.indexOf(l.id)===-1 && !deletados.has(l.id); });
-      soMLocal.forEach(function(mat){ _syncMatSheets(mat); });
-      // Para itens em ambos: preservar status local se mais recente
-      var merged = dadosFiltrados.map(function(d){
-        var loc = local.find(function(l){ return l.id===d.id; });
-        return (loc && loc.status!==d.status) ? Object.assign({},d,{status:loc.status}) : d;
-      });
-      var combinado = merged.concat(soMLocal);
-      // Deduplicar por codigo+serie — evita repetições de sincronizações anteriores
-      var vistos = {};
-      state.materiaisPatrimonio = combinado.filter(function(m){
-        var key = ((m.codigo||"")+"||"+(m.serie||"")).toUpperCase().trim();
-        if(!key || key==="||") return true;
-        if(vistos[key]) return false;
-        vistos[key] = true;
-        return true;
-      });
-      salvarLocal();
-    });
+    // Trilho A (materiais_patrimonio) desativado — itens migrados para Trilho B (inv_itens)
+    // _sincSheets("materiais_patrimonio", ...) removido em 2026-06-14 (auditoria)
 
   } catch(e){
     console.log("[BCS] Erro ao carregar dados app do Sheets:", e);
@@ -9962,6 +9938,42 @@ function _solGerarPDF(protocolo){
   w.document.close();
 }
 
+function _migrarTrilhoAparaB() {
+  var legados = (state.materiaisPatrimonio||[]).filter(function(m){ return (m.status||"ativo")==="ativo"; });
+  if(!legados.length){ showToast("Nenhum item legado para migrar."); return; }
+  if(!confirm("Migrar "+legados.length+" item(s) de Patrimônio para o Inventário (Trilho B)?\nEles serão copiados como novos itens em inv_itens.")) return;
+  var migrados = 0;
+  legados.forEach(function(m){
+    // Verifica se já existe em inv_itens por código/série
+    var jaExiste = (state.invItens||[]).some(function(i){
+      return (i.tombamento||"").toUpperCase() === (m.codigo||"").toUpperCase() ||
+             (i.serie||"").toUpperCase() === (m.serie||"").toUpperCase() && (m.serie||"");
+    });
+    if(jaExiste) return;
+    var novoItem = {
+      id: "inv_mig_"+m.id,
+      tipo: m.tipo||"Material",
+      descricao: m.descricao||m.codigo||"Item migrado",
+      tombamento: (m.codigo||"").toUpperCase(),
+      serie: (m.serie||"").toUpperCase(),
+      localizacao: "Almoxarifado",
+      tipo_carga: "none",
+      status: "ativo",
+      obs: "Migrado de materiais_patrimonio em "+new Date().toLocaleDateString("pt-BR"),
+      criadoEm: m.criadoEm||new Date().toISOString(),
+      origem: "legado_mat_patrimonio"
+    };
+    if(!state.invItens) state.invItens = [];
+    state.invItens.push(novoItem);
+    _invEnviarSheets("inv_item", novoItem);
+    migrados++;
+  });
+  _invSalvarLocal();
+  salvarLocal();
+  showToast("✓ "+migrados+" item(s) migrado(s) para o Inventário.");
+  setTela("config");
+}
+
 function renderConfiguracoes(main){
   var temIaKey = !!(localStorage.getItem("bcs_anthropic_key")||"");
   var temSheetsUrl = !!(typeof SHEETS_URL !== "undefined" && SHEETS_URL);
@@ -10036,6 +10048,9 @@ function renderConfiguracoes(main){
 
   var btnD = "display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:1px solid #4a2020;color:#c05050;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:left";
   h.push("<button onclick='restaurarDatasOriginais()' style='"+btnD+"'>🗓 <span>Restaurar Datas Originais</span><span style='margin-left:auto;color:#6a3030;font-size:10px'>Use se as datas estiverem incorretas</span></button>");
+  // Migração Trilho A → B (one-shot, só aparece se houver itens legados)
+  var nLegado = (state.materiaisPatrimonio||[]).filter(function(m){ return (m.status||"ativo")==="ativo"; }).length;
+  if(nLegado > 0) h.push("<button onclick='_migrarTrilhoAparaB()' style='"+btnD.replace("#4a2020","#2a3a20").replace("#c05050","#6adf80")+"'>📦 <span>Migrar "+nLegado+" item(s) legado(s) para o Inventário</span><span style='margin-left:auto;color:#4a6a30;font-size:10px'>Trilho A → Trilho B</span></button>");
   h.push("<button onclick='if(confirm(\"Limpar cache local? Os dados serão recarregados do Sheets.\")){ localStorage.clear(); location.reload(); }' style='"+btnD.replace("#4a2020","#6a1010").replace("#c05050","#ef4444")+"'>🗑 <span>Limpar cache local</span><span style='margin-left:auto;color:#6a3030;font-size:10px'>Recarrega tudo do Sheets</span></button>");
   h.push("</div>");
 
