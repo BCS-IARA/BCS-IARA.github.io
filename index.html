@@ -3399,7 +3399,7 @@ function renderCalendar() {
     (ev.vis||[]).slice(0,1).forEach(v=>{ html+=`<div class="cal-event" style="background:#334155;color:#94a3b8">✓ ${(v.vitima_nome||"--").split(" ")[0]}</div>`; });
     (ev.esc||[]).slice(0,1).forEach(a=>{ html+=`<div class="cal-event" style="background:#1e3a5f;color:#38bdf8;font-size:9px">🏫 ${(a.escolaNome||"Escola").split(" ")[0]}</div>`; });
     (ev.cham||[]).slice(0,1).forEach(c=>{ html+=`<div class="cal-event" style="background:#3E2A1A;color:#6B5236;font-size:9px">📚 ${(c.projetoNome||"Aula").substring(0,10)}</div>`; });
-    _evAvDia.slice(0,1).forEach(e=>{ html+=`<div class="cal-event" style="background:${e.cor||"#8b5cf6"};color:#fff;font-size:9px">${e.hora||""} ${e.titulo.substring(0,10)}</div>`; });
+    _evAvDia.slice(0,1).forEach(e=>{ html+=`<div class="cal-event" style="background:${e.cor||"#6A4A8A"};color:#fff;font-size:9px">${e.hora||""} ${e.titulo.substring(0,10)}</div>`; });
     _projDia.slice(0,1).forEach(p=>{ html+=`<div class="cal-event" style="background:#2a1a3a;color:#c084fc;font-size:9px">📁 ${(p.nome||"").substring(0,10)}</div>`; });
     // Badge de sexta com encaminhamentos pendentes
     if(_isSex && _encPendCount>0) html+=`<div style="font-size:8px;color:#D9A53C;font-weight:700;text-align:right;padding-right:2px">📤${_encPendCount}</div>`;
@@ -3431,7 +3431,7 @@ function renderCalendar() {
     ev.vis.forEach(v=>{html+=`<div style="background:#36221a;border-left:3px solid #10b981;border-radius:8px;padding:12px;margin-bottom:8px">${tag("✓ Realizada","#10b981")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${v.vitima_nome}</p>${v.resultado?`<p style="color:#a07c58;font-size:12px;margin-top:4px">${v.resultado}</p>`:""}</div>`;});
     escDia.forEach(a=>{html+=`<div style="background:#0f2035;border-left:3px solid #38bdf8;border-radius:8px;padding:12px;margin-bottom:8px">${tag("🏫 "+esc(a.subtipo||a.tipo||"Visita Escolar"),"#38bdf8")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${esc(a.escolaNome||"Escola")}</p>${a.responsavel?`<p style="color:#a07c58;font-size:12px;margin-top:4px">👮 ${esc(a.responsavel)}</p>`:""}${a.tema?`<p style="color:#a07c58;font-size:11px;margin-top:2px">${esc(a.tema)}</p>`:""}</div>`;});
     chamDia.forEach(c=>{html+=`<div style="background:#EAD9B8;border-left:3px solid #6B5236;border-radius:8px;padding:12px;margin-bottom:8px">${tag("📚 "+esc(c.projetoNome||"Aula"),"#6B5236")}<p style="color:#6B5236;font-size:12px;margin-top:6px">👨‍🏫 ${esc(c.instrutor||"Instrutor")}</p>${c.presencas?`<p style="color:#a07c58;font-size:11px;margin-top:2px">Presenças: ${Array.isArray(c.presencas)?c.presencas.filter(Boolean).length:c.presencas}</p>`:""}</div>`;});
-    evAvulsos.forEach(e=>{html+=`<div class="cal-ev-avulso" data-ev-id="${e.id}" style="background:#36221a;border-left:3px solid ${e.cor||"#8b5cf6"};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onmouseover="this.style.background='#3c2818'" onmouseout="this.style.background='#36221a'">
+    evAvulsos.forEach(e=>{html+=`<div class="cal-ev-avulso" data-ev-id="${e.id}" style="background:#36221a;border-left:3px solid ${e.cor||"#6A4A8A"};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onmouseover="this.style.background='#3c2818'" onmouseout="this.style.background='#36221a'">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         ${tag(e.tipo||"Evento","#8b5cf6")}<span style="color:#a07c58;font-size:12px">${e.hora||""}</span>
       </div>
@@ -13328,7 +13328,7 @@ function renderTela() {
           h.push("<div style='display:flex;align-items:center;gap:10px;margin-bottom:6px'>");
           h.push("<span style='background:"+cor+"22;color:"+cor+";padding:3px 10px;border-radius:4px;font-size:12px;font-weight:700;text-transform:uppercase'>"+( o.tipo||"—")+"</span>");
           h.push("<span style='color:#7a7060;font-size:11px'>"+(o.hora||"--")+" · "+(o.bairro||"—")+"</span>");
-          if(o.violencia_domestica) h.push("<span style='background:rgba(168,85,247,0.2);color:#a855f7;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700'>VD</span>");
+          if(o.violencia_domestica) h.push("<span style='background:rgba(168,73,46,0.2);color:var(--verm);padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700'>VD</span>");
           if(o.medida_protetiva==="Sim") h.push("<span style='background:rgba(200,80,80,0.2);color:#c85050;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700'>M.P.</span>");
           if(o.reincidente) h.push("<span style='background:rgba(232,148,58,0.2);color:#e8943a;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700'>REINC</span>");
           h.push("<span style='color:#8a6a4a;font-size:14px;margin-left:auto'>›</span>");
@@ -14743,7 +14743,7 @@ function renderTela() {
       });
       // Eventos avulsos de hoje
       evHoje.forEach(function(e){
-        var c=e.cor||"#8b5cf6";
+        var c=e.cor||"#6A4A8A";
         var stCors={Pendente:"#f59e0b",Realizado:"#22c55e",NaoRealizado:"#ef4444",Cancelado:"#6b7280"};
         var stCor=stCors[e.status||"Pendente"]||"#f59e0b";
         g.push("<div onclick=\"verEventoAvulso('"+e.id+"')\" style='padding:10px 16px;border-bottom:1px solid #2a2418;border-left:3px solid "+c+";cursor:pointer;background:#36221a;display:flex;align-items:center;gap:10px' onmouseover=\"this.style.background='#3e2c22'\" onmouseout=\"this.style.background='#36221a'\">");
@@ -14781,7 +14781,7 @@ function renderTela() {
           g.push("<span style='color:#8a6a4a;font-size:10px;white-space:nowrap'>"+fmtData(a.data)+(a.hora?" · "+a.hora:"")+" <span style='color:#b0805044;font-size:9px'>"+diasLabel+"</span></span>");
           g.push("</div>");
         } else {
-          var e=item.obj; var c2=e.cor||"#8b5cf6";
+          var e=item.obj; var c2=e.cor||"#6A4A8A";
           g.push("<div onclick=\"verEventoAvulso('"+e.id+"')\" style='padding:9px 16px;border-bottom:1px solid #3c2818;border-left:3px solid "+c2+";cursor:pointer;display:flex;align-items:center;gap:10px' onmouseover=\"this.style.background='#36221a'\" onmouseout=\"this.style.background=''\">");
           g.push("<span style='background:"+c2+"22;color:"+c2+";padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700'>"+esc(e.tipo)+"</span>");
           g.push("<div style='flex:1;min-width:0'><p style='color:#ddd2c0;font-size:12px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>"+esc(e.titulo)+"</p></div>");
@@ -21609,7 +21609,7 @@ function renderInventario(main){
         h+="<div style='display:flex;gap:6px'>";
         if(!conf.concluida) h+="<button onclick='_invAbrirConferencia(\""+conf.id+"\")' style='background:#1a2a1a;border:1px solid #22c55e44;color:#22c55e;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>▶ Continuar</button>";
         h+="<button onclick='_invGerarPDFConferencia(\""+conf.id+"\")' style='background:#1a1a2a;border:1px solid #4a9fd433;color:#4a9fd4;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>📄 PDF</button>";
-        if(conf.concluida) h+="<button onclick='_invAbrirParecerModal(\""+conf.id+"\")' style='background:#1a0a2a;border:1px solid #a855f766;color:#a855f7;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>📋 Parecer</button>";
+        if(conf.concluida) h+="<button onclick='_invAbrirParecerModal(\""+conf.id+"\")' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>📋 Parecer</button>";
         h+="</div></div>";
         h+="<div style='display:flex;gap:8px;flex-wrap:wrap'>";
         if(nOk) h+="<span style='background:#22c55e22;color:#22c55e;padding:3px 10px;border-radius:8px;font-size:12px'>✓ "+nOk+" OK</span>";
