@@ -9312,6 +9312,17 @@ function _computarRelatorio(mes, ano, periodo){
     return noMes(a.data) && /visita solid/i.test(a.tipo||"");
   }).length;
 
+  // 8a. AÇÕES DE PATRULHA — palestras, cestas e famílias do módulo Ações
+  var palestras = 0, cestasBasicas = 0, familiasAcoes = 0;
+  (state.acoesPatrulha||[]).filter(function(ap){ return noMes(ap.data); })
+    .forEach(function(ap){
+      palestras     += (ap.palestras||0);
+      cestasBasicas += (ap.cestas||0);
+      familiasAcoes += (ap.familias||0);
+      acoes += (ap.palestras||0);
+      beneficiados += (ap.pessoasPalestra||0) + (ap.familias||0);
+    });
+
   // 8. COMPLEMENTOS MANUAIS — soma os lançamentos das auxiliares
   console.log("[BCS] Complementos total:",comps.length,"per:",JSON.stringify(per));
   comps.forEach(function(c,i){
@@ -9339,6 +9350,9 @@ function _computarRelatorio(mes, ano, periodo){
     projAtivos:  projAtivos,
     beneficiados:beneficiados,
     inscritos:   inscritos,
+    palestras:   palestras,
+    cestasBasicas: cestasBasicas,
+    familiasAcoes: familiasAcoes,
     nComplementos: compsDoMes.length
   };
 }
@@ -9551,7 +9565,13 @@ function _renderRelatorioMensal(main){
     {label:"Beneficiados",            icon:"👥", val:dados.beneficiados,cor:"#f59e0b", key:"beneficiados",
      fonte:"Presenças nas chamadas + visitas + complementos manuais"},
     {label:"Inscritos nos Projetos",  icon:"📚", val:dados.inscritos,  cor:"#60a5fa", key:"inscritos",
-     fonte:"Total de candidatos aprovados em projetos ativos"}
+     fonte:"Total de candidatos aprovados em projetos ativos"},
+    {label:"Palestras / Ações Patrulha",icon:"🎤",val:dados.palestras, cor:"#a855f7", key:"palestras",
+     fonte:"Palestras e ações registradas no módulo Ações de Patrulha"},
+    {label:"Cestas Básicas",          icon:"🧺", val:dados.cestasBasicas,cor:"#f59e0b",key:"cestasBasicas",
+     fonte:"Cestas distribuídas registradas no módulo Ações de Patrulha"},
+    {label:"Famílias Atendidas",      icon:"🏠", val:dados.familiasAcoes,cor:"#10b981",key:"familiasAcoes",
+     fonte:"Famílias atendidas em ações de patrulha comunitária"}
   ];
 
   h.push("<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px'>");
@@ -9591,6 +9611,9 @@ function _renderRelatorioMensal(main){
     "Projetos Sociais:         "+_vr("projAtivos", dados.projAtivos),
     "Beneficiados:             "+_vr("beneficiados",dados.beneficiados),
     "Inscritos nos Projetos:   "+_vr("inscritos",  dados.inscritos),
+    "Palestras / Ações:        "+_vr("palestras",  dados.palestras),
+    "Cestas Básicas:           "+_vr("cestasBasicas",dados.cestasBasicas),
+    "Famílias Atendidas:       "+_vr("familiasAcoes",dados.familiasAcoes),
     "————————————————————————————",
     "Gerado pelo Sistema IARA · "+new Date().toLocaleDateString("pt-BR")
   ];
