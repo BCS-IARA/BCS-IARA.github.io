@@ -15946,103 +15946,24 @@ function _armImportarCodigosParaPatrimonio(){
   renderLivroParteArmamento(document.getElementById("main")||document.getElementById("main-content"));
 }
 
-// Migra todos os materiais do patrimônio para o inventário como material_belico
-function _armMigrarParaInventario(){
-  var mats=(state.materiaisPatrimonio||[]).filter(function(m){return (m.status||"ativo")==="ativo";});
-  if(!mats.length){ showToast("Nenhum material ativo para migrar","error"); return; }
-  if(!state.invItens) state.invItens=[];
-  var migrados=0, atualizados=0;
-  mats.forEach(function(m){
-    var ja=(state.invItens||[]).find(function(x){return x.tombamento&&x.tombamento.toUpperCase()===(m.codigo||"").toUpperCase();});
-    if(ja){
-      // Atualiza campos que podem ter mudado
-      ja.descricao    = m.descricao||ja.descricao;
-      ja.numero_serie = m.serie||ja.numero_serie;
-      ja.observacoes  = m.obs||ja.observacoes;
-      ja._matId       = m.id; // vincula ao patrimônio
-      atualizados++;
-    } else {
-      // Mapeia tipo do patrimônio para subcategoria
-      var subcat = m.tipo==="Colete Balístico"?"Colete balístico"
-                 : m.tipo==="Arma"?"Arma de fogo"
-                 : m.tipo==="Munição"?"Munição"
-                 : m.tipo==="Algemas"?"Algema"
-                 : m.tipo;
-      var item={
-        id:         "inv_arm_"+m.id,
-        criadoEm:   m.criadoEm||new Date().toISOString(),
-        tombamento: (m.codigo||"").toUpperCase(),
-        descricao:  m.descricao||"",
-        categoria:  "material_belico",
-        subcategoria: subcat||"",
-        marca:"", modelo:"",
-        numero_serie:(m.serie||"").toUpperCase(),
-        estado:     "bom",
-        localizacao:"Almoxarifado",
-        data_aquisicao:"",
-        observacoes:m.obs||"",
-        foto:"", foto_url:"",
-        tipo_carga: "none",
-        carga_responsavel_nome:"", carga_responsavel_grad:"", carga_responsavel_matricula:"",
-        carga_assinatura:"", carga_liberador_nome:"", carga_liberador_grad:"",
-        carga_liberador_matricula:"", carga_liberador_assinatura:"", carga_data:"",
-        _matId: m.id, // vínculo com patrimônio
-        ativo: true
-      };
-      state.invItens.push(item);
-      _invEnviarSheets("inv_item", item);
-      migrados++;
-    }
+// Consulta um item no patrimônio pelo código — somente leitura, nunca escreve no inventário
+function _armConsultarInventario(codigo){
+  if(!codigo) return null;
+  var cod=codigo.toUpperCase();
+  return (state.inventarioPatrimonio||[]).find(function(x){
+    return x.numero_serie&&x.numero_serie.toUpperCase()===cod;
   });
-  _invSalvarLocal();
-  salvarLocal();
-  var msg="✅ "+migrados+" migrado(s)";
-  if(atualizados) msg+=", "+atualizados+" atualizado(s)";
-  showToast(msg+"! Acesse o módulo Inventário → Material Bélico.");
-  renderLivroParteArmamento(document.getElementById("main")||document.getElementById("main-content"));
 }
 
-// Retorna o status atual de um material no inventário (pelo código)
+// Retorna o status atual de um material no patrimônio (pelo código)
 function _armStatusInventario(codigo){
   if(!codigo) return null;
   var cod=codigo.toUpperCase();
-  return (state.invItens||[]).find(function(x){
-    return x.tombamento&&x.tombamento.toUpperCase()===cod;
+  return (state.inventarioPatrimonio||[]).find(function(x){
+    return x.numero_serie&&x.numero_serie.toUpperCase()===cod;
+  })||(state.materiaisPatrimonio||[]).find(function(x){
+    return x.codigo&&x.codigo.toUpperCase()===cod;
   });
-}
-
-// Atualiza o inventário quando uma carga/descarga é registrada no Livro de Parte
-function _armAtualizarInventarioAposCarga(carga){
-  if(!carga||!Array.isArray(carga.itens)) return;
-  var tipo=carga.tipo_carga||"Carga";
-  carga.itens.forEach(function(it){
-    var cod=(it.codigo||"").toUpperCase();
-    if(!cod) return;
-    var idx=(state.invItens||[]).findIndex(function(x){return x.tombamento&&x.tombamento.toUpperCase()===cod;});
-    if(idx<0) return; // item não está no inventário
-    var item=state.invItens[idx];
-    if(tipo==="Carga"){
-      // Item saiu em carga → registra policial responsável
-      item.tipo_carga="fixa";
-      item.carga_responsavel_nome=carga.nome||"";
-      item.carga_responsavel_grad="";
-      item.carga_responsavel_matricula=carga.matricula||"";
-      item.carga_data=carga.data_registro||new Date().toISOString();
-      item.localizacao="Em carga — "+(carga.nome||"—");
-      item._cargaAtual={protocolo:carga.protocolo,nome:carga.nome,matricula:carga.matricula,data:carga.data,hora:carga.hora};
-    } else if(tipo==="Descarga"){
-      // Item devolvido → limpa carga
-      item.tipo_carga="none";
-      item.carga_responsavel_nome="";
-      item.carga_responsavel_grad="";
-      item.carga_responsavel_matricula="";
-      item.carga_data="";
-      item.localizacao="Almoxarifado";
-      item._cargaAtual=null;
-    }
-    _invEnviarSheets("inv_item", item);
-  });
-  _invSalvarLocal();
 }
 
 function _renderPatrimonioCadastro(h,IS){
@@ -16086,10 +16007,9 @@ function _renderPatrimonioCadastro(h,IS){
   var _jaNoInv=(state.invItens||[]).filter(function(x){return x.categoria==="material_belico";}).length;
   var _totalPat=(state.materiaisPatrimonio||[]).filter(function(x){return (x.status||"ativo")==="ativo";}).length;
   var _naoMigrados=_totalPat-_jaNoInv;
-  h.push("<div style='background:#0a1a0a;border:1px solid #10b98144;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px'>");
-  h.push("<div><p style='color:#10b981;font-size:12px;font-weight:700;margin:0'>📦 Inventário — Material Bélico</p>");
-  h.push("<p style='color:#5a8a6a;font-size:11px;margin:2px 0 0'>"+_jaNoInv+" item(s) no inventário · "+(_naoMigrados>0?_naoMigrados+" ainda não migrado(s)":"todos migrados")+"</p></div>");
-  h.push("<button onclick='_armMigrarParaInventario()' style='background:#0a2a1a;border:1px solid #10b981;color:#10b981;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>"+(_naoMigrados>0?"📥 Migrar para Inventário":"🔄 Atualizar Inventário")+"</button>");
+  h.push("<div style='background:#0a1a0a;border:1px solid #10b98144;border-radius:10px;padding:12px 16px;margin-bottom:14px'>");
+  h.push("<p style='color:#10b981;font-size:12px;font-weight:700;margin:0'>📦 Patrimônio Bélico</p>");
+  h.push("<p style='color:#5a8a6a;font-size:11px;margin:2px 0 0'>"+_jaNoInv+" item(s) cadastrados · Gerenciar no módulo Inventário</p>");
   h.push("</div>");
 
   // Banner legado — novos itens devem ir para o Inventário (Trilho B)
@@ -16714,7 +16634,7 @@ function _armSincronizar(){
       var novas=0;
       resp.dados.forEach(function(r){
         var ex=state.cargasArmamento.find(function(x){return x.protocolo===r.protocolo;});
-        if(!ex){ state.cargasArmamento.push(r); novas++; _armAtualizarInventarioAposCarga(r); }
+        if(!ex){ state.cargasArmamento.push(r); novas++; }
       });
       salvarLocal();
       showToast(novas>0?"✅ "+novas+" novo(s) registro(s) sincronizado(s)!":"✅ Sem novidades.");
