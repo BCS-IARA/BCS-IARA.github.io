@@ -3287,11 +3287,36 @@ function renderCalendar() {
   // Pre-indexar eventos por data para O(1) lookup no loop (performance mobile)
   var _cancelados = new Set((state.agendamentosCancelados||[]).map(function(x){return x.id;}));
   var _agByDate = {}, _visByDate = {}, _evAvByDate = {}, _escByDate = {}, _chamByDate = {};
+  // FRIDAs nível E — agrupa por data do agendamento relacionado (urgente)
+  var _fridaEByOcId = {};
+  (state.db.frida||[]).forEach(function(f){ if(f.nivel==="E") _fridaEByOcId[f.ocorrenciaId]=true; });
+  var _fridaEByDate = {};
+  // Encaminhamentos pendentes — count total para badge de sexta
+  var _encPendCount = (state.encaminhamentos||[]).filter(function(e){ return e.status==="pendente"||e.status==="a_encaminhar"; }).length;
+  // Projetos — prazos de entregas como eventos no calendário
+  var _projByDate = {};
+  (state.projetos||[]).forEach(function(p){
+    if(p.status==="Concluído"||p.status==="Cancelado") return;
+    (p.entregas||[]).forEach(function(en){
+      if(!en.prazo||en.status==="Concluída") return;
+      var d=normData(en.prazo); if(!d) return;
+      if(!_projByDate[d]) _projByDate[d]=[];
+      _projByDate[d].push({nome:p.nome,entrega:en.nome,prioridade:p.prioridade||"Media"});
+    });
+    if(p.dataFim && p.status!=="Concluído"){
+      var df=normData(p.dataFim); if(df){
+        if(!_projByDate[df]) _projByDate[df]=[];
+        _projByDate[df].push({nome:p.nome,entrega:"Prazo final",prioridade:p.prioridade||"Media"});
+      }
+    }
+  });
   (state.db.agendamentos||[]).forEach(function(a){
     if(_cancelados.has(a.id)) return;
     var d=normData(a.data); if(!d) return;
     if(!_agByDate[d]) _agByDate[d]=[];
     _agByDate[d].push(a);
+    // Marcar dia com FRIDA nível E se agendamento é de OC com FRIDA elevado
+    if(a.ocorrencia_id && _fridaEByOcId[a.ocorrencia_id]) _fridaEByDate[d]=true;
   });
   (state.db.visitas||[]).forEach(function(v){
     var d=normData(v.data); if(!d) return;
@@ -3317,13 +3342,14 @@ function renderCalendar() {
   });
   const getEvs=d=>{
     var ds=dStr(d);
-    return { ags:_agByDate[ds]||[], vis:_visByDate[ds]||[], esc:_escByDate[ds]||[], cham:_chamByDate[ds]||[] };
+    return { ags:_agByDate[ds]||[], vis:_visByDate[ds]||[], esc:_escByDate[ds]||[], cham:_chamByDate[ds]||[], proj:_projByDate[ds]||[] };
   };
   const sem=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
+  var _sincBadge = state.ultimaSinc ? "<span style='color:#6a8a50;font-size:9px;margin-left:6px'>✓ "+state.ultimaSinc.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</span>" : "";
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
     <button class="btn btn-ghost" onclick="calNav(-1)" style="padding:8px 16px;font-size:16px">‹</button>
-    <h3 style="color:#f5ede0;font-size:17px;font-weight:700;text-transform:capitalize">${nomeMes}</h3>
+    <div style="text-align:center"><h3 style="color:#f5ede0;font-size:17px;font-weight:700;text-transform:capitalize;margin:0">${nomeMes}</h3>${_sincBadge}</div>
     <div style="display:flex;gap:8px;align-items:center">
       <button onclick="abrirModalEventoAvulso()" style="background:linear-gradient(135deg,#3a5a28,#2a4a18);border:none;color:#a8d890;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ Evento</button>
       <button class="btn btn-ghost" onclick="calNav(1)" style="padding:8px 16px;font-size:16px">›</button>
@@ -3337,16 +3363,26 @@ function renderCalendar() {
   for(let d=1;d<=total;d++){
     const ds=dStr(d), ev=getEvs(d), isHoje=ds===hojeStr, isSel=state.calDia===d;
     const _evAvDia=_evAvByDate[ds]||[];
-    const totalEvDia=ev.ags.length+ev.vis.length+_evAvDia.length+ev.esc.length+ev.cham.length;
+    const _projDia=_projByDate[ds]||[];
+    const totalEvDia=ev.ags.length+ev.vis.length+_evAvDia.length+ev.esc.length+ev.cham.length+_projDia.length;
     const alertaCls=totalEvDia>=3?" alerta-3":totalEvDia===2?" alerta-2":"";
     const bg=isSel?"background:#3e2c22":isHoje?"background:#42301e":(totalEvDia>=3?"background:#1f0808":"background:#36221a");
-    html+=`<div class="cal-day${isHoje?" today":""}${isSel?" selected":""}${alertaCls}" style="${bg}" onclick="calClick(${d})">
-      <div class="cal-num" style="color:${totalEvDia?"#f5ede0":"#9a7050"}">${d}</div>`;
+    // Dia da semana: 0=Dom...5=Sex
+    var _dow=new Date(ano,mn,d).getDay();
+    var _isSex=_dow===5;
+    var _fridaE=_fridaEByDate[ds];
+    // Estilo extra: sexta-feira fundo âmbar claro; FRIDA E borda vermelha topo
+    var _extraStyle=_isSex?"border-top:2px solid #D9A53C;":(_fridaE?"border-top:3px solid #A8492E;":"");
+    html+=`<div class="cal-day${isHoje?" today":""}${isSel?" selected":""}${alertaCls}" style="${bg};${_extraStyle}" onclick="calClick(${d})">
+      <div class="cal-num" style="color:${_isSex?"#D9A53C":totalEvDia?"#f5ede0":"#9a7050"}">${d}</div>`;
     (ev.ags||[]).slice(0,2).forEach(a=>{ html+=`<div class="cal-event" style="background:${COR_VISITA[a.tipo]||"#d4a87a"};color:#000">${normHora(a.hora)} ${(a.vitima_nome||"--").split(" ")[0]}</div>`; });
     (ev.vis||[]).slice(0,1).forEach(v=>{ html+=`<div class="cal-event" style="background:#334155;color:#94a3b8">✓ ${(v.vitima_nome||"--").split(" ")[0]}</div>`; });
     (ev.esc||[]).slice(0,1).forEach(a=>{ html+=`<div class="cal-event" style="background:#1e3a5f;color:#38bdf8;font-size:9px">🏫 ${(a.escolaNome||"Escola").split(" ")[0]}</div>`; });
     (ev.cham||[]).slice(0,1).forEach(c=>{ html+=`<div class="cal-event" style="background:#3E2A1A;color:#6B5236;font-size:9px">📚 ${(c.projetoNome||"Aula").substring(0,10)}</div>`; });
     _evAvDia.slice(0,1).forEach(e=>{ html+=`<div class="cal-event" style="background:${e.cor||"#8b5cf6"};color:#fff;font-size:9px">${e.hora||""} ${e.titulo.substring(0,10)}</div>`; });
+    _projDia.slice(0,1).forEach(p=>{ html+=`<div class="cal-event" style="background:#2a1a3a;color:#c084fc;font-size:9px">📁 ${(p.nome||"").substring(0,10)}</div>`; });
+    // Badge de sexta com encaminhamentos pendentes
+    if(_isSex && _encPendCount>0) html+=`<div style="font-size:8px;color:#D9A53C;font-weight:700;text-align:right;padding-right:2px">📤${_encPendCount}</div>`;
     html+=`</div>`;
   }
   html+=`</div></div>`;
@@ -3357,13 +3393,14 @@ function renderCalendar() {
     const evAvulsos=_evAvByDate[diaSel]||[];
     const escDia=_escByDate[diaSel]||[];
     const chamDia=_chamByDate[diaSel]||[];
-    const totalEvs=ev.ags.length+ev.vis.length+evAvulsos.length+escDia.length+chamDia.length;
+    const projDia=_projByDate[diaSel]||[];
+    const totalEvs=ev.ags.length+ev.vis.length+evAvulsos.length+escDia.length+chamDia.length+projDia.length;
     html+=`<div class="card" style="margin-top:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <h4 style="color:#f5ede0;font-size:15px;font-weight:700;margin:0">${String(state.calDia).padStart(2,"0")}/${String(mn+1).padStart(2,"0")}/${ano}</h4>
         <button onclick="abrirModalEventoAvulso('${diaSel}')" style="background:#1a2810;border:1px solid #6a8a50;color:#a8d890;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">+ Evento neste dia</button>
       </div>`;
-    if(!totalEvs) html+=`<p style="color:#5e4636;font-size:14px">Nenhum evento neste dia.</p>`;
+    if(!totalEvs) html+=`<div style="text-align:center;padding:24px 0"><p style="font-size:20px;margin-bottom:6px">✓</p><p style="color:#5e4636;font-size:13px;font-weight:600">Nenhum evento neste dia — tudo em dia</p></div>`;
     ev.ags.forEach(a=>{const c=COR_VISITA[a.tipo]||"#d4a87a";html+=`<div class="cal-ag-item" data-ag-id="${a.id}" style="background:#36221a;border-left:3px solid ${c};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onmouseover="this.style.background='#3c2818'" onmouseout="this.style.background='#36221a'"><div style="display:flex;justify-content:space-between;margin-bottom:4px">${tag(a.tipo,c)}<span style="color:#a07c58;font-size:12px">${normHora(a.hora)}</span></div><p style="color:#f5ede0;font-size:14px;font-weight:500">${a.vitima_nome}</p>${a.endereco?`<p style="color:#a07c58;font-size:12px">📍 ${a.endereco}</p>`:""}</div>`;});
     ev.vis.forEach(v=>{html+=`<div style="background:#36221a;border-left:3px solid #10b981;border-radius:8px;padding:12px;margin-bottom:8px">${tag("✓ Realizada","#10b981")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${v.vitima_nome}</p>${v.resultado?`<p style="color:#a07c58;font-size:12px;margin-top:4px">${v.resultado}</p>`:""}</div>`;});
     escDia.forEach(a=>{html+=`<div style="background:#0f2035;border-left:3px solid #38bdf8;border-radius:8px;padding:12px;margin-bottom:8px">${tag("🏫 "+esc(a.subtipo||a.tipo||"Visita Escolar"),"#38bdf8")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${esc(a.escolaNome||"Escola")}</p>${a.responsavel?`<p style="color:#a07c58;font-size:12px;margin-top:4px">👮 ${esc(a.responsavel)}</p>`:""}${a.tema?`<p style="color:#a07c58;font-size:11px;margin-top:2px">${esc(a.tema)}</p>`:""}</div>`;});
@@ -3375,6 +3412,10 @@ function renderCalendar() {
       <p style="color:#f5ede0;font-size:13px;font-weight:600;margin:0">${e.titulo}</p>
       ${e.descricao?`<p style="color:#a07c58;font-size:11px;margin:4px 0 0">${e.descricao}</p>`:""}
     </div>`;});
+    projDia.forEach(function(p){ var _cor=p.prioridade==="Critica"||p.prioridade==="Alta"?"#c084fc":"#9f7aea"; html+=`<div onclick="state.tela='projetos';render()" style="background:#1a0f2a;border-left:3px solid ${_cor};border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">${tag("📁 Gestão e Planejamento",_cor)}<span style="color:#7c5fa8;font-size:9px;font-weight:700;text-transform:uppercase">${p.prioridade||"Média"}</span></div><p style="color:#e2d0f8;font-size:13px;font-weight:600;margin:2px 0 0">${esc(p.nome)} — ${esc(p.entrega)}</p></div>`; });
+    // Bloco sexta: encaminhamentos a enviar
+    var _dowSel=new Date(ano,mn,state.calDia).getDay();
+    if(_dowSel===5 && _encPendCount>0){ html+=`<div onclick="state.tela='encaminhamentos';render()" style="background:#2a1f08;border:1.5px dashed #D9A53C;border-radius:8px;padding:10px 14px;margin-bottom:8px;cursor:pointer"><p style="color:#D9A53C;font-size:11px;font-weight:700;margin:0 0 2px">📤 Encaminhamentos desta sexta</p><p style="color:#8a6a40;font-size:11px;margin:0">${_encPendCount} pendente(s) para enviar em lote</p></div>`; }
     html+=`</div>`;
   }
   cal.innerHTML=html;
