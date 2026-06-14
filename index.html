@@ -11002,6 +11002,81 @@ function renderAssistenteIA(main){
   _renderChatIA();
 }
 
+// ── TRIAGEM ────────────────────────────────────────────────────────
+function renderTriagem(main) {
+  var ocs = (state.db.ocorrencias||[]);
+  // VDs com situacao nova primeiro, depois restantes novas, ambos por data decrescente
+  var novas = ocs.filter(function(o){ return (o.situacao||"nova")==="nova"; });
+  var vds   = novas.filter(function(o){ return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||""); });
+  var resto = novas.filter(function(o){ return !vds.includes(o); });
+  function porDataDesc(a,b){ return (b.data||"").localeCompare(a.data||""); }
+  vds.sort(porDataDesc);
+  resto.sort(porDataDesc);
+  var fila = vds.concat(resto);
+
+  var h = "<div style='max-width:860px;margin:0 auto'>";
+  h += "<div style='display:flex;align-items:center;gap:14px;margin-bottom:22px'>";
+  h += "<h2 style='font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--tinta);margin:0'>📥 Fila de Triagem</h2>";
+  h += "<span style='background:var(--verm);color:#fff;border-radius:12px;padding:2px 10px;font-size:13px;font-weight:900'>"+fila.length+"</span>";
+  h += "<span style='color:var(--tinta-2);font-size:12px;margin-left:auto'>"+vds.length+" VD · "+resto.length+" outras</span>";
+  h += "</div>";
+
+  if(!fila.length){
+    h += "<div class='card' style='text-align:center;padding:56px'>";
+    h += "<p style='font-size:32px;margin-bottom:10px'>✅</p>";
+    h += "<p style='font-size:16px;font-weight:700;color:var(--tinta);font-family:Georgia,serif'>Fila vazia</p>";
+    h += "<p style='color:var(--tinta-2);font-size:13px;margin-top:6px'>Todas as ocorrências foram triadas.</p>";
+    h += "</div>";
+  } else {
+    fila.forEach(function(o){
+      var isVD = o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
+      var bordaCor = isVD ? "var(--verm)" : "var(--papel-3)";
+      h += "<div class='oc-row' style='border-left:4px solid "+bordaCor+";cursor:default;margin-bottom:10px'>";
+      h += "<div style='display:flex;align-items:flex-start;gap:12px'>";
+      // Info principal
+      h += "<div style='flex:1'>";
+      h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px'>";
+      if(isVD) h += "<span style='background:var(--verm);color:#fff;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:900'>VD</span>";
+      h += "<span style='background:var(--papel-3);color:var(--tinta);border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700'>"+esc(o.tipo||"—")+"</span>";
+      h += "<span style='color:var(--tinta-2);font-size:11px'>"+esc(o.data||"—")+(o.hora?" · "+esc(o.hora):"")+"</span>";
+      if(o.bairro) h += "<span style='color:var(--tinta-2);font-size:11px'>· "+esc(o.bairro)+"</span>";
+      h += "</div>";
+      if(o.vitima_nome) h += "<p style='font-size:13px;color:var(--tinta);font-weight:600;margin-bottom:2px'>👤 "+esc(o.vitima_nome)+"</p>";
+      if(o.descricao) h += "<p style='font-size:12px;color:var(--tinta-2);margin:0;line-height:1.5'>"+esc((o.descricao||"").substring(0,140))+(o.descricao&&o.descricao.length>140?"…":"")+"</p>";
+      h += "</div>";
+      // Ações de situação
+      h += "<div style='display:flex;flex-direction:column;gap:6px;flex-shrink:0'>";
+      var situacoes = [
+        {v:"em_triagem",    l:"Em triagem",    c:"var(--ambar)"},
+        {v:"em_acompanhamento", l:"Acompanhamento", c:"var(--verde)"},
+        {v:"encerrada",    l:"Encerrar",      c:"var(--tinta-2)"},
+        {v:"historico",    l:"Histórico",     c:"var(--papel-3)"}
+      ];
+      situacoes.forEach(function(s){
+        h += "<button onclick='_triarOc(\""+esc(o.id)+"\",\""+s.v+"\")' style='background:var(--papel-2);border:1.5px solid "+s.c+";color:var(--tinta);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>"+s.l+"</button>";
+      });
+      h += "</div>";
+      h += "</div>";
+      h += "</div>";
+    });
+  }
+  h += "</div>";
+  main.innerHTML = h;
+}
+
+function _triarOc(id, situacao) {
+  var idx = (state.db.ocorrencias||[]).findIndex(function(o){ return o.id===id; });
+  if(idx<0) return;
+  state.db.ocorrencias[idx].situacao = situacao;
+  salvarLocal();
+  // Envia para o backend
+  _sheetsGet({acao:"atualizarSituacaoOc", id:id, situacao:situacao}).catch(function(){});
+  // Re-renderiza a fila sem sair da tela
+  var main = document.getElementById("main");
+  if(main) renderTriagem(main);
+  showToast("✓ Situação: "+situacao.replace(/_/g," "));
+}
+
 function renderTela() {
   const main=document.getElementById("main");
   if(!main)return;
@@ -12246,31 +12321,8 @@ function renderTela() {
   }
 
   // ATENDIMENTOS
-  if(tela==="atendimentos"){
-    main.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-      <h2 style="font-size:24px;font-weight:700;color:#f5ede0">Atendimentos (${ats.length})</h2>
-      <button class="btn btn-purple" onclick="abrirFormAtend()">+ Novo</button>
-    </div>
-    <div id="form-atend" class="card hidden" style="margin-bottom:16px;max-width:540px">
-      <div class="grid2"><div class="field"><label>Data</label><input type="date" id="at-data" value="${hoje()}"/></div><div class="field"><label>Hora</label><input type="time" id="at-hora" value="${agora()}"/></div></div>
-      <div class="field"><label>Nome *</label><input type="text" id="at-nome" placeholder="Nome completo"/></div>
-      <div class="field"><label>Telefone</label><input type="text" id="at-tel" placeholder="(77) 00000-0000"/></div>
-      <div class="field"><label>Tipo</label><select id="at-tipo"><option>Informação</option><option>Denúncia</option><option>Acompanhamento</option><option>Orientação</option><option>Emergência</option></select></div>
-      <div class="field"><label>Descrição</label><textarea id="at-desc" rows="3"></textarea></div>
-      <div class="field"><label>Encaminhamento</label><textarea id="at-encam" rows="2" placeholder="CREAS, Delegacia, UBS..."></textarea></div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-ghost" onclick="document.getElementById('form-atend').classList.add('hidden')">Cancelar</button>
-        <button class="btn btn-purple" onclick="salvarAtend()">Salvar Atendimento</button>
-      </div>
-    </div>
-    ${!ats.length?`<div class="card" style="text-align:center;padding:48px"><p style="color:#5e4636">Nenhum atendimento registrado</p></div>`:
-    ats.map(a=>`<div class="card" style="margin-bottom:7px">
-      <div style="display:flex;gap:7px;align-items:center;margin-bottom:4px">${tag(a.tipo,"#c4833a")}<span style="color:#7a5e48;font-size:12px">${a.data} ${a.hora}</span></div>
-      <p style="color:#f5ede0;font-size:14px;font-weight:500">${a.nome} · <span style="color:#a07c58">${a.telefone||""}</span></p>
-      ${a.descricao?`<p style="color:#a07c58;font-size:12px;margin-top:2px">${a.descricao}</p>`:""}
-      ${a.encaminhamento?`<p style="color:#10b981;font-size:12px;margin-top:2px">→ ${a.encaminhamento}</p>`:""}
-    </div>`).join("")}`;
+  if(tela==="triagem"){
+    renderTriagem(main);
     return;
   }
 
@@ -12852,6 +12904,12 @@ function render(){
       <button class="nav-btn${state.tela==="dashboard"?" active":""}" data-tela="dashboard" onclick="setTela('dashboard')">📊 Painel</button>
       <button class="nav-btn${state.tela==="dashcomandante"?" active":""}" data-tela="dashcomandante" onclick="setTela('dashcomandante')" style="color:${state.tela==="dashcomandante"?"#d4a87a":"#b0805088"};border-color:${state.tela==="dashcomandante"?"#d4a87a":"transparent"}">${(function(){ var nP=(state.alertasProjetos||[]).filter(function(a){return !a.lido;}).length; var nC=(state.alertasCrescimento||[]).filter(function(a){return !a.lido;}).length; var total=nP+nC; if(nC>0) return "⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>🚨 "+total+"</span>"; if(nP>0) return "⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>"+nP+"</span>"; return "⚔️ Painel do Comando"; })()}</button>
       <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" data-tela="ocorrencias" onclick="setTela('ocorrencias')">🔍 Analisar Ocorrências</button>
+      ${(function(){
+        var _nTriar=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length;
+        var _ativo=state.tela==="triagem";
+        var _badge=_nTriar>0?"<span style='background:"+(_ativo?"#fff":"var(--verm)")+";"+"color:"+(_ativo?"var(--verm)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nTriar+"</span>":"";
+        return "<button class='nav-btn"+(_ativo?" active":"")+"' data-tela='triagem' onclick='setTela(\"triagem\")' style='"+((_nTriar>0&&!_ativo)?"color:var(--verm);animation:piscar-suave 2s infinite;":"")+"'>📥 Triagem"+_badge+"</button>";
+      })()}
       <button class="nav-btn${state.tela==="calendario"?" active":""}" data-tela="calendario" onclick="setTela('calendario')">🗓 Calendário</button>
       <button class="nav-btn${state.tela==="dashvcm"?" active":""}" data-tela="dashvcm" onclick="setTela('dashvcm')" style="${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0&&state.tela!=="dashvcm"?"animation:piscar-rosa 1.4s infinite;color:#ff69b4;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";";})()}">🌸 Dashboard VCM${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0?` <span style="background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${_n}</span>`:"";})()}</button>
       <button class="nav-btn${state.tela==="cadastrosvcm"?" active":""}" data-tela="cadastrosvcm" onclick="setTela('cadastrosvcm')" style="color:#ff69b4;border-color:${state.tela==="cadastrosvcm"?"#ff1493":"transparent"}">💜 Atendimentos Realizados</button>
