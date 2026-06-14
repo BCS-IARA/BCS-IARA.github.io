@@ -7018,7 +7018,10 @@ function renderGestaoProjectos(main){
     window._relBaixarPDF = function(){
       if(!state._relPreview){return;}
       var win=window.open("","_blank");
-      win.document.write("<html><head><title>Relatório Semanal — 77ª CIPM</title><style>body{font-family:'Georgia',serif;max-width:700px;margin:40px auto;color:#1a1a1a;line-height:1.8;font-size:14px}h1{color:#5a2a0a}@media print{button{display:none}}</style></head><body><h1>77ª CIPM — Relatório Semanal de Inteligência</h1><pre style='font-family:inherit;white-space:pre-wrap'>"+state._relPreview.replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><button onclick='window.print()' style='margin-top:20px;padding:10px 24px;font-size:14px;cursor:pointer'>⬇ Imprimir / Salvar PDF</button></body></html>");
+      var _relData=new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+      win.document.write("<html><head><title>Relatório Semanal — 77ª CIPM</title><style>body{font-family:'Georgia',serif;max-width:700px;margin:40px auto;color:#1a1a1a;line-height:1.8;font-size:14px}@media print{button{display:none}}</style></head><body>");
+      win.document.write("<div style='background:#1B3A6B;padding:14px 20px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:4px'><img src='"+BCS_LOGO_B64+"' style='width:60px;height:60px;border-radius:50%;object-fit:cover;flex-shrink:0'><div><div style='color:#fff;font-size:20px;font-weight:700;font-family:Georgia,serif'>Relatório Semanal de Inteligência</div><div style='color:#adc8ff;font-size:12px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div><div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:11px'>Emitido em "+_relData+"</div></div>");
+      win.document.write("<pre style='font-family:inherit;white-space:pre-wrap;padding:16px 0'>"+state._relPreview.replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><button onclick='window.print()' style='margin-top:20px;padding:10px 24px;font-size:14px;cursor:pointer'>⬇ Imprimir / Salvar PDF</button></body></html>");
       win.document.close();
     };
     window._relCopiarWhatsApp = function(){
@@ -12399,8 +12402,11 @@ window._gerarDossie = function(vitimaId){
   html+=".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e8d5b7;font-size:11px;color:#8a6a4a;display:flex;justify-content:space-between}";
   html+="@media print{body{margin:20px;padding:0}button{display:none!important}}";
   html+="</style></head><body>";
-  html+="<div class='header'><div><div class='titulo'>Dossiê da Vítima</div><div style='font-size:13px;color:#5a2a0a;margin-top:4px'>77ª Companhia Independente de Polícia Militar</div></div>";
-  html+="<div class='logo'>Base Comunitária de Segurança<br>Nova Cidade · Vitória da Conquista-BA<br><strong>Emitido em "+dataDossie+"</strong><br><span style='color:#dc2626;font-weight:700'>CONFIDENCIAL</span></div></div>";
+  html+="<div style='background:#1B3A6B;padding:14px 20px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:4px'>";
+  html+="<img src='"+BCS_LOGO_B64+"' style='width:60px;height:60px;border-radius:50%;object-fit:cover;flex-shrink:0'>";
+  html+="<div><div style='color:#fff;font-size:20px;font-weight:700;font-family:Georgia,serif'>Dossiê da Vítima</div>";
+  html+="<div style='color:#adc8ff;font-size:12px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
+  html+="<div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:11px'>Emitido em "+dataDossie+"<br><span style='color:#ff9999;font-weight:700'>CONFIDENCIAL</span></div></div>";
   // Identificação
   html+="<h2>Identificação</h2>";
   var idCampos=[["Nome",vit.nome||"—"],["Sexo",vit.sexo==="F"?"Feminino":vit.sexo==="M"?"Masculino":(vit.sexo||"—")],["Idade",vit.idade?vit.idade+" anos":"—"],["Telefone",vit.telefone||"—"],["Endereço",vit.endereco||"—"]];
@@ -22130,8 +22136,11 @@ function _invGerarPDFConferencia(confId){
   h+=".sig-area{border:1px solid #ccc;border-radius:6px;padding:10px;margin:8px 0;display:inline-block;min-width:220px}";
   h+="@media print{body{padding:10px}}";
   h+="</style></head><body>";
-  h+="<h1>📋 Conferência de Inventário — 77ª CIPM BCS</h1>";
-  h+="<div style='color:#666;font-size:10px;margin-bottom:12px'>Iniciada: "+dt+" · Concluída: "+dtConc+"</div>";
+  h+="<div style='background:#1B3A6B;padding:12px 18px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:10px'>";
+  h+="<img src='"+BCS_LOGO_B64+"' style='width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0'>";
+  h+="<div><div style='color:#fff;font-size:17px;font-weight:700'>Conferência de Inventário</div>";
+  h+="<div style='color:#adc8ff;font-size:11px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
+  h+="<div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:10px'>Iniciada: "+dt+"<br>Concluída: "+dtConc+"</div></div>";
   h+="<div style='margin-bottom:14px'>";
   h+="<div class='kpi' style='border-color:green'><b class='ok'>"+nOk+"</b>OK</div>";
   h+="<div class='kpi' style='border-color:#b45700'><b class='div'>"+nDiv+"</b>Divergência</div>";
