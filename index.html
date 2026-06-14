@@ -1231,6 +1231,7 @@ let state = {
   calMes: new Date(),
   calDia: null,
   calHistorico: false,
+  calVista: "mes",
   charts: {},
   ultimaBusca: "",
   filaPendente: JSON.parse(localStorage.getItem("bcs_fila_pendente")||"[]"),
@@ -3371,7 +3372,9 @@ function renderCalendar() {
   const sem=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
   var _sincBadge = state.ultimaSinc ? "<span style='color:#6a8a50;font-size:9px;margin-left:6px'>✓ "+state.ultimaSinc.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</span>" : "";
-  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+  var _vista = state.calVista || "mes";
+  function _vBtnStyle(v){ return "padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid "+(_vista===v?"#C8A84B":"#5e4636")+";background:"+(_vista===v?"#2a1c10":"transparent")+";color:"+(_vista===v?"#C8A84B":"#a07c58")+";font-weight:"+(_vista===v?"700":"400"); }
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
     <button class="btn btn-ghost" onclick="calNav(-1)" style="padding:8px 16px;font-size:16px">‹</button>
     <div style="text-align:center"><h3 style="color:#f5ede0;font-size:17px;font-weight:700;text-transform:capitalize;margin:0">${nomeMes}</h3>${_sincBadge}</div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -3380,7 +3383,55 @@ function renderCalendar() {
       <button class="btn btn-ghost" onclick="calNav(1)" style="padding:8px 16px;font-size:16px">›</button>
     </div>
   </div>
-  <div style="background:#42301e;border:1px solid #5e4636;border-radius:12px;overflow:hidden">
+  <div style="display:flex;gap:6px;margin-bottom:12px">
+    <button onclick="state.calVista='mes';renderCalendar()" style="${_vBtnStyle('mes')}">📅 Mês</button>
+    <button onclick="state.calVista='semana';state.calDia=null;renderCalendar()" style="${_vBtnStyle('semana')}">📋 Semana</button>
+    <button onclick="state.calVista='dia';if(!state.calDia)state.calDia=new Date().getDate();renderCalendar()" style="${_vBtnStyle('dia')}">🗓 Dia</button>
+  </div>`;
+
+  // ── SEMANA VIEW ──────────────────────────────────────────────────────────────
+  if(_vista === "semana"){
+    // Semana da data selecionada ou hoje
+    var _diaRef = state.calDia ? new Date(ano,mn,state.calDia) : new Date();
+    var _dow = _diaRef.getDay(); // 0=Dom
+    var _inicioSem = new Date(_diaRef); _inicioSem.setDate(_diaRef.getDate()-_dow);
+    html += `<div style="display:flex;flex-direction:column;gap:8px">`;
+    for(var _sd=0;_sd<7;_sd++){
+      var _dt = new Date(_inicioSem); _dt.setDate(_inicioSem.getDate()+_sd);
+      var _ds2 = _dt.getFullYear()+"-"+String(_dt.getMonth()+1).padStart(2,"0")+"-"+String(_dt.getDate()).padStart(2,"0");
+      var _isHj2 = _ds2===hojeStr;
+      var _agsD = _agByDate[_ds2]||[], _visD = _visByDate[_ds2]||[], _evD = _evAvByDate[_ds2]||[];
+      var _semN = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"][_dt.getDay()];
+      var _total2 = _agsD.length+_visD.length+_evD.length;
+      html += `<div style="background:${_isHj2?"#42301e":"#2a1c10"};border:1px solid ${_isHj2?"#C8A84B":"#5e4636"};border-radius:10px;padding:10px 14px">`;
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${_total2>0?8:0}px">`;
+      html += `<span style="color:${_isHj2?"#D9A53C":"#a07c58"};font-size:12px;font-weight:700">${_semN} ${String(_dt.getDate()).padStart(2,"0")}/${String(_dt.getMonth()+1).padStart(2,"0")}</span>`;
+      if(_total2>0) html += `<span style="color:#6B5236;font-size:10px">${_total2} evento(s)</span>`;
+      else html += `<span style="color:#5e4636;font-size:10px">—</span>`;
+      html += `</div>`;
+      _agsD.forEach(function(a){
+        var _c = COR_VISITA[a.tipo]||"#d4a87a";
+        var _stBadge = a.status==="Realizado"?"<span style='background:#22c55e22;color:#22c55e;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700'>✅</span>":a.status==="NaoRealizado"?"<span style='background:#ef444422;color:#ef4444;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700'>❌</span>":"";
+        var _btns2 = state.perfil==="guarnicao"&&a.status!=="Realizado"&&a.status!=="NaoRealizado"?`<div style="display:flex;gap:6px;margin-top:6px"><button onclick="confirmarVisita('${a.id}','Realizado')" style="flex:1;background:#22c55e22;border:1px solid #22c55e;color:#22c55e;padding:7px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Realizei</button><button onclick="confirmarVisita('${a.id}','NaoRealizado')" style="flex:1;background:#ef444411;border:1px solid #ef4444;color:#ef4444;padding:7px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✗ Não fui</button></div>`:"";
+        html += `<div style="border-left:3px solid ${_c};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:#36221a"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="color:${_c};font-size:10px;font-weight:700">${a.tipo||"Visita"}</span><span style="color:#a07c58;font-size:10px">${normHora(a.hora)}</span>${_stBadge}</div><p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${a.vitima_nome||"—"}</p>${_btns2}</div>`;
+      });
+      _evD.forEach(function(e){ html += `<div style="border-left:3px solid ${e.cor||"#8b5cf6"};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:#36221a"><span style="color:${e.cor||"#8b5cf6"};font-size:10px;font-weight:700">${e.tipo||"Evento"}</span>${e.hora?` <span style='color:#a07c58;font-size:10px'>${e.hora}</span>`:""}<p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${e.titulo}</p></div>`; });
+      html += `</div>`;
+    }
+    html += `</div>`;
+    cal.innerHTML = html;
+    return;
+  }
+
+  // ── DIA VIEW ────────────────────────────────────────────────────────────────
+  if(_vista === "dia"){
+    if(!state.calDia) state.calDia = new Date().getDate();
+    // Fall through to normal rendering which will show the day detail below the (collapsed) grid
+    // Just render the grid compactly then the day detail
+  }
+
+  // ── MÊS VIEW (default) ──────────────────────────────────────────────────────
+  html += `<div style="background:#42301e;border:1px solid #5e4636;border-radius:12px;overflow:hidden${_vista==='dia'?';display:none':''}">
     <div class="cal-grid" style="background:#080400">`;
   sem.forEach(s=>{ html+=`<div class="cal-header-day">${s}</div>`; });
   html+=`</div><div class="cal-grid" style="gap:1px;background:#5e4636">`;
@@ -3624,9 +3675,23 @@ function verEventoAvulso(evId){
 }
 
 function calNav(dir){
-  const m=state.calMes;
-  state.calMes=new Date(m.getFullYear(),m.getMonth()+dir,1);
-  state.calDia=null;
+  var vista=state.calVista||"mes";
+  if(vista==="semana"){
+    // Navigate by week: move calDia by 7 days
+    var _dRef = state.calDia ? new Date(state.calMes.getFullYear(),state.calMes.getMonth(),state.calDia) : new Date();
+    _dRef.setDate(_dRef.getDate()+(dir*7));
+    state.calMes = new Date(_dRef.getFullYear(),_dRef.getMonth(),1);
+    state.calDia = _dRef.getDate();
+  } else if(vista==="dia"){
+    var _dRef2 = state.calDia ? new Date(state.calMes.getFullYear(),state.calMes.getMonth(),state.calDia) : new Date();
+    _dRef2.setDate(_dRef2.getDate()+dir);
+    state.calMes = new Date(_dRef2.getFullYear(),_dRef2.getMonth(),1);
+    state.calDia = _dRef2.getDate();
+  } else {
+    const m=state.calMes;
+    state.calMes=new Date(m.getFullYear(),m.getMonth()+dir,1);
+    state.calDia=null;
+  }
   renderCalendar();
 }
 function calClick(d){ state.calDia=state.calDia===d?null:d; renderCalendar(); }
