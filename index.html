@@ -20706,6 +20706,15 @@ function _invSalvarItem(idExistente){
   }
   _invSalvarLocal();
   _invEnviarSheets("inv_item", item);
+  // Registra movimentação de carga ao atribuir carga fixa
+  if(tipoCarga==="fixa" && item.carga_responsavel_nome){
+    var movCarga={id:"mc"+Date.now(),itemId:item.id,tipo:"entrega",modalidade:"individual",
+      responsavel:(item.carga_responsavel_grad?" "+item.carga_responsavel_grad:"")+" "+item.carga_responsavel_nome+(item.carga_responsavel_matricula?" ("+item.carga_responsavel_matricula+")":""),
+      assinatura:item.carga_assinatura||"",dataHora:new Date().toISOString(),observacao:"Carga fixa registrada via inventário"};
+    if(!state.invMovimentacoes) state.invMovimentacoes=[];
+    state.invMovimentacoes.push(movCarga);
+    _invEnviarSheets("inv_movimentacao",movCarga);
+  }
   _invEnviarFotoEAtualizarItem(item); // upload foto → Drive em background
   document.getElementById("modal-inv-item").remove();
   showToast("✓ Item salvo! Enviando foto para o Drive...");
@@ -21437,6 +21446,13 @@ function renderInventario(main){
           if(item.genero) h+="<span style='background:#1a1a2a;color:#c084fc;padding:1px 7px;border-radius:5px;font-size:10px'>"+esc(item.genero)+"</span>";
           if(_valdBadge) h+=_valdBadge;
           if(_lpStatus) h+="<span style='background:#22c55e22;color:#22c55e;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>🔫 Em carga: "+esc(_lpStatus.pol||"—")+"</span>";
+          // Badge situacao_carga
+          if(item.tipo_carga==="fixa"||item.tipo_carga==="pessoal"){
+            var _scNome=(item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+esc(item.carga_responsavel_nome||"—");
+            h+="<span style='background:#4a9fd422;color:#4a9fd4;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>📋 Carga individual: "+_scNome+"</span>";
+          } else {
+            h+="<span style='background:#33333322;color:#888;padding:1px 8px;border-radius:5px;font-size:10px'>📦 Em estoque</span>";
+          }
           h+="</div>";
           h+="<div style='color:#888;font-size:11px;margin-top:2px'>";
           if(item.tombamento) h+="<span style='color:#d4a87a'>Nº "+esc(item.tombamento)+"</span> · ";
