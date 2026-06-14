@@ -13850,6 +13850,10 @@ function renderTela() {
     renderFilaEncaminhamentos(main);
     return;
   }
+  if(tela==="devolutivas"){
+    renderDevolutivas(main);
+    return;
+  }
 
   // AGENDAMENTOS
   if(tela==="agendamentos"){
@@ -14446,6 +14450,12 @@ function render(){
         var _ativo=state.tela==="encaminhamentos";
         var _badge=_nEnc>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";"+"color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nEnc+"</span>":"";
         return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"encaminhamentos\")'>📤 Encaminhamentos"+_badge+"</button>";
+      })()}
+      ${(function(){
+        var _nDev=(state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length;
+        var _ativo=state.tela==="devolutivas";
+        var _badge=_nDev>0?"<span style='background:"+(_ativo?"#fff":"#22c55e")+";"+"color:"+(_ativo?"#22c55e":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nDev+" novo</span>":"";
+        return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"devolutivas\")' style='color:#22c55e;border-color:"+(_ativo?"#22c55e":"transparent")+((_nDev>0&&!_ativo)?";animation:piscar-suave 2s infinite":"")+"'>↩ Devolutivas"+_badge+"</button>";
       })()}
       <button class="nav-btn${state.tela==="calendario"?" active":""}" data-tela="calendario" onclick="setTela('calendario')">🗓 Calendário</button>
       <button class="nav-btn${state.tela==="dashvcm"?" active":""}" data-tela="dashvcm" onclick="setTela('dashvcm')" style="${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0&&state.tela!=="dashvcm"?"animation:piscar-rosa 1.4s infinite;color:#ff69b4;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";";})()}">🌸 Dashboard VCM${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0?` <span style="background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${_n}</span>`:"";})()}</button>
@@ -20553,6 +20563,171 @@ function _invSalvarConferencia(confId, concluir){
 function _invAplicarFiltros(){
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PAINEL DE DEVOLUTIVAS
+// ══════════════════════════════════════════════════════════════════
+function renderDevolutivas(main){
+  state._devTab = state._devTab||"aguardando";
+  var encs = state.encaminhamentos||[];
+  var hoje15 = new Date(); hoje15.setDate(hoje15.getDate()-15);
+  var hoje7  = new Date(); hoje7.setDate(hoje7.getDate()-7);
+  var hojeNow = new Date();
+
+  // Classificar encaminhamentos
+  var _aguard = encs.filter(function(e){
+    return (e.status==="aguardando_devolutiva"||e.status==="enviado")&&!e.relato_devolutiva;
+  });
+  var _receb  = encs.filter(function(e){ return !!e.relato_devolutiva; });
+  var _venc   = encs.filter(function(e){
+    var dtEnv=e.data_envio?new Date(e.data_envio):null;
+    return (e.status==="aguardando_devolutiva"||e.status==="enviado")&&!e.relato_devolutiva&&dtEnv&&dtEnv<hoje15;
+  });
+  var _nNovos = _receb.filter(function(e){return !e.registrado_na_ficha;}).length;
+
+  var h=[];
+  h.push("<div style='max-width:860px;margin:0 auto'>");
+  // Header
+  h.push("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px'>");
+  h.push("<div><h2 style='font-size:20px;font-weight:800;color:#f5ede0;margin:0'>↩ Devolutivas dos Órgãos</h2><p style='color:#5e4636;font-size:11px;margin:2px 0 0'>Respostas dos órgãos parceiros — CRAV, CREAS, Conselho Tutelar, MP</p></div>");
+  h.push("<button onclick=\"state.tela='encaminhamentos';render()\" style='background:#2a1c10;border:1px solid #4a3224;color:#8a6a4a;padding:7px 14px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer'>📤 Ver Fila</button>");
+  h.push("</div>");
+
+  // Abas
+  h.push("<div style='display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid #4a3224'>");
+  [["aguardando","⏳ Aguardando",_aguard.length,"#f59e0b"],["recebidas","✅ Recebidas",_receb.length,"#22c55e"],["vencidas","🔴 Vencidas",_venc.length,"#ef4444"]].forEach(function(ab){
+    var ativ=state._devTab===ab[0];
+    var cor=ativ?ab[3]:"#8a6a4a";
+    h.push("<button onclick=\"state._devTab='"+ab[0]+"';renderDevolutivas(document.getElementById('main')||document.getElementById('main-content'))\" style='padding:10px 18px;background:transparent;border:none;border-bottom:3px solid "+(ativ?ab[3]:"transparent")+";color:"+cor+";font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px'>"+ab[1]);
+    if(ab[2]>0) h.push("<span style='background:"+(ativ?ab[3]+"22":"#4a3224")+";color:"+(ativ?ab[3]:"#5e4636")+";padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700'>"+ab[2]+"</span>");
+    h.push("</button>");
+  });
+  h.push("</div>");
+
+  function _orgLabel(o){ var m={crav:"CRAV",creas:"CREAS",mp:"MP",delegacia:"Delegacia",defensoria:"Defensoria",conselho_tutelar:"Conselho Tutelar",saude:"Saúde"}; return m[o]||(o||"—"); }
+  function _diasAtras(d){ if(!d) return null; return Math.floor((hojeNow-new Date(d))/864e5); }
+
+  // ── ABA AGUARDANDO ────────────────────────────────
+  if(state._devTab==="aguardando"){
+    if(!_aguard.length){
+      h.push("<div style='text-align:center;padding:60px 20px'><p style='font-size:40px;margin-bottom:12px'>✓</p><p style='color:#5e4636;font-size:13px'>Nenhum encaminhamento aguardando resposta.</p></div>");
+    } else {
+      h.push("<div style='display:flex;flex-direction:column;gap:8px'>");
+      _aguard.forEach(function(e){
+        var vit=e.vitima_id?(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;}):null;
+        var dias=_diasAtras(e.data_envio);
+        var tarde=dias!==null&&dias>7;
+        h.push("<div style='background:#2a1c10;border:1px solid "+(tarde?"#f59e0b44":"#4a3224")+";border-left:3px solid "+(tarde?"#f59e0b":"#4a3224")+";border-radius:10px;padding:14px 16px'>");
+        h.push("<div style='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px'>");
+        h.push("<span style='background:#2a2a0a;color:#f59e0b;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700'>"+_orgLabel(e.orgao)+"</span>");
+        if(vit) h.push("<span style='color:#f5ede0;font-size:12px;font-weight:600'>"+esc(vit.nome||"—")+"</span>");
+        h.push("<span style='color:#5e4636;font-size:11px;margin-left:auto'>"+(dias!==null?dias+" dia(s) sem resposta":"sem data de envio")+"</span>");
+        if(tarde) h.push("<span style='background:#f59e0b22;color:#f59e0b;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700'>⚠ Atrasado</span>");
+        h.push("</div>");
+        // Link devolutiva
+        var _token=e.token||("enc_"+e.id+"_"+Math.random().toString(36).slice(2,8));
+        var _link=window.location.origin+window.location.pathname.replace("index.html","")+"crav-devolutiva.html?token="+_token+"&enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"");
+        h.push("<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'>");
+        h.push("<input readonly value='"+esc(_link)+"' style='flex:1;min-width:200px;background:#36221a;border:1px solid #4a3224;color:#8a6a4a;padding:6px 10px;border-radius:6px;font-size:11px;font-family:monospace' onclick='this.select()'/>");
+        h.push("<button onclick=\"navigator.clipboard.writeText('"+esc(_link)+"').then(function(){showToast('Link copiado!','success')})\" style='background:#1a3a1a;border:1px solid #2a6a2a;color:#4a9a4a;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>📋 Copiar</button>");
+        h.push("<button onclick=\"_reenviarDevolutiva('"+e.id+"')\" style='background:#1a0e00;border:1px solid #4a3224;color:#d4a87a;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>🔄 Reenviar</button>");
+        h.push("</div>");
+        h.push("</div>");
+      });
+      h.push("</div>");
+    }
+  }
+
+  // ── ABA RECEBIDAS ─────────────────────────────────
+  if(state._devTab==="recebidas"){
+    if(!_receb.length){
+      h.push("<div style='text-align:center;padding:60px 20px'><p style='font-size:40px;margin-bottom:12px'>📭</p><p style='color:#5e4636;font-size:13px'>Nenhuma devolutiva recebida ainda.</p></div>");
+    } else {
+      if(_nNovos>0) h.push("<div style='margin-bottom:12px;padding:10px 14px;background:#0a1a0a;border:1px solid #22c55e44;border-radius:8px;display:flex;align-items:center;gap:8px'><span style='color:#22c55e;font-size:13px;font-weight:700'>"+_nNovos+" devolutiva(s) nova(s) — clique em \"Registrar na ficha\" para documentar.</span></div>");
+      h.push("<div style='display:flex;flex-direction:column;gap:8px'>");
+      _receb.forEach(function(e){
+        var vit=e.vitima_id?(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;}):null;
+        var novo=!e.registrado_na_ficha;
+        h.push("<div style='background:#2a1c10;border:1px solid "+(novo?"#22c55e44":"#4a3224")+";border-left:3px solid "+(novo?"#22c55e":"#3a2818")+";border-radius:10px;padding:14px 16px'>");
+        h.push("<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap'>");
+        h.push("<span style='background:#0a1a0a;color:#22c55e;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700'>"+_orgLabel(e.orgao)+"</span>");
+        if(vit) h.push("<span style='color:#f5ede0;font-size:12px;font-weight:600'>"+esc(vit.nome||"—")+"</span>");
+        if(novo) h.push("<span style='background:#22c55e22;color:#22c55e;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-left:auto'>NOVO</span>");
+        h.push("</div>");
+        h.push("<p style='color:#c8b07a;font-size:12px;line-height:1.6;margin:0 0 10px;background:#36221a;padding:10px 12px;border-radius:8px'>"+esc(e.relato_devolutiva||"—")+"</p>");
+        if(e.resultado_devolutiva) h.push("<p style='color:#8a6a4a;font-size:11px;margin:0 0 8px'>Resultado: <strong style='color:#f5ede0'>"+esc(e.resultado_devolutiva)+"</strong></p>");
+        if(e.responsavel_devolutiva) h.push("<p style='color:#5e4636;font-size:10px;margin:0 0 8px'>👤 "+esc(e.responsavel_devolutiva)+"</p>");
+        if(novo){
+          h.push("<button onclick=\"_registrarNaFicha('"+e.id+"')\" style='background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>✅ Registrar na ficha</button>");
+        } else {
+          h.push("<span style='color:#3a6a3a;font-size:11px'>✓ Registrado na ficha em "+(e.registrado_em||"—")+"</span>");
+        }
+        h.push("</div>");
+      });
+      h.push("</div>");
+    }
+  }
+
+  // ── ABA VENCIDAS ──────────────────────────────────
+  if(state._devTab==="vencidas"){
+    if(!_venc.length){
+      h.push("<div style='text-align:center;padding:60px 20px'><p style='font-size:40px;margin-bottom:12px'>🟢</p><p style='color:#5e4636;font-size:13px'>Nenhum encaminhamento vencido. Ótimo!</p></div>");
+    } else {
+      h.push("<div style='margin-bottom:12px;padding:10px 14px;background:#1a0000;border:1px solid #ef444422;border-radius:8px'><p style='color:#f87171;font-size:12px;margin:0'>"+_venc.length+" encaminhamento(s) sem resposta há mais de 15 dias. Use o botão \"Reenviar link\" para enviar novo formulário.</p></div>");
+      h.push("<div style='display:flex;flex-direction:column;gap:8px'>");
+      _venc.forEach(function(e){
+        var vit=e.vitima_id?(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;}):null;
+        var dias=_diasAtras(e.data_envio)||"?";
+        h.push("<div style='background:#1a0000;border:1px solid #ef444444;border-left:3px solid #ef4444;border-radius:10px;padding:14px 16px'>");
+        h.push("<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px'>");
+        h.push("<span style='background:#1a0000;color:#ef4444;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700'>"+_orgLabel(e.orgao)+"</span>");
+        if(vit) h.push("<span style='color:#f5ede0;font-size:12px;font-weight:600'>"+esc(vit.nome||"—")+"</span>");
+        h.push("<span style='color:#ef4444;font-size:11px;margin-left:auto'>"+dias+" dias sem resposta</span>");
+        h.push("</div>");
+        h.push("<button onclick=\"_reenviarDevolutiva('"+e.id+"')\" style='background:#1a0000;border:1px solid #ef444466;color:#f87171;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>🔄 Reenviar Link</button>");
+        h.push("</div>");
+      });
+      h.push("</div>");
+    }
+  }
+
+  h.push("</div>");
+  main.innerHTML=h.join("");
+
+  // Funções
+  window._reenviarDevolutiva = function(encId){
+    var e=(state.encaminhamentos||[]).find(function(x){return x.id===encId;});
+    if(!e) return;
+    e.token = "enc_"+e.id+"_"+Date.now();
+    e.token_expira = new Date(Date.now()+30*864e5).toISOString().slice(0,10);
+    e.token_usado = false;
+    e.data_envio = new Date().toISOString().slice(0,10);
+    e.status = "aguardando_devolutiva";
+    localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
+    var _link=window.location.origin+window.location.pathname.replace("index.html","")+"crav-devolutiva.html?token="+e.token+"&enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"");
+    navigator.clipboard.writeText(_link).then(function(){showToast("Novo link gerado e copiado!","success");}).catch(function(){});
+    renderDevolutivas(main);
+  };
+  window._registrarNaFicha = function(encId){
+    var e=(state.encaminhamentos||[]).find(function(x){return x.id===encId;});
+    if(!e) return;
+    e.registrado_na_ficha = true;
+    e.registrado_em = new Date().toLocaleDateString("pt-BR");
+    e.status = "concluido";
+    // Adicionar na linha do tempo da vítima
+    if(e.vitima_id){
+      var vit=(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;});
+      if(vit){
+        vit.historico = vit.historico||[];
+        vit.historico.push({data:new Date().toISOString().slice(0,10),tipo:"devolutiva",descricao:"Devolutiva de "+_orgLabel(e.orgao)+": "+e.relato_devolutiva,registradoEm:new Date().toLocaleString("pt-BR")});
+        localStorage.setItem("bcs_vitimas",JSON.stringify(state.vitimas));
+      }
+    }
+    localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
+    showToast("Devolutiva registrada na ficha da vítima!","success");
+    renderDevolutivas(main);
+  };
 }
 
 function renderInventario(main){
