@@ -14270,8 +14270,9 @@ function renderTela() {
       });
       return;
     }
-    // SUPER FILTRO
-    if(tela==="filtro"){
+    // SUPER FILTRO (extinto — seção 42; busca integrada em Ocorrências)
+    if(tela==="filtro"){ setTela("ocorrencias"); return; }
+    if(false && tela==="filtro"){
     const hoje2 = hoje();
     main.innerHTML=`
     <div style="max-width:720px;margin:0 auto">
@@ -15017,13 +15018,13 @@ function render(){
       <img src="${BCS_LOGO_B64}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="BCS"/>
       <div>
         <div style="font-size:12px;font-weight:700;color:#d4a87a;line-height:1.3">IARA</div>
-        <div style="font-size:10px;color:#5e4636;letter-spacing:1px">${state.perfil==="comandante"?"COMANDANTE":state.perfil==="gestor"||state.perfil==="operador"?"GESTOR / AUXILIAR":state.perfil==="conselho"?"CONSELHO":state.perfil==="guarnicao"?"GUARNIÇÃO":"INSTRUTOR"}</div>
+        <div style="font-size:10px;color:#5e4636;letter-spacing:1px">${state.perfil==="comandante"?"COMANDANTE":state.perfil==="gestor"||state.perfil==="operador"?"AUXILIAR":state.perfil==="conselho"?"CONSELHO":state.perfil==="guarnicao"?"GUARNIÇÃO":"INSTRUTOR"}</div>
       </div>
     </div>
     ${state.perfil==="guarnicao"?`
       <p style="color:#4a9fd466;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:4px 0 2px">Calendário</p>
       <button class="nav-btn${state.tela==="calendario"?" active":""}" data-tela="calendario" onclick="setTela('calendario')" style="color:#4a9fd4;border-color:${state.tela==="calendario"?"#4a9fd4":"transparent"}">🗓 Calendário / Agenda</button>
-    `:`${state.perfil==="operador"?`
+    `:`${false&&state.perfil==="operador"?`
       <button class="nav-btn${state.tela==="dashboard"?" active":""}" data-tela="dashboard" onclick="setTela('dashboard')">🛡 Painel</button>
       <button class="nav-btn${state.tela==="lancar"?" active":""}" onclick="setTela('lancar')">📝 Lançar Ocorrência</button>
       <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" onclick="setTela('ocorrencias')">📋 Ocorrências</button>
@@ -15049,7 +15050,6 @@ function render(){
         return n>0?` <span style="background:#ff4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${n}</span>`:"";
       })()}</button>
       <button class="nav-btn${state.tela==="avisos"?" active":""}" onclick="setTela('avisos')" style="${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0&&state.tela!=='avisos'?'animation:piscar 1s infinite;color:#d4a87a;':''}"">📣 Avisos${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0?` <span style="background:#d4a87a;color:#2a1c10;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length}</span>`:""}</button>
-      <button class="nav-btn${state.tela==="filtro"?" active":""}" data-tela="filtro" onclick="setTela('filtro')">🔍 Super Filtro</button>
       <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="color:${state.tela==='importar_zap'?'#d4a87a':'#d4a87a66'};border-color:${state.tela==='importar_zap'?'#d4a87a':'transparent'}">📥 Importar Dados</button>
       <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#10b981':'#10b98166'};border-color:${state.tela==='inventario'?'#10b981':'transparent'}">📦 Inventário</button>
     `:`
