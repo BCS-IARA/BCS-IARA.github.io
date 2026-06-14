@@ -15052,7 +15052,7 @@ function render(){
       })()}</button>
       <button class="nav-btn${state.tela==="avisos"?" active":""}" onclick="setTela('avisos')" style="${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0&&state.tela!=='avisos'?'animation:piscar 1s infinite;color:#d4a87a;':''}"">📣 Avisos${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0?` <span style="background:#d4a87a;color:#2a1c10;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length}</span>`:""}</button>
       <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="color:${state.tela==='importar_zap'?'#d4a87a':'#d4a87a66'};border-color:${state.tela==='importar_zap'?'#d4a87a':'transparent'}">📥 Importar Dados</button>
-      <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#10b981':'#10b98166'};border-color:${state.tela==='inventario'?'#10b981':'transparent'}">📦 Inventário</button>
+      <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#D9A53C':'#D9A53C66'};border-color:${state.tela==='inventario'?'#D9A53C':'transparent'}">📦 Inventário</button>
     `:`
       <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="background:${state.tela==='importar_zap'?'rgba(212,168,122,0.15)':'rgba(200,168,75,0.06)'};border:1px solid ${state.tela==='importar_zap'?'#d4a87a':'rgba(200,168,75,0.3)'};color:#d4a87a;font-weight:700;margin-bottom:8px">📥 Importar Dados</button>
       <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:4px 0 2px">Operacional</p>
@@ -15091,7 +15091,7 @@ function render(){
       <button class="nav-btn${state.tela==="conselho"?" active":""}" data-tela="conselho" onclick="setTela('conselho')" style="color:${state.tela==="conselho"?"var(--ambar)":"var(--ambar-claro)"};border-color:${state.tela==="conselho"?"var(--ambar)":"transparent"}">👥 Conselho Comunitário</button>
       <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:8px 0 2px">Módulos</p>
       <button class="nav-btn${state.tela==="armamento"?" active":""}" data-tela="armamento" onclick="setTela('armamento')" style="color:${state.tela==='armamento'?'#60a5fa':'#60a5fa66'};border-color:${state.tela==='armamento'?'#60a5fa':'transparent'}">🔫 Livro de Parte</button>
-      <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#10b981':'#10b98166'};border-color:${state.tela==='inventario'?'#10b981':'transparent'}">📦 Inventário</button>
+      <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#D9A53C':'#D9A53C66'};border-color:${state.tela==='inventario'?'#D9A53C':'transparent'}">📦 Inventário</button>
       <button class="nav-btn${state.tela==="solicitacoes"?" active":""}" data-tela="solicitacoes" onclick="setTela('solicitacoes')" style="color:${state.tela==='solicitacoes'?'#d4a87a':'#d4a87a66'};border-color:${state.tela==='solicitacoes'?'#d4a87a':'transparent'}">${(function(){ var n=(state.solicitacoes||[]).filter(function(s){return s.status==="pendente";}).length; return "📄 Solicitações"+(n>0?" <span style='background:#d4a87a;color:#1a0e00;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+n+"</span>":""); })()}</button>
       <button class="nav-btn${state.tela==="assistente"?" active":""}" data-tela="assistente" onclick="setTela('assistente')" style="color:${state.tela==="assistente"?"#6B5236":"#6B523688"};border-color:${state.tela==="assistente"?"#6B5236":"transparent"}">🤖 Assistente IA</button>
       <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:8px 0 2px">Comando</p>
@@ -16104,9 +16104,9 @@ function _renderPatrimonioCadastro(h,IS){
   var _jaNoInv=(state.invItens||[]).filter(function(x){return x.categoria==="material_belico";}).length;
   var _totalPat=(state.materiaisPatrimonio||[]).filter(function(x){return (x.status||"ativo")==="ativo";}).length;
   var _naoMigrados=_totalPat-_jaNoInv;
-  h.push("<div style='background:#0a1a0a;border:1px solid #10b98144;border-radius:10px;padding:12px 16px;margin-bottom:14px'>");
-  h.push("<p style='color:#10b981;font-size:12px;font-weight:700;margin:0'>📦 Patrimônio Bélico</p>");
-  h.push("<p style='color:#5a8a6a;font-size:11px;margin:2px 0 0'>"+_jaNoInv+" item(s) cadastrados · Gerenciar no módulo Inventário</p>");
+  h.push("<div style='background:#EAD9B8;border:1px solid #A87B22;border-radius:10px;padding:12px 16px;margin-bottom:14px'>");
+  h.push("<p style='color:#D9A53C;font-size:12px;font-weight:700;margin:0'>📦 Patrimônio Bélico</p>");
+  h.push("<p style='color:#6B5236;font-size:11px;margin:2px 0 0'>"+_jaNoInv+" item(s) cadastrados · Gerenciar no módulo Inventário</p>");
   h.push("</div>");
 
   // Banner legado — novos itens devem ir para o Inventário (Trilho B)
@@ -20562,85 +20562,86 @@ function _invAbrirItem(id){
   var tipoCarga = item?(item.tipo_carga||"none"):"none";
 
   var html = "<div id='modal-inv-item' style='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto'>";
-  html += "<div style='background:#111;border:1px solid #2a3a2a;border-radius:14px;width:100%;max-width:620px;padding:0;display:flex;flex-direction:column;max-height:calc(100vh - 32px);margin-bottom:16px'>";
+  html += "<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:620px;padding:0;display:flex;flex-direction:column;max-height:calc(100vh - 32px);margin-bottom:16px'>";
   // Cabeçalho fixo
-  html += "<div style='background:#0a1a0a;padding:14px 20px;border-bottom:1px solid #1a2a1a;display:flex;justify-content:space-between;align-items:center;border-radius:14px 14px 0 0;flex-shrink:0;position:sticky;top:0;z-index:1'>";
-  html += "<span style='color:#10b981;font-size:15px;font-weight:700'>📦 "+(ed?"Editar Item":"Novo Item")+"</span>";
+  html += "<div style='background:#2a1c10;padding:14px 20px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center;border-radius:14px 14px 0 0;flex-shrink:0;position:sticky;top:0;z-index:1'>";
+  html += "<span style='color:#D9A53C;font-size:15px;font-weight:700'>📦 "+(ed?"Editar Item":"Novo Item")+"</span>";
   html += "<button onclick=\"document.getElementById('modal-inv-item').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html += "</div>";
   // Corpo com scroll
   html += "<div style='padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex:1'>";
 
+  var ISm="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
   // Tombamento + descrição
   html += "<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px'>";
-  html += "<div><label style='color:#999;font-size:11px'>Tombamento/Nº</label><input id='inv-tomb' value='"+(item?esc(item.tombamento||""):"")+"' placeholder='Nº patrimônio' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Descrição*</label><input id='inv-desc' value='"+(item?esc(item.descricao||""):"")+"' placeholder='Descrição do item' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Tombamento/Nº</label><input id='inv-tomb' value='"+(item?esc(item.tombamento||""):"")+"' placeholder='Nº patrimônio' style='"+ISm+"'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Descrição*</label><input id='inv-desc' value='"+(item?esc(item.descricao||""):"")+"' placeholder='Descrição do item' style='"+ISm+"'></div>";
   html += "</div>";
 
   // Categoria + subcategoria
   html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
-  html += "<div><label style='color:#999;font-size:11px'>Categoria*</label><select id='inv-cat' onchange='_invAtualizarSubs()' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Categoria*</label><select id='inv-cat' onchange='_invAtualizarSubs()' style='"+ISm+"'>";
   cats.forEach(function(k){html+="<option value='"+k+"'"+(catSel===k?" selected":"")+">"+INV_CATS[k].label+"</option>";});
   html += "</select></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Subcategoria</label><select id='inv-sub' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>"+subOpts+"</select></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Subcategoria</label><select id='inv-sub' style='"+ISm+"'>"+subOpts+"</select></div>";
   html += "</div>";
 
   // Marca + modelo + nº série
   html += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px'>";
-  html += "<div><label style='color:#999;font-size:11px'>Marca</label><input id='inv-marca' value='"+(item?esc(item.marca||""):"")+"' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Modelo</label><input id='inv-modelo' value='"+(item?esc(item.modelo||""):"")+"' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Nº Série</label><input id='inv-serie' value='"+(item?esc(item.numero_serie||""):"")+"' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Marca</label><input id='inv-marca' value='"+(item?esc(item.marca||""):"")+"' style='"+ISm+"'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Modelo</label><input id='inv-modelo' value='"+(item?esc(item.modelo||""):"")+"' style='"+ISm+"'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Nº Série</label><input id='inv-serie' value='"+(item?esc(item.numero_serie||""):"")+"' style='"+ISm+"'></div>";
   html += "</div>";
 
   // Estado + localização + data aquisição
   html += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px'>";
-  html += "<div><label style='color:#999;font-size:11px'>Estado*</label><select id='inv-estado' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>"+stOpts+"</select></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Localização*</label><select id='inv-local' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>"+locOpts+"</select></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Data Aquisição</label><input id='inv-dtaq' type='date' value='"+(item?item.data_aquisicao||"":"")+"' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Estado*</label><select id='inv-estado' style='"+ISm+"'>"+stOpts+"</select></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Localização*</label><select id='inv-local' style='"+ISm+"'>"+locOpts+"</select></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Data Aquisição</label><input id='inv-dtaq' type='date' value='"+(item?item.data_aquisicao||"":"")+"' style='"+ISm+"'></div>";
   html += "</div>";
 
   // Campos específicos: tamanho, gênero, data de validade
-  html += "<div style='border:1px solid #2a2a1a;border-radius:8px;padding:12px;background:#0d0d08'>";
-  html += "<p style='color:#d4a87a;font-size:11px;font-weight:700;margin:0 0 10px'>📐 Características Adicionais <span style='color:#555;font-size:10px;font-weight:400'>(colete, EPI, equipamento com validade)</span></p>";
+  html += "<div style='border:1px solid #DBC79E;border-radius:8px;padding:12px;background:#EAD9B8'>";
+  html += "<p style='color:#6B5236;font-size:11px;font-weight:700;margin:0 0 10px'>📐 Características Adicionais <span style='color:#a07c58;font-size:10px;font-weight:400'>(colete, EPI, equipamento com validade)</span></p>";
   html += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px'>";
   // Tamanho
   var tmOpts=["","PP","P","M","G","GG","XG","XGG","Único"].map(function(t){return "<option value='"+t+"'"+(item&&item.tamanho===t?" selected":"")+">"+( t||"— Não se aplica")+"</option>";}).join("");
-  html += "<div><label style='color:#999;font-size:11px'>Tamanho</label><select id='inv-tamanho' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>"+tmOpts+"</select></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Tamanho</label><select id='inv-tamanho' style='"+ISm+"'>"+tmOpts+"</select></div>";
   // Gênero
   var gnOpts=["","Masculino","Feminino","Unissex"].map(function(g){return "<option value='"+g+"'"+(item&&item.genero===g?" selected":"")+">"+( g||"— Não se aplica")+"</option>";}).join("");
-  html += "<div><label style='color:#999;font-size:11px'>Gênero</label><select id='inv-genero' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>"+gnOpts+"</select></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Gênero</label><select id='inv-genero' style='"+ISm+"'>"+gnOpts+"</select></div>";
   // Data de validade — calcula automaticamente +6 anos se tiver data de aquisição
   var dtVenc = item && item.data_validade ? item.data_validade : "";
-  html += "<div><label style='color:#d4a87a;font-size:11px;font-weight:700'>Data de Validade</label>";
-  html += "<input id='inv-validade' type='date' value='"+dtVenc+"' style='width:100%;background:#1a1a1a;border:1px solid #d4a87a55;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>";
-  html += "<button type='button' onclick='_invAutoValidade()' style='width:100%;margin-top:4px;background:#1a1a08;border:1px solid #d4a87a44;color:#d4a87a;padding:4px;border-radius:5px;font-size:10px;cursor:pointer'>⚡ +6 anos da aquisição</button>";
+  html += "<div><label style='color:#D9A53C;font-size:11px;font-weight:700'>Data de Validade</label>";
+  html += "<input id='inv-validade' type='date' value='"+dtVenc+"' style='"+ISm+"'>";
+  html += "<button type='button' onclick='_invAutoValidade()' style='width:100%;margin-top:4px;background:#2a1c10;border:1px solid #C8A84B44;color:#C8A84B;padding:4px;border-radius:5px;font-size:10px;cursor:pointer'>⚡ +6 anos da aquisição</button>";
   html += "</div>";
   html += "</div></div>";
 
   // Observações
-  html += "<div><label style='color:#999;font-size:11px'>Observações</label><textarea id='inv-obs' rows='2' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box'>"+(item?esc(item.observacoes||""):"")+"</textarea></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Observações</label><textarea id='inv-obs' rows='2' style='"+ISm+";resize:vertical'>"+(item?esc(item.observacoes||""):"")+"</textarea></div>";
 
   // Foto
   html += "<div>";
-  html += "<label style='color:#999;font-size:11px'>Foto do Item</label>";
+  html += "<label style='color:#6B5236;font-size:11px'>Foto do Item</label>";
   html += "<div style='display:flex;align-items:center;gap:10px;margin-top:4px'>";
   if(item&&item.foto){
-    html += "<img id='inv-foto-prev' src='"+item.foto+"' style='width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #333'>";
+    html += "<img id='inv-foto-prev' src='"+item.foto+"' style='width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #DBC79E'>";
   } else {
-    html += "<div id='inv-foto-prev' style='width:80px;height:60px;background:#1a1a1a;border:1px dashed #333;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px'>Sem foto</div>";
+    html += "<div id='inv-foto-prev' style='width:80px;height:60px;background:#EAD9B8;border:1px dashed #A87B22;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#a07c58;font-size:10px'>Sem foto</div>";
   }
-  html += "<label style='cursor:pointer;background:#1a2a1a;border:1px solid #22c55e44;color:#22c55e;padding:6px 12px;border-radius:6px;font-size:12px'>📷 Selecionar<input type='file' accept='image/*' style='display:none' onchange='_invFotoSelecionada(this)'></label>";
+  html += "<label style='cursor:pointer;background:#EAD9B8;border:1px solid #A87B22;color:#6B5236;padding:6px 12px;border-radius:6px;font-size:12px'>📷 Selecionar<input type='file' accept='image/*' style='display:none' onchange='_invFotoSelecionada(this)'></label>";
   html += "<input type='hidden' id='inv-foto-data' value='"+(item&&item.foto?item.foto:"")+"'>";
   html += "</div></div>";
 
   // Tipo de carga
   // "Carga Fixa" = item formalmente entregue a um policial responsável (assina o termo)
-  html += "<div style='border:1px solid #1a3a1a;border-radius:8px;padding:14px;background:#0a1a0a'>";
-  html += "<label style='color:#10b981;font-size:12px;font-weight:700;display:block;margin-bottom:4px'>📋 Carga</label>";
-  html += "<p style='color:#5a8a6a;font-size:10px;margin:0 0 10px'>Carga Fixa: o policial assina e fica formalmente responsável pelo item</p>";
+  html += "<div style='border:1px solid #A87B22;border-radius:8px;padding:14px;background:#EAD9B8'>";
+  html += "<label style='color:#D9A53C;font-size:12px;font-weight:700;display:block;margin-bottom:4px'>📋 Carga</label>";
+  html += "<p style='color:#6B5236;font-size:10px;margin:0 0 10px'>Carga Fixa: o policial assina e fica formalmente responsável pelo item</p>";
   html += "<div style='display:flex;gap:8px;margin-bottom:12px'>";
-  html += "<button id='inv-carga-btn-none' onclick=\"_invSetTipoCarga('none')\" type='button' style='flex:1;padding:8px;border:1px solid #333;border-radius:6px;color:#aaa;font-size:12px;cursor:pointer;background:"+(tipoCarga==="none"?"#1a1a1a":"transparent")+"'>Sem Carga</button>";
-  html += "<button id='inv-carga-btn-fixa' onclick=\"_invSetTipoCarga('fixa')\" type='button' style='flex:1;padding:8px;border:1px solid #10b981;border-radius:6px;color:#10b981;font-size:12px;font-weight:700;cursor:pointer;background:"+(tipoCarga==="fixa"?"#0a2a1a":"transparent")+"'>✅ Carga Fixa</button>";
+  html += "<button id='inv-carga-btn-none' onclick=\"_invSetTipoCarga('none')\" type='button' style='flex:1;padding:8px;border:1px solid #5e4636;border-radius:6px;color:#6B5236;font-size:12px;cursor:pointer;background:"+(tipoCarga==="none"?"#DBC79E":"transparent")+"'>Sem Carga</button>";
+  html += "<button id='inv-carga-btn-fixa' onclick=\"_invSetTipoCarga('fixa')\" type='button' style='flex:1;padding:8px;border:1px solid #D9A53C;border-radius:6px;color:#D9A53C;font-size:12px;font-weight:700;cursor:pointer;background:"+(tipoCarga==="fixa"?"#2a1c10":"transparent")+"'>✅ Carga Fixa</button>";
   html += "</div>";
   html += "<input type='hidden' id='inv-tipo-carga-val' value='"+tipoCarga+"'>";
   // Oculta os botões antigos de pessoal — carga fixa agora é o único modo com policial
@@ -20650,29 +20651,30 @@ function _invAbrirItem(id){
   html += "<div id='inv-sec-fixa' style='display:"+(tipoCarga==="fixa"?"block":"none")+";margin-bottom:10px'>";
 
   // ─── Quem recebe (policial responsável) ────────────────────────
-  html += "<div style='background:#0d1f0d;border:1px solid #1a3a1a;border-radius:7px;padding:12px;margin-bottom:10px'>";
-  html += "<p style='color:#4ade80;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>👮 Policial que Recebe a Carga</p>";
+  html += "<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:7px;padding:12px;margin-bottom:10px'>";
+  html += "<p style='color:#3a7a4a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>👮 Policial que Recebe a Carga</p>";
   html += "<div style='display:grid;grid-template-columns:100px 1fr 140px;gap:8px;margin-bottom:10px'>";
-  html += "<div><label style='color:#999;font-size:11px'>Graduação</label><input id='inv-carga-grad' value='"+(item?esc(item.carga_responsavel_grad||""):"")+"' placeholder='Ex: 3°Sgt' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Nome *</label><input id='inv-carga-nome' value='"+(item?esc(item.carga_responsavel_nome||""):"")+"' placeholder='Nome completo' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Matrícula</label><input id='inv-carga-mat' value='"+(item?esc(item.carga_responsavel_matricula||""):"")+"' placeholder='Nº matrícula' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
+  var ISinv="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Graduação</label><input id='inv-carga-grad' value='"+(item?esc(item.carga_responsavel_grad||""):"")+"' placeholder='Ex: 3°Sgt' style='"+ISinv+"'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Nome *</label><input id='inv-carga-nome' value='"+(item?esc(item.carga_responsavel_nome||""):"")+"' placeholder='Nome completo' style='"+ISinv+"'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Matrícula</label><input id='inv-carga-mat' value='"+(item?esc(item.carga_responsavel_matricula||""):"")+"' placeholder='Nº matrícula' style='"+ISinv+"'></div>";
   html += "</div>";
-  html += "<label style='color:#999;font-size:11px'>Assinatura de quem recebe</label>";
-  html += "<div style='position:relative;margin-top:4px;border:1px solid #1a3a1a;border-radius:8px;background:#fff'>";
+  html += "<label style='color:#6B5236;font-size:11px'>Assinatura de quem recebe</label>";
+  html += "<div style='position:relative;margin-top:4px;border:1px solid #DBC79E;border-radius:8px;background:#fff'>";
   html += "<canvas id='inv-pad-canvas' width='500' height='160' style='width:100%;height:160px;border-radius:8px;display:block;cursor:crosshair;touch-action:none'></canvas>";
   html += "<button type='button' onclick='_invLimparPad(\"inv-pad-canvas\")' style='position:absolute;top:5px;right:6px;background:#f0f0f0;border:1px solid #ccc;color:#555;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
   html += "</div></div>";
 
   // ─── Quem libera (responsável pelo almoxarifado/arsenal) ────────
-  html += "<div style='background:#1a0d0a;border:1px solid #3a1a0a;border-radius:7px;padding:12px;margin-bottom:4px'>";
-  html += "<p style='color:#d4a87a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>🗝️ Responsável que Libera a Carga</p>";
+  html += "<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:7px;padding:12px;margin-bottom:4px'>";
+  html += "<p style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>🗝️ Responsável que Libera a Carga</p>";
   html += "<div style='display:grid;grid-template-columns:100px 1fr 140px;gap:8px;margin-bottom:10px'>";
-  html += "<div><label style='color:#999;font-size:11px'>Graduação</label><input id='inv-lib-grad' value='"+(item?esc(item.carga_liberador_grad||""):"")+"' placeholder='Ex: Sgt' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Nome *</label><input id='inv-lib-nome' value='"+(item?esc(item.carga_liberador_nome||""):"")+"' placeholder='Nome do responsável' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
-  html += "<div><label style='color:#999;font-size:11px'>Matrícula</label><input id='inv-lib-mat' value='"+(item?esc(item.carga_liberador_matricula||""):"")+"' placeholder='Nº matrícula' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Graduação</label><input id='inv-lib-grad' value='"+(item?esc(item.carga_liberador_grad||""):"")+"' placeholder='Ex: Sgt' style='"+ISinv+"'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Nome *</label><input id='inv-lib-nome' value='"+(item?esc(item.carga_liberador_nome||""):"")+"' placeholder='Nome do responsável' style='"+ISinv+"'></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Matrícula</label><input id='inv-lib-mat' value='"+(item?esc(item.carga_liberador_matricula||""):"")+"' placeholder='Nº matrícula' style='"+ISinv+"'></div>";
   html += "</div>";
-  html += "<label style='color:#999;font-size:11px'>Assinatura de quem libera</label>";
-  html += "<div style='position:relative;margin-top:4px;border:1px solid #3a1a0a;border-radius:8px;background:#fff'>";
+  html += "<label style='color:#6B5236;font-size:11px'>Assinatura de quem libera</label>";
+  html += "<div style='position:relative;margin-top:4px;border:1px solid #DBC79E;border-radius:8px;background:#fff'>";
   html += "<canvas id='inv-pad-lib' width='500' height='160' style='width:100%;height:160px;border-radius:8px;display:block;cursor:crosshair;touch-action:none'></canvas>";
   html += "<button type='button' onclick='_invLimparPad(\"inv-pad-lib\")' style='position:absolute;top:5px;right:6px;background:#f0f0f0;border:1px solid #ccc;color:#555;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
   html += "</div></div>";
@@ -20689,8 +20691,8 @@ function _invAbrirItem(id){
 
   // Botões
   html += "<div style='display:flex;gap:10px;justify-content:flex-end;margin-top:4px'>";
-  html += "<button onclick=\"document.getElementById('modal-inv-item').remove()\" style='background:transparent;border:1px solid #333;color:#888;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
-  html += "<button onclick='_invSalvarItem(\""+esc(id||"")+"\")'  style='background:#10b981;border:none;color:#fff;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>💾 Salvar</button>";
+  html += "<button onclick=\"document.getElementById('modal-inv-item').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
+  html += "<button onclick='_invSalvarItem(\""+esc(id||"")+"\")'  style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>💾 Salvar</button>";
   html += "</div>";
 
   html += "</div></div></div>";
@@ -20830,7 +20832,7 @@ function _invAbrirMovimentacao(itemId){
   var item=(state.invItens||[]).find(function(x){return x.id===itemId;});
   if(!item) return;
   var todos=_invGetLocais();
-  var IS="width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
+  var IS="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
 
   var locOpts=todos.map(function(l){
     return "<option value='"+esc(l)+"'"+(l===item.localizacao?" disabled":"")+">"+esc(l)+"</option>";
@@ -20838,65 +20840,65 @@ function _invAbrirMovimentacao(itemId){
   locOpts+="<option value='__novo__'>+ Cadastrar novo local...</option>";
 
   var html="<div id='modal-inv-mov' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9100;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto'>";
-  html+="<div style='background:#111;border:1px solid #2a3a2a;border-radius:14px;width:100%;max-width:580px;padding:0;overflow:hidden;margin-bottom:40px'>";
+  html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:580px;padding:0;overflow:hidden;margin-bottom:40px'>";
 
   // Cabeçalho
-  html+="<div style='background:#0a1a0a;padding:14px 18px;border-bottom:1px solid #1a2a1a;display:flex;justify-content:space-between;align-items:center'>";
-  html+="<span style='color:#10b981;font-size:14px;font-weight:700'>🚛 Movimentação de Item</span>";
+  html+="<div style='background:#2a1c10;padding:14px 18px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center'>";
+  html+="<span style='color:#D9A53C;font-size:14px;font-weight:700'>🚛 Movimentação de Item</span>";
   html+="<button onclick=\"document.getElementById('modal-inv-mov').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html+="</div>";
 
   html+="<div style='padding:18px;display:flex;flex-direction:column;gap:14px'>";
 
   // Info do item
-  html+="<div style='background:#1a1208;border-radius:8px;padding:10px 14px'>";
-  html+="<span style='color:#d4a87a;font-size:11px'>Item: </span><span style='color:#e8e0d0;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</span>";
-  if(item.tombamento) html+=" <span style='color:#666;font-size:11px'>#"+esc(item.tombamento)+"</span>";
-  html+="<br><span style='color:#999;font-size:11px'>📍 Origem: <b>"+esc(item.localizacao||"Almoxarifado")+"</b></span>";
+  html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:10px 14px'>";
+  html+="<span style='color:#6B5236;font-size:11px'>Item: </span><span style='color:#3D2B1A;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</span>";
+  if(item.tombamento) html+=" <span style='color:#a07c58;font-size:11px'>#"+esc(item.tombamento)+"</span>";
+  html+="<br><span style='color:#6B5236;font-size:11px'>📍 Origem: <b>"+esc(item.localizacao||"Almoxarifado")+"</b></span>";
   html+="</div>";
 
   // Destino + motivo
   html+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
-  html+="<div><label style='color:#10b981;font-size:11px;font-weight:700;display:block;margin-bottom:4px'>Destino *</label>";
+  html+="<div><label style='color:#D9A53C;font-size:11px;font-weight:700;display:block;margin-bottom:4px'>Destino *</label>";
   html+="<select id='mov-dest' onchange='_invDestChange(this)' style='"+IS+"'>"+locOpts+"</select>";
-  html+="<div id='mov-novo-local' style='display:none;margin-top:6px'><input id='mov-novo-nome' placeholder='Nome do novo local' style='"+IS+"'/><button onclick='_invSalvarNovoLocal()' type='button' style='width:100%;background:#10b981;border:none;color:#fff;padding:6px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-top:4px'>+ Salvar Local</button></div>";
+  html+="<div id='mov-novo-local' style='display:none;margin-top:6px'><input id='mov-novo-nome' placeholder='Nome do novo local' style='"+IS+"'/><button onclick='_invSalvarNovoLocal()' type='button' style='width:100%;background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:6px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-top:4px'>+ Salvar Local</button></div>";
   html+="</div>";
-  html+="<div><label style='color:#999;font-size:11px;display:block;margin-bottom:4px'>Motivo / Observação</label>";
+  html+="<div><label style='color:#6B5236;font-size:11px;display:block;margin-bottom:4px'>Motivo / Observação</label>";
   html+="<input id='mov-motivo' placeholder='Ex: Uso em operação' style='"+IS+"'/></div>";
   html+="</div>";
 
   // Quem autoriza
-  html+="<div style='background:#1a0d08;border:1px solid #3a1a08;border-radius:8px;padding:12px'>";
-  html+="<p style='color:#d4a87a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>🗝️ Quem Autoriza a Movimentação</p>";
+  html+="<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:8px;padding:12px'>";
+  html+="<p style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>🗝️ Quem Autoriza a Movimentação</p>";
   html+="<div style='display:grid;grid-template-columns:90px 1fr 120px;gap:8px;margin-bottom:8px'>";
-  html+="<div><label style='color:#999;font-size:10px'>Graduação</label><input id='mov-aut-grad' placeholder='Sgt...' style='"+IS+"'></div>";
-  html+="<div><label style='color:#999;font-size:10px'>Nome *</label><input id='mov-aut-nome' placeholder='Nome completo' style='"+IS+"'></div>";
-  html+="<div><label style='color:#999;font-size:10px'>Matrícula</label><input id='mov-aut-mat' placeholder='Nº' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Graduação</label><input id='mov-aut-grad' placeholder='Sgt...' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Nome *</label><input id='mov-aut-nome' placeholder='Nome completo' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Matrícula</label><input id='mov-aut-mat' placeholder='Nº' style='"+IS+"'></div>";
   html+="</div>";
-  html+="<label style='color:#999;font-size:10px'>Assinatura de quem autoriza</label>";
-  html+="<div style='position:relative;margin-top:4px;border:1px solid #3a1a08;border-radius:7px;overflow:hidden'>";
+  html+="<label style='color:#6B5236;font-size:10px'>Assinatura de quem autoriza</label>";
+  html+="<div style='position:relative;margin-top:4px;border:1px solid #DBC79E;border-radius:7px;overflow:hidden'>";
   html+="<canvas id='mov-pad-aut' width='520' height='150' style='width:100%;height:150px;display:block;cursor:crosshair;touch-action:none;background:#fff'></canvas>";
   html+="<button type='button' onclick='_invLimparMovPad(\"mov-pad-aut\")' style='position:absolute;top:5px;right:6px;background:rgba(240,240,240,.9);border:1px solid #ccc;color:#555;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
   html+="</div></div>";
 
   // Quem recebe / responsável pelo local
-  html+="<div style='background:#0d1f0d;border:1px solid #1a3a1a;border-radius:8px;padding:12px'>";
-  html+="<p style='color:#4ade80;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>👮 Quem Recebe / Responsável pelo Local</p>";
+  html+="<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:8px;padding:12px'>";
+  html+="<p style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>👮 Quem Recebe / Responsável pelo Local</p>";
   html+="<div style='display:grid;grid-template-columns:90px 1fr 120px;gap:8px;margin-bottom:8px'>";
-  html+="<div><label style='color:#999;font-size:10px'>Graduação</label><input id='mov-rec-grad' placeholder='Sd...' style='"+IS+"'></div>";
-  html+="<div><label style='color:#999;font-size:10px'>Nome *</label><input id='mov-rec-nome' placeholder='Nome completo' style='"+IS+"'></div>";
-  html+="<div><label style='color:#999;font-size:10px'>Matrícula</label><input id='mov-rec-mat' placeholder='Nº' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Graduação</label><input id='mov-rec-grad' placeholder='Sd...' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Nome *</label><input id='mov-rec-nome' placeholder='Nome completo' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Matrícula</label><input id='mov-rec-mat' placeholder='Nº' style='"+IS+"'></div>";
   html+="</div>";
-  html+="<label style='color:#999;font-size:10px'>Assinatura de quem recebe</label>";
-  html+="<div style='position:relative;margin-top:4px;border:1px solid #1a3a1a;border-radius:7px;overflow:hidden'>";
+  html+="<label style='color:#6B5236;font-size:10px'>Assinatura de quem recebe</label>";
+  html+="<div style='position:relative;margin-top:4px;border:1px solid #DBC79E;border-radius:7px;overflow:hidden'>";
   html+="<canvas id='mov-pad-rec' width='520' height='150' style='width:100%;height:150px;display:block;cursor:crosshair;touch-action:none;background:#fff'></canvas>";
   html+="<button type='button' onclick='_invLimparMovPad(\"mov-pad-rec\")' style='position:absolute;top:5px;right:6px;background:rgba(240,240,240,.9);border:1px solid #ccc;color:#555;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
   html+="</div></div>";
 
   // Botões
   html+="<div style='display:flex;gap:10px;justify-content:flex-end'>";
-  html+="<button onclick=\"document.getElementById('modal-inv-mov').remove()\" style='background:transparent;border:1px solid #333;color:#888;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
-  html+="<button onclick='_invConfirmarMovimentacao(\""+esc(itemId)+"\",\""+esc(item.localizacao||"Almoxarifado")+"\")' style='background:#10b981;border:none;color:#fff;padding:9px 24px;border-radius:7px;font-size:14px;font-weight:700;cursor:pointer'>✓ Registrar</button>";
+  html+="<button onclick=\"document.getElementById('modal-inv-mov').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
+  html+="<button onclick='_invConfirmarMovimentacao(\""+esc(itemId)+"\",\""+esc(item.localizacao||"Almoxarifado")+"\")' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:9px 24px;border-radius:7px;font-size:14px;font-weight:700;cursor:pointer'>✓ Registrar</button>";
   html+="</div></div></div></div>";
 
   document.body.insertAdjacentHTML("beforeend", html);
@@ -20979,9 +20981,9 @@ function _invVerHistorico(itemId){
     return (c.itens||[]).some(function(it){return (it.codigo||"").toUpperCase()===cod;});
   }).sort(function(a,b){return(b.data_registro||b.data||"")>(a.data_registro||a.data||"")?1:-1;}):[];
   var html="<div id='modal-inv-hist' style='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9200;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto'>";
-  html+="<div style='background:#111;border:1px solid #2a3a2a;border-radius:14px;width:100%;max-width:560px;padding:0;overflow:hidden'>";
-  html+="<div style='background:#0a1a0a;padding:14px 18px;border-bottom:1px solid #1a2a1a;display:flex;justify-content:space-between;align-items:center'>";
-  html+="<span style='color:#10b981;font-size:14px;font-weight:700'>📜 Histórico — "+esc(item.descricao)+"</span>";
+  html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:560px;padding:0;overflow:hidden'>";
+  html+="<div style='background:#2a1c10;padding:14px 18px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center'>";
+  html+="<span style='color:#D9A53C;font-size:14px;font-weight:700'>📜 Histórico — "+esc(item.descricao)+"</span>";
   html+="<button onclick=\"document.getElementById('modal-inv-hist').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html+="</div><div style='padding:16px;display:flex;flex-direction:column;gap:10px'>";
   if(!movs.length){
@@ -20991,36 +20993,36 @@ function _invVerHistorico(itemId){
       var dt=m.dataHora?new Date(m.dataHora).toLocaleString("pt-BR"):"—";
       var autNome=(m.autorizador_grad?m.autorizador_grad+" ":"")+esc(m.autorizador_nome||m.responsavel||"—");
       var recNome=(m.receptor_grad?m.receptor_grad+" ":"")+esc(m.receptor_nome||"—");
-      html+="<div style='background:#1a1a0a;border:1px solid #2a2a1a;border-radius:8px;padding:12px'>";
+      html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:8px;padding:12px'>";
       // Cabeçalho
       html+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px'>";
       html+="<span style='color:#d4a87a;font-size:11px;font-weight:700'>"+dt+"</span>";
-      html+="<span style='color:#aaa;font-size:11px;font-weight:700'>"+esc(m.origem||"—")+" → <span style='color:#22c55e'>"+esc(m.destino||"—")+"</span></span>";
+      html+="<span style='color:#6B5236;font-size:11px;font-weight:700'>"+esc(m.origem||"—")+" → <span style='color:#D9A53C'>"+esc(m.destino||"—")+"</span></span>";
       html+="</div>";
-      if(m.motivo) html+="<div style='color:#888;font-size:11px;margin-bottom:8px'>Motivo: "+esc(m.motivo)+"</div>";
+      if(m.motivo) html+="<div style='color:#6B5236;font-size:11px;margin-bottom:8px'>Motivo: "+esc(m.motivo)+"</div>";
       // Assinaturas
       html+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>";
       // Autorizador
-      html+="<div style='background:#1a0d08;border:1px solid #2a1a08;border-radius:6px;padding:8px;text-align:center'>";
+      html+="<div style='background:#EAD9B8;border:1px solid #A87B22;border-radius:6px;padding:8px;text-align:center'>";
       html+="<p style='color:#d4a87a;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 5px'>🗝️ Autorizou</p>";
       if(m.autorizador_assinatura||m.assinatura){
-        html+="<img src='"+(m.autorizador_assinatura||m.assinatura)+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #3a2a18;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
+        html+="<img src='"+(m.autorizador_assinatura||m.assinatura)+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #A87B22;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
       } else {
-        html+="<div style='height:40px;border-bottom:1px solid #5a4a3a;margin-bottom:4px'></div>";
+        html+="<div style='height:40px;border-bottom:1px solid #A87B22;margin-bottom:4px'></div>";
       }
-      html+="<p style='color:#e8e0d0;font-size:10px;font-weight:700;margin:0'>"+autNome+"</p>";
-      if(m.autorizador_mat) html+="<p style='color:#888;font-size:9px;margin:1px 0 0'>Matr.: "+esc(m.autorizador_mat)+"</p>";
+      html+="<p style='color:#3D2B1A;font-size:10px;font-weight:700;margin:0'>"+autNome+"</p>";
+      if(m.autorizador_mat) html+="<p style='color:#6B5236;font-size:9px;margin:1px 0 0'>Matr.: "+esc(m.autorizador_mat)+"</p>";
       html+="</div>";
       // Receptor
-      html+="<div style='background:#0d1f0d;border:1px solid #1a2a1a;border-radius:6px;padding:8px;text-align:center'>";
-      html+="<p style='color:#4ade80;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 5px'>👮 Recebeu</p>";
+      html+="<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:6px;padding:8px;text-align:center'>";
+      html+="<p style='color:#6B5236;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 5px'>👮 Recebeu</p>";
       if(m.receptor_assinatura){
-        html+="<img src='"+m.receptor_assinatura+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #1a3a1a;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
+        html+="<img src='"+m.receptor_assinatura+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #5e4636;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
       } else {
-        html+="<div style='height:40px;border-bottom:1px solid #2a3a2a;margin-bottom:4px'></div>";
+        html+="<div style='height:40px;border-bottom:1px solid #5e4636;margin-bottom:4px'></div>";
       }
-      html+="<p style='color:#e8e0d0;font-size:10px;font-weight:700;margin:0'>"+recNome+"</p>";
-      if(m.receptor_mat) html+="<p style='color:#888;font-size:9px;margin:1px 0 0'>Matr.: "+esc(m.receptor_mat)+"</p>";
+      html+="<p style='color:#3D2B1A;font-size:10px;font-weight:700;margin:0'>"+recNome+"</p>";
+      if(m.receptor_mat) html+="<p style='color:#6B5236;font-size:9px;margin:1px 0 0'>Matr.: "+esc(m.receptor_mat)+"</p>";
       html+="</div>";
       html+="</div></div>";
     });
@@ -21059,36 +21061,37 @@ function _invAbrirConferencia(confId){
   var itensAtivos=(state.invItens||[]).filter(function(x){return x.ativo!==false;});
   var cats=Object.keys(INV_CATS);
   var html="<div id='modal-inv-conf' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9300;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto'>";
-  html+="<div style='background:#111;border:1px solid #2a3a2a;border-radius:14px;width:100%;max-width:720px;padding:0;overflow:hidden;margin-bottom:40px'>";
-  html+="<div style='background:#0a1a0a;padding:14px 18px;border-bottom:1px solid #1a2a1a;display:flex;justify-content:space-between;align-items:center'>";
-  html+="<span style='color:#10b981;font-size:14px;font-weight:700'>📋 Conferência de Inventário "+(isNew?"— Nova":"— Continuar")+"</span>";
+  html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:720px;padding:0;overflow:hidden;margin-bottom:40px'>";
+  html+="<div style='background:#2a1c10;padding:14px 18px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center'>";
+  html+="<span style='color:#D9A53C;font-size:14px;font-weight:700'>📋 Conferência de Inventário "+(isNew?"— Nova":"— Continuar")+"</span>";
   html+="<button onclick=\"document.getElementById('modal-inv-conf').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html+="</div><div style='padding:18px;display:flex;flex-direction:column;gap:14px'>";
   // Data + responsáveis
-  html+="<div style='background:#1a1208;border-radius:8px;padding:10px 14px'><span style='color:#d4a87a;font-size:11px;font-weight:700'>Data: </span><span style='color:#e8e0d0;font-size:12px'>"+new Date(conf.criadoEm).toLocaleString("pt-BR")+"</span></div>";
+  var ISc="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
+  html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:10px 14px'><span style='color:#6B5236;font-size:11px;font-weight:700'>Data: </span><span style='color:#3D2B1A;font-size:12px'>"+new Date(conf.criadoEm).toLocaleString("pt-BR")+"</span></div>";
   html+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
-  html+="<div><label style='color:#999;font-size:11px'>Responsável 1*</label><input id='conf-resp1' value='"+esc(conf.responsavel1||"")+"' placeholder='Nome e graduação' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
-  html+="<div><label style='color:#999;font-size:11px'>Responsável 2</label><input id='conf-resp2' value='"+esc(conf.responsavel2||"")+"' placeholder='Nome e graduação' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Responsável 1*</label><input id='conf-resp1' value='"+esc(conf.responsavel1||"")+"' placeholder='Nome e graduação' style='"+ISc+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Responsável 2</label><input id='conf-resp2' value='"+esc(conf.responsavel2||"")+"' placeholder='Nome e graduação' style='"+ISc+"'></div>";
   html+="</div>";
   // Parecer da comissão
   html+="<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:2px'>";
-  html+="<div><label style='color:#999;font-size:11px'>Resultado da Comissão</label><select id='conf-resultado' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Resultado da Comissão</label><select id='conf-resultado' style='"+ISc+"'>";
   ["","aprovado","pendencia","reprovado"].forEach(function(v){
     var l={"":" — Selecione —",aprovado:"✅ Aprovado",pendencia:"⚠️ Com Pendências",reprovado:"❌ Reprovado"}[v]||v;
     html+="<option value='"+v+"'"+(conf.resultado===v?" selected":"")+">"+l+"</option>";
   });
   html+="</select></div>";
-  html+="<div><label style='color:#999;font-size:11px'>Observações da Comissão</label><input id='conf-parecer-obs' value='"+esc(conf.parecer_obs||"")+"' placeholder='Observações, ressalvas, prazos...' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Observações da Comissão</label><input id='conf-parecer-obs' value='"+esc(conf.parecer_obs||"")+"' placeholder='Observações, ressalvas, prazos...' style='"+ISc+"'></div>";
   html+="</div>";
   // Busca + barra de progresso
   var _totalConf=Object.values(conf.itens||{}).filter(function(v){return v==="ok"||v==="divergencia"||v==="ausente";}).length;
   var _totalItens=itensAtivos.length;
   var _pct=_totalItens?Math.round(_totalConf/_totalItens*100):0;
-  html+="<div style='background:#1a1208;border-radius:8px;padding:10px 14px'>";
-  html+="<div style='display:flex;justify-content:space-between;margin-bottom:6px'><span style='color:#d4a87a;font-size:11px;font-weight:700'>Progresso</span><span style='color:#e8e0d0;font-size:11px;font-weight:700'>"+_totalConf+"/"+_totalItens+" itens · "+_pct+"%</span></div>";
-  html+="<div style='background:#2a2a1a;border-radius:4px;height:6px'><div style='background:"+(_pct===100?"#22c55e":_pct>50?"#d4a87a":"#4a9fd4")+";width:"+_pct+"%;height:6px;border-radius:4px;transition:width 0.3s'></div></div>";
+  html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:10px 14px'>";
+  html+="<div style='display:flex;justify-content:space-between;margin-bottom:6px'><span style='color:#6B5236;font-size:11px;font-weight:700'>Progresso</span><span style='color:#3D2B1A;font-size:11px;font-weight:700'>"+_totalConf+"/"+_totalItens+" itens · "+_pct+"%</span></div>";
+  html+="<div style='background:#EAD9B8;border-radius:4px;height:6px'><div style='background:"+(_pct===100?"#3a7a4a":_pct>50?"#d4a87a":"#4a9fd4")+";width:"+_pct+"%;height:6px;border-radius:4px;transition:width 0.3s'></div></div>";
   html+="</div>";
-  html+="<input id='inv-conf-busca' type='text' placeholder='🔍 Buscar por nome, n.º série ou categoria…' oninput='_invConfFiltrar()' style='width:100%;box-sizing:border-box;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:9px 12px;border-radius:7px;font-size:13px'>";
+  html+="<input id='inv-conf-busca' type='text' placeholder='🔍 Buscar por nome, n.º série ou categoria…' oninput='_invConfFiltrar()' style='width:100%;box-sizing:border-box;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px 12px;border-radius:7px;font-size:13px'>";
   // Lista de itens por categoria
   cats.forEach(function(cat){
     var catItens=itensAtivos.filter(function(x){return x.categoria===cat;});
@@ -21099,11 +21102,11 @@ function _invAbrirConferencia(confId){
     html+="</div><div style='padding:8px 14px'>";
     catItens.forEach(function(item){
       var status=conf.itens[item.id]||"pendente";
-      html+="<div class='inv-conf-item' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' style='display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1a1a1a'>";
-      html+="<span style='flex:1;color:#e8e0d0;font-size:12px'>"+esc(item.descricao)+(item.tombamento?" <span style='color:#666;font-size:10px'>#"+esc(item.tombamento)+"</span>":"")+"</span>";
-      html+="<span style='color:#888;font-size:11px'>"+esc(item.localizacao||"—")+"</span>";
+      html+="<div class='inv-conf-item' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' style='display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #DBC79E'>";
+      html+="<span style='flex:1;color:#3D2B1A;font-size:12px'>"+esc(item.descricao)+(item.tombamento?" <span style='color:#a07c58;font-size:10px'>#"+esc(item.tombamento)+"</span>":"")+"</span>";
+      html+="<span style='color:#6B5236;font-size:11px'>"+esc(item.localizacao||"—")+"</span>";
       html+="<div style='display:flex;gap:4px'>";
-      html+="<button type='button' onclick='_invConfItens(\""+item.id+"\",\"ok\")' style='padding:3px 8px;border-radius:4px;font-size:11px;border:1px solid #22c55e;color:"+(status==="ok"?"#fff":"#22c55e")+";background:"+(status==="ok"?"#22c55e":"transparent")+";cursor:pointer'>✓ OK</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+item.id+"\",\"ok\")' style='padding:3px 8px;border-radius:4px;font-size:11px;border:1px solid #3a7a4a;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer'>✓ OK</button>";
       html+="<button type='button' onclick='_invConfItens(\""+item.id+"\",\"divergencia\")' style='padding:3px 8px;border-radius:4px;font-size:11px;border:1px solid #f59e0b;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer'>⚠ Divergência</button>";
       html+="<button type='button' onclick='_invConfItens(\""+item.id+"\",\"ausente\")' style='padding:3px 8px;border-radius:4px;font-size:11px;border:1px solid #ef4444;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer'>✗ Ausente</button>";
       html+="</div></div>";
@@ -21113,18 +21116,18 @@ function _invAbrirConferencia(confId){
   // Assinaturas
   html+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px'>";
   ["1","2"].forEach(function(n){
-    html+="<div><label style='color:#999;font-size:11px'>Assinatura — Responsável "+n+"</label>";
-    html+="<div style='position:relative;margin-top:4px;border:1px solid #2a3a2a;border-radius:8px;background:#0d0d0d'>";
+    html+="<div><label style='color:#6B5236;font-size:11px'>Assinatura — Responsável "+n+"</label>";
+    html+="<div style='position:relative;margin-top:4px;border:1px solid #A87B22;border-radius:8px;background:#fff'>";
     html+="<canvas id='conf-pad"+n+"' width='300' height='90' style='width:100%;height:90px;display:block;cursor:crosshair;border-radius:8px'></canvas>";
-    html+="<button type='button' onclick='document.getElementById(\"conf-pad"+n+"\").getContext(\"2d\").clearRect(0,0,300,90)' style='position:absolute;top:4px;right:6px;background:#1a1a1a;border:1px solid #333;color:#aaa;padding:2px 7px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
+    html+="<button type='button' onclick='document.getElementById(\"conf-pad"+n+"\").getContext(\"2d\").clearRect(0,0,300,90)' style='position:absolute;top:4px;right:6px;background:#EAD9B8;border:1px solid #A87B22;color:#6B5236;padding:2px 7px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
     html+="</div></div>";
   });
   html+="</div>";
   // Botões
   html+="<div style='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap'>";
-  html+="<button onclick=\"document.getElementById('modal-inv-conf').remove()\" style='background:transparent;border:1px solid #333;color:#888;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Fechar</button>";
+  html+="<button onclick=\"document.getElementById('modal-inv-conf').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Fechar</button>";
   html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",false)' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>💾 Salvar Progresso</button>";
-  html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",true)' style='background:#10b981;border:none;color:#fff;padding:8px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✅ Concluir e Gerar PDF</button>";
+  html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",true)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✅ Concluir e Gerar PDF</button>";
   html+="</div>";
   html+="</div></div></div>";
   document.body.insertAdjacentHTML("beforeend", html);
@@ -21400,24 +21403,24 @@ function renderInventario(main){
 
   // Header
   h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px'>";
-  h+="<div><h2 style='color:#10b981;font-size:20px;font-weight:800;margin:0'>📦 Inventário</h2><p style='color:#888;font-size:12px;margin:2px 0 0'>Gestão de patrimônio — 77ª CIPM BCS</p></div>";
+  h+="<div><h2 style='color:#D9A53C;font-size:20px;font-weight:800;margin:0;font-family:Georgia,serif'>📦 Inventário</h2><p style='color:#a07c58;font-size:12px;margin:2px 0 0'>Gestão de patrimônio — 77ª CIPM BCS</p></div>";
   h+="<div style='display:flex;gap:8px;flex-wrap:wrap'>";
-  h+="<button onclick='_invAbrirImport()' style='background:#1a2a1a;border:1px solid #10b98166;color:#10b981;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📤 Importar Lista</button>";
+  h+="<button onclick='_invAbrirImport()' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📤 Importar Lista</button>";
   h+="<button onclick='_invGerarPDF()' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📄 Exportar PDF</button>";
-  h+="<button onclick='_invAbrirItem(null)' style='background:#10b981;border:none;color:#fff;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Item</button>";
+  h+="<button onclick='_invAbrirItem(null)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Item</button>";
   h+="</div></div>";
 
   // KPIs
   h+="<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px'>";
-  h+="<div style='background:#0a1a0a;border:1px solid #1a2a1a;border-radius:10px;padding:12px;text-align:center'><div style='color:#10b981;font-size:24px;font-weight:800'>"+total+"</div><div style='color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.5px'>Total de Itens</div></div>";
+  h+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:10px;padding:12px;text-align:center'><div style='color:#D9A53C;font-size:24px;font-weight:800'>"+total+"</div><div style='color:#a07c58;font-size:10px;text-transform:uppercase;letter-spacing:.5px'>Total de Itens</div></div>";
   Object.keys(INV_CATS).forEach(function(k){
-    h+="<div style='background:#0a1a0a;border:1px solid "+INV_CATS[k].cor+"33;border-radius:10px;padding:12px;text-align:center'>";
+    h+="<div style='background:#F2E4C8;border:1px solid "+INV_CATS[k].cor+"55;border-radius:10px;padding:12px;text-align:center'>";
     h+="<div style='color:"+INV_CATS[k].cor+";font-size:20px;font-weight:800'>"+INV_CATS[k].icon+" "+(totalCats[k]||0)+"</div>";
     h+="<div style='color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.5px'>"+INV_CATS[k].label+"</div>";
     h+="</div>";
   });
   var nConf=(state.invConferencias||[]).length;
-  h+="<div style='background:#0a1a0a;border:1px solid #d4a87a33;border-radius:10px;padding:12px;text-align:center'><div style='color:#d4a87a;font-size:20px;font-weight:800'>📋 "+nConf+"</div><div style='color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.5px'>Conferências</div></div>";
+  h+="<div style='background:#F2E4C8;border:1px solid #d4a87a55;border-radius:10px;padding:12px;text-align:center'><div style='color:#d4a87a;font-size:20px;font-weight:800'>📋 "+nConf+"</div><div style='color:#a07c58;font-size:10px;text-transform:uppercase;letter-spacing:.5px'>Conferências</div></div>";
   h+="</div>";
 
   // ── KPI: itens com validade vencida ou vencendo em 90 dias ────
@@ -21454,10 +21457,10 @@ function renderInventario(main){
   }
 
   // Tabs
-  h+="<div style='display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid #1a2a1a;overflow-x:auto'>";
+  h+="<div style='display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid #5e4636;overflow-x:auto'>";
   [["itens","📋 Itens"],["movimentacoes","🚛 Movimentações"],["conferencias","📊 Conferências"],["policiais","👮 Por Policial"]].forEach(function(pair){
     var active=tab===pair[0];
-    h+="<button onclick='state._invTab=\""+pair[0]+"\";_invAplicarFiltros()' style='padding:8px 16px;border:none;border-bottom:3px solid "+(active?"#10b981":"transparent")+";background:transparent;color:"+(active?"#10b981":"#666")+";font-size:12px;cursor:pointer;font-weight:"+(active?"700":"400")+";white-space:nowrap'>"+pair[1]+"</button>";
+    h+="<button onclick='state._invTab=\""+pair[0]+"\";_invAplicarFiltros()' style='padding:8px 16px;border:none;border-bottom:3px solid "+(active?"#D9A53C":"transparent")+";background:transparent;color:"+(active?"#D9A53C":"#a07c58")+";font-size:12px;cursor:pointer;font-weight:"+(active?"700":"400")+";white-space:nowrap'>"+pair[1]+"</button>";
   });
   h+="</div>";
 
@@ -21486,7 +21489,7 @@ function renderInventario(main){
     });
 
     if(!filtered.length){
-      h+="<div style='text-align:center;padding:50px;color:#555;font-size:14px'>Nenhum item encontrado. <button onclick='_invAbrirItem(null)' style='background:none;border:none;color:#10b981;cursor:pointer;font-size:14px'>+ Adicionar</button></div>";
+      h+="<div style='text-align:center;padding:50px;color:#a07c58;font-size:14px'>Nenhum item encontrado. <button onclick='_invAbrirItem(null)' style='background:none;border:none;color:#D9A53C;cursor:pointer;font-size:14px'>+ Adicionar</button></div>";
     } else {
       // Agrupar por categoria
       Object.keys(INV_CATS).forEach(function(cat){
@@ -21523,18 +21526,18 @@ function renderInventario(main){
             else if(_dias<=90) _valdBadge="<span style='background:#f59e0b22;color:#f59e0b;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700'>⚠ Vence em "+_dias+"d</span>";
             else _valdBadge="<span style='background:#22c55e11;color:#22c55e88;padding:2px 7px;border-radius:5px;font-size:10px'>Val: "+new Date(item.data_validade+"T12:00").toLocaleDateString("pt-BR")+"</span>";
           }
-          h+="<div style='background:#111;border:1px solid "+(item.data_validade&&new Date(item.data_validade+"T12:00")<new Date()?"#ef444455":"#1a2a1a")+"';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap'>";
+          h+="<div style='background:#F2E4C8;border:1px solid "+(item.data_validade&&new Date(item.data_validade+"T12:00")<new Date()?"#ef444455":"#5e4636")+"';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap'>";
           var _fotoSrc=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
           if(_fotoSrc){
-            h+="<img src='"+_fotoSrc+"' style='width:56px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #2a2a2a;flex-shrink:0' onerror=\"this.style.display='none'\">";
+            h+="<img src='"+_fotoSrc+"' style='width:56px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #A87B22;flex-shrink:0' onerror=\"this.style.display='none'\">";
           } else {
-            h+="<div style='width:56px;height:42px;background:#1a1a1a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0'>"+INV_CATS[cat].icon+"</div>";
+            h+="<div style='width:56px;height:42px;background:#EAD9B8;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0'>"+INV_CATS[cat].icon+"</div>";
           }
           h+="<div style='flex:1;min-width:0'>";
           h+="<div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap'>";
-          h+="<span style='color:#e8e0d0;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</span>";
-          if(item.tamanho) h+="<span style='background:#1a1a2a;color:#6B5236;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:700'>"+esc(item.tamanho)+"</span>";
-          if(item.genero) h+="<span style='background:#1a1a2a;color:#c084fc;padding:1px 7px;border-radius:5px;font-size:10px'>"+esc(item.genero)+"</span>";
+          h+="<span style='color:#3D2B1A;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</span>";
+          if(item.tamanho) h+="<span style='background:#EAD9B8;color:#6B5236;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:700'>"+esc(item.tamanho)+"</span>";
+          if(item.genero) h+="<span style='background:#EAD9B8;color:#6B5236;padding:1px 7px;border-radius:5px;font-size:10px'>"+esc(item.genero)+"</span>";
           if(_valdBadge) h+=_valdBadge;
           if(_lpStatus) h+="<span style='background:#22c55e22;color:#22c55e;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>🔫 Em carga: "+esc(_lpStatus.pol||"—")+"</span>";
           // Badge situacao_carga
@@ -21545,7 +21548,7 @@ function renderInventario(main){
             h+="<span style='background:#33333322;color:#888;padding:1px 8px;border-radius:5px;font-size:10px'>📦 Em estoque</span>";
           }
           h+="</div>";
-          h+="<div style='color:#888;font-size:11px;margin-top:2px'>";
+          h+="<div style='color:#6B5236;font-size:11px;margin-top:2px'>";
           if(item.tombamento) h+="<span style='color:#d4a87a'>Nº "+esc(item.tombamento)+"</span> · ";
           h+=esc(item.localizacao||"—");
           if(item.marca||item.modelo) h+=" · "+esc([item.marca,item.modelo].filter(Boolean).join(" "));
@@ -21555,12 +21558,12 @@ function renderInventario(main){
           h+="<div style='display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0'>";
           h+="<span style='background:"+est.cor+"22;color:"+est.cor+";padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700'>"+est.label+"</span>";
           h+="<div style='display:flex;gap:5px'>";
-          h+="<button onclick='_invAbrirItem(\""+item.id+"\")' style='background:#1a1a1a;border:1px solid #333;color:#aaa;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>✏️ Editar</button>";
-          h+="<button onclick='_invAbrirMovimentacao(\""+item.id+"\")' style='background:#1a2a1a;border:1px solid #22c55e44;color:#22c55e;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🚛 Mover</button>";
-          h+="<button onclick='_invVerHistorico(\""+item.id+"\")' style='background:#1a1a2a;border:1px solid #4a9fd433;color:#4a9fd4;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>📜 Histórico</button>";
-          if(item.tipo_carga==="fixa"&&item.carga_responsavel_nome) h+="<button onclick='_invPDFRecibo(\""+item.id+"\")' style='background:#1a1a0a;border:1px solid #d4a87a55;color:#d4a87a;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🧾 Recibo</button>";
+          h+="<button onclick='_invAbrirItem(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #A87B22;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>✏️ Editar</button>";
+          h+="<button onclick='_invAbrirMovimentacao(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #5e4636;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🚛 Mover</button>";
+          h+="<button onclick='_invVerHistorico(\""+item.id+"\")' style='background:#1a2a3a;border:1px solid #4a9fd433;color:#4a9fd4;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>📜 Histórico</button>";
+          if(item.tipo_carga==="fixa"&&item.carga_responsavel_nome) h+="<button onclick='_invPDFRecibo(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #d4a87a55;color:#d4a87a;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🧾 Recibo</button>";
           if(item.tipo_carga==="fixa"&&item.carga_responsavel_nome) h+="<button onclick='_invDevolverItem(\""+item.id+"\")' style='background:#1a0808;border:1px solid #ef444455;color:#ef4444;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>↩ Devolver</button>";
-          h+="<button onclick='_invQRCode(\""+item.id+"\")' style='background:#1a1a2a;border:1px solid #6B523655;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>📱 QR</button>";
+          h+="<button onclick='_invQRCode(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #5e4636;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>📱 QR</button>";
           h+="</div></div>";
           h+="</div>";
         });
@@ -21576,20 +21579,20 @@ function renderInventario(main){
       movs.forEach(function(m){
         var item=(state.invItens||[]).find(function(x){return x.id===m.itemId;});
         var dt=m.dataHora?new Date(m.dataHora).toLocaleString("pt-BR"):"—";
-        h+="<div style='background:#111;border:1px solid #1a2a1a;border-radius:10px;padding:12px 14px'>";
+        h+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:10px;padding:12px 14px'>";
         h+="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px'>";
-        h+="<div><span style='color:#d4a87a;font-size:11px'>"+dt+"</span><br><span style='color:#e8e0d0;font-size:13px;font-weight:700'>"+esc(item?item.descricao:m.itemId)+"</span></div>";
-        h+="<div style='text-align:right'><span style='color:#aaa;font-size:12px'>"+esc(m.responsavel||"—")+"</span></div>";
+        h+="<div><span style='color:#d4a87a;font-size:11px'>"+dt+"</span><br><span style='color:#3D2B1A;font-size:13px;font-weight:700'>"+esc(item?item.descricao:m.itemId)+"</span></div>";
+        h+="<div style='text-align:right'><span style='color:#6B5236;font-size:12px'>"+esc(m.responsavel||"—")+"</span></div>";
         h+="</div>";
-        h+="<div style='color:#888;font-size:12px;margin-top:6px'>"+esc(m.origem||"—")+" → <span style='color:#22c55e'>"+esc(m.destino||"—")+"</span>"+(m.motivo?" · "+esc(m.motivo):"")+"</div>";
-        if(m.assinatura) h+="<div style='margin-top:8px'><img src='"+m.assinatura+"' style='max-width:180px;height:45px;object-fit:contain;border:1px solid #333;border-radius:4px;background:#fff'></div>";
+        h+="<div style='color:#6B5236;font-size:12px;margin-top:6px'>"+esc(m.origem||"—")+" → <span style='color:#D9A53C'>"+esc(m.destino||"—")+"</span>"+(m.motivo?" · "+esc(m.motivo):"")+"</div>";
+        if(m.assinatura) h+="<div style='margin-top:8px'><img src='"+m.assinatura+"' style='max-width:180px;height:45px;object-fit:contain;border:1px solid #A87B22;border-radius:4px;background:#fff'></div>";
         h+="</div>";
       });
       h+="</div>";
     }
   } else if(tab==="conferencias"){
     h+="<div style='margin-bottom:12px;display:flex;justify-content:flex-end'>";
-    h+="<button onclick='_invAbrirConferencia(null)' style='background:#10b981;border:none;color:#fff;padding:8px 18px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Nova Conferência</button>";
+    h+="<button onclick='_invAbrirConferencia(null)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 18px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Nova Conferência</button>";
     h+="</div>";
     var confs=(state.invConferencias||[]).slice().sort(function(a,b){return(b.criadoEm||"")>(a.criadoEm||"")?1:-1;});
     if(!confs.length){
@@ -21603,11 +21606,11 @@ function renderInventario(main){
         var nDiv=vals.filter(function(v){return v==="divergencia";}).length;
         var nAus=vals.filter(function(v){return v==="ausente";}).length;
         var nPend=itens.length-vals.length;
-        h+="<div style='background:#111;border:1px solid #1a2a1a;border-radius:10px;padding:14px'>";
+        h+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:10px;padding:14px'>";
         h+="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px'>";
-        h+="<div><span style='color:#d4a87a;font-size:11px'>"+dt+"</span><br><span style='color:#e8e0d0;font-size:13px;font-weight:700'>Conferência "+(conf.concluida?"<span style='color:#22c55e;font-size:11px'>✅ Concluída</span>":"<span style='color:#f59e0b;font-size:11px'>⏳ Em andamento</span>")+"</span></div>";
+        h+="<div><span style='color:#d4a87a;font-size:11px'>"+dt+"</span><br><span style='color:#3D2B1A;font-size:13px;font-weight:700'>Conferência "+(conf.concluida?"<span style='color:#3a7a4a;font-size:11px'>✅ Concluída</span>":"<span style='color:#f59e0b;font-size:11px'>⏳ Em andamento</span>")+"</span></div>";
         h+="<div style='display:flex;gap:6px'>";
-        if(!conf.concluida) h+="<button onclick='_invAbrirConferencia(\""+conf.id+"\")' style='background:#1a2a1a;border:1px solid #22c55e44;color:#22c55e;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>▶ Continuar</button>";
+        if(!conf.concluida) h+="<button onclick='_invAbrirConferencia(\""+conf.id+"\")' style='background:#EAD9B8;border:1px solid #A87B22;color:#6B5236;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>▶ Continuar</button>";
         h+="<button onclick='_invGerarPDFConferencia(\""+conf.id+"\")' style='background:#1a1a2a;border:1px solid #4a9fd433;color:#4a9fd4;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>📄 PDF</button>";
         if(conf.concluida) h+="<button onclick='_invAbrirParecerModal(\""+conf.id+"\")' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>📋 Parecer</button>";
         h+="</div></div>";
@@ -21654,9 +21657,9 @@ function _invRenderPoliciais(itens){
     grupos[chave].itens.push(x);
   });
   var h="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px'>";
-  h+="<p style='color:#10b981;font-size:13px;font-weight:700;margin:0'>"+Object.keys(grupos).length+" policial(is) com itens em carga</p>";
+  h+="<p style='color:#D9A53C;font-size:13px;font-weight:700;margin:0'>"+Object.keys(grupos).length+" policial(is) com itens em carga</p>";
   h+="<div style='display:flex;gap:6px'>";
-  h+="<input id='inv-pol-busca' oninput='_invFiltrarPoliciais(this.value)' placeholder='🔍 Buscar policial...' style='background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:7px 10px;border-radius:6px;font-size:12px;outline:none'/>";
+  h+="<input id='inv-pol-busca' oninput='_invFiltrarPoliciais(this.value)' placeholder='🔍 Buscar policial...' style='background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:7px 10px;border-radius:6px;font-size:12px;outline:none'/>";
   h+="</div></div>";
   h+="<div id='inv-pol-lista' style='display:flex;flex-direction:column;gap:12px'>";
   Object.keys(grupos).forEach(function(k){
@@ -21664,16 +21667,16 @@ function _invRenderPoliciais(itens){
     var nomeCompleto=(g.grad?g.grad+" ":"")+g.nome;
     var totalVal=g.itens.length;
     var belico=g.itens.filter(function(x){return x.categoria==="material_belico";}).length;
-    h+="<div class='inv-pol-card' data-nome='"+esc((g.grad+" "+g.nome+" "+g.mat).toLowerCase())+"' style='background:#111;border:1px solid #1a2a1a;border-radius:10px;overflow:hidden'>";
+    h+="<div class='inv-pol-card' data-nome='"+esc((g.grad+" "+g.nome+" "+g.mat).toLowerCase())+"' style='background:#F2E4C8;border:1px solid #5e4636;border-radius:10px;overflow:hidden'>";
     // Cabeçalho do policial
-    h+="<div style='background:#0a1a0a;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px'>";
+    h+="<div style='background:#2a1c10;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px'>";
     h+="<div style='display:flex;align-items:center;gap:10px'>";
     h+="<span style='font-size:22px'>👮</span>";
-    h+="<div><p style='color:#e8e0d0;font-size:14px;font-weight:700;margin:0'>"+esc(nomeCompleto)+"</p>";
-    if(g.mat) h+="<p style='color:#666;font-size:11px;margin:2px 0 0'>Matr.: "+esc(g.mat)+"</p>";
+    h+="<div><p style='color:#f5ede0;font-size:14px;font-weight:700;margin:0'>"+esc(nomeCompleto)+"</p>";
+    if(g.mat) h+="<p style='color:#a07c58;font-size:11px;margin:2px 0 0'>Matr.: "+esc(g.mat)+"</p>";
     h+="</div></div>";
     h+="<div style='display:flex;gap:6px;align-items:center;flex-wrap:wrap'>";
-    h+="<span style='background:#10b98122;color:#10b981;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700'>"+totalVal+" item(s)</span>";
+    h+="<span style='background:#D9A53C22;color:#D9A53C;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700'>"+totalVal+" item(s)</span>";
     if(belico) h+="<span style='background:#ef444422;color:#ef4444;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700'>🔫 "+belico+" bélico(s)</span>";
     h+="<button onclick='_invTermoResponsabilidade(\""+esc(k)+"\")' style='background:#1a1a0a;border:1px solid #d4a87a55;color:#d4a87a;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>📄 Termo</button>";
     h+="</div></div>";
@@ -21682,13 +21685,13 @@ function _invRenderPoliciais(itens){
     g.itens.forEach(function(item){
       var est=INV_ESTADOS[item.estado]||{label:item.estado,cor:"#888"};
       var dt=item.carga_data?new Date(item.carga_data).toLocaleDateString("pt-BR"):"—";
-      h+="<div style='display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1a1a1a'>";
+      h+="<div style='display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #DBC79E'>";
       var _fp=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
       if(_fp) h+="<img src='"+_fp+"' style='width:40px;height:30px;object-fit:cover;border-radius:4px;flex-shrink:0' onerror=\"this.style.display='none'\">";
       else h+="<span style='font-size:18px;flex-shrink:0'>"+(INV_CATS[item.categoria]||{icon:"📦"}).icon+"</span>";
       h+="<div style='flex:1;min-width:0'>";
-      h+="<p style='color:#e8e0d0;font-size:12px;font-weight:700;margin:0'>"+esc(item.descricao)+"</p>";
-      h+="<p style='color:#666;font-size:10px;margin:1px 0 0'>";
+      h+="<p style='color:#3D2B1A;font-size:12px;font-weight:700;margin:0'>"+esc(item.descricao)+"</p>";
+      h+="<p style='color:#6B5236;font-size:10px;margin:1px 0 0'>";
       if(item.tombamento) h+="Nº "+esc(item.tombamento)+" · ";
       h+=esc(item.localizacao||"—")+" · Desde "+dt;
       h+="</p></div>";
@@ -21713,40 +21716,40 @@ function _invFiltrarPoliciais(busca){
 function _invDevolverItem(itemId){
   var item=(state.invItens||[]).find(function(x){return x.id===itemId;});
   if(!item) return;
-  var IS="width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
+  var IS="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
   var html="<div id='modal-inv-dev' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto'>";
-  html+="<div style='background:#111;border:1px solid #3a1a1a;border-radius:14px;width:100%;max-width:560px;padding:0;margin-bottom:40px'>";
-  html+="<div style='background:#1a0808;padding:14px 18px;border-bottom:1px solid #3a1a1a;display:flex;justify-content:space-between;align-items:center;border-radius:14px 14px 0 0'>";
-  html+="<span style='color:#ef4444;font-size:14px;font-weight:700'>↩ Devolução ao Almoxarifado</span>";
+  html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:560px;padding:0;margin-bottom:40px'>";
+  html+="<div style='background:#2a1c10;padding:14px 18px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center;border-radius:14px 14px 0 0'>";
+  html+="<span style='color:#f5ede0;font-size:14px;font-weight:700'>↩ Devolução ao Almoxarifado</span>";
   html+="<button onclick=\"document.getElementById('modal-inv-dev').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html+="</div><div style='padding:18px;display:flex;flex-direction:column;gap:12px'>";
   // Info item
-  html+="<div style='background:#1a1208;border-radius:8px;padding:10px 14px'>";
-  html+="<p style='color:#d4a87a;font-size:11px;margin:0 0 4px'>Item a devolver:</p>";
-  html+="<p style='color:#e8e0d0;font-size:13px;font-weight:700;margin:0'>"+esc(item.descricao)+(item.tombamento?" — Nº "+esc(item.tombamento):"")+"</p>";
-  html+="<p style='color:#999;font-size:11px;margin:4px 0 0'>Policial: <b>"+(item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+esc(item.carga_responsavel_nome||"—")+"</b></p>";
+  html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:10px 14px'>";
+  html+="<p style='color:#6B5236;font-size:11px;margin:0 0 4px'>Item a devolver:</p>";
+  html+="<p style='color:#3D2B1A;font-size:13px;font-weight:700;margin:0'>"+esc(item.descricao)+(item.tombamento?" — Nº "+esc(item.tombamento):"")+"</p>";
+  html+="<p style='color:#a07c58;font-size:11px;margin:4px 0 0'>Policial: <b>"+(item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+esc(item.carga_responsavel_nome||"—")+"</b></p>";
   html+="</div>";
   // Estado na devolução
-  html+="<div><label style='color:#999;font-size:11px;display:block;margin-bottom:4px'>Estado na devolução</label>";
+  html+="<div><label style='color:#6B5236;font-size:11px;display:block;margin-bottom:4px'>Estado na devolução</label>";
   html+="<select id='dev-estado' style='"+IS+"'>";
   Object.keys(INV_ESTADOS).forEach(function(k){html+="<option value='"+k+"'"+(item.estado===k?" selected":"")+">"+INV_ESTADOS[k].label+"</option>";});
   html+="</select></div>";
-  html+="<div><label style='color:#999;font-size:11px;display:block;margin-bottom:4px'>Observação</label><input id='dev-obs' placeholder='Condições, avarias, etc.' style='"+IS+"'/></div>";
+  html+="<div><label style='color:#6B5236;font-size:11px;display:block;margin-bottom:4px'>Observação</label><input id='dev-obs' placeholder='Condições, avarias, etc.' style='"+IS+"'/></div>";
   // Quem recebe no almoxarifado
-  html+="<div style='background:#0a1a0a;border:1px solid #1a3a1a;border-radius:8px;padding:12px'>";
-  html+="<p style='color:#10b981;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>🗝️ Quem Recebe no Almoxarifado</p>";
+  html+="<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:8px;padding:12px'>";
+  html+="<p style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>🗝️ Quem Recebe no Almoxarifado</p>";
   html+="<div style='display:grid;grid-template-columns:90px 1fr;gap:8px;margin-bottom:8px'>";
-  html+="<div><label style='color:#999;font-size:10px'>Graduação</label><input id='dev-rec-grad' style='"+IS+"'></div>";
-  html+="<div><label style='color:#999;font-size:10px'>Nome *</label><input id='dev-rec-nome' placeholder='Responsável pelo almoxarifado' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Graduação</label><input id='dev-rec-grad' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Nome *</label><input id='dev-rec-nome' placeholder='Responsável pelo almoxarifado' style='"+IS+"'></div>";
   html+="</div>";
-  html+="<label style='color:#999;font-size:10px'>Assinatura de quem recebe</label>";
-  html+="<div style='position:relative;margin-top:4px;border:1px solid #1a3a1a;border-radius:7px;overflow:hidden'>";
+  html+="<label style='color:#6B5236;font-size:10px'>Assinatura de quem recebe</label>";
+  html+="<div style='position:relative;margin-top:4px;border:1px solid #DBC79E;border-radius:7px;overflow:hidden'>";
   html+="<canvas id='dev-pad-rec' width='500' height='140' style='width:100%;height:140px;display:block;cursor:crosshair;touch-action:none;background:#fff'></canvas>";
   html+="<button type='button' onclick='_invLimparMovPad(\"dev-pad-rec\")' style='position:absolute;top:5px;right:6px;background:rgba(240,240,240,.9);border:1px solid #ccc;color:#555;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
   html+="</div></div>";
   // Botões
   html+="<div style='display:flex;gap:10px;justify-content:flex-end'>";
-  html+="<button onclick=\"document.getElementById('modal-inv-dev').remove()\" style='background:transparent;border:1px solid #333;color:#888;padding:9px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
+  html+="<button onclick=\"document.getElementById('modal-inv-dev').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:9px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
   html+="<button onclick='_invConfirmarDevolucao(\""+itemId+"\")' style='background:#ef4444;border:none;color:#fff;padding:9px 24px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>↩ Confirmar Devolução</button>";
   html+="</div></div></div></div>";
   document.body.insertAdjacentHTML("beforeend", html);
@@ -21854,17 +21857,17 @@ function _invQRCode(itemId){
   var texto="77CIPM-BCS|"+ref+"|"+item.descricao.slice(0,30);
   var qrUrl="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data="+encodeURIComponent(texto);
   var html="<div id='modal-inv-qr' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9600;display:flex;align-items:center;justify-content:center;padding:20px'>";
-  html+="<div style='background:#111;border:1px solid #2a3a2a;border-radius:14px;width:100%;max-width:320px;padding:0;overflow:hidden'>";
-  html+="<div style='background:#0a1a0a;padding:12px 16px;border-bottom:1px solid #1a2a1a;display:flex;justify-content:space-between;align-items:center'>";
-  html+="<span style='color:#10b981;font-size:13px;font-weight:700'>📱 QR Code — "+esc(item.tombamento||item.descricao.slice(0,20))+"</span>";
+  html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:320px;padding:0;overflow:hidden'>";
+  html+="<div style='background:#2a1c10;padding:12px 16px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center'>";
+  html+="<span style='color:#D9A53C;font-size:13px;font-weight:700'>📱 QR Code — "+esc(item.tombamento||item.descricao.slice(0,20))+"</span>";
   html+="<button onclick=\"document.getElementById('modal-inv-qr').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html+="</div>";
   html+="<div style='padding:20px;text-align:center'>";
-  html+="<img src='"+qrUrl+"' style='width:200px;height:200px;border:1px solid #333;border-radius:8px;background:#fff'>";
-  html+="<p style='color:#e8e0d0;font-size:12px;font-weight:700;margin:12px 0 4px'>"+esc(item.descricao)+"</p>";
-  if(item.tombamento) html+="<p style='color:#666;font-size:11px;margin:0'>Nº "+esc(item.tombamento)+"</p>";
-  html+="<p style='color:#555;font-size:10px;margin:8px 0 0'>Cole na embalagem ou no item</p>";
-  html+="<button onclick=\"window.open('"+qrUrl+"','_blank')\" style='margin-top:12px;background:#1a2a1a;border:1px solid #10b981;color:#10b981;padding:8px 20px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;width:100%'>⬇ Baixar / Imprimir</button>";
+  html+="<img src='"+qrUrl+"' style='width:200px;height:200px;border:1px solid #DBC79E;border-radius:8px;background:#fff'>";
+  html+="<p style='color:#3D2B1A;font-size:12px;font-weight:700;margin:12px 0 4px'>"+esc(item.descricao)+"</p>";
+  if(item.tombamento) html+="<p style='color:#a07c58;font-size:11px;margin:0'>Nº "+esc(item.tombamento)+"</p>";
+  html+="<p style='color:#6B5236;font-size:10px;margin:8px 0 0'>Cole na embalagem ou no item</p>";
+  html+="<button onclick=\"window.open('"+qrUrl+"','_blank')\" style='margin-top:12px;background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 20px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;width:100%'>⬇ Baixar / Imprimir</button>";
   html+="</div></div></div>";
   document.body.insertAdjacentHTML("beforeend", html);
   document.getElementById("modal-inv-qr").onclick=function(e){if(e.target===this)this.remove();};
@@ -22015,48 +22018,48 @@ function _invGerarPDF(){
 // ---- IMPORTAÇÃO DE ITENS ----
 function _invAbrirImport(){
   var html="<div id='modal-inv-import' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9400;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto'>";
-  html+="<div style='background:#111;border:1px solid #2a3a2a;border-radius:14px;width:100%;max-width:700px;padding:0;overflow:hidden;margin-bottom:40px'>";
-  html+="<div style='background:#0a1a0a;padding:14px 18px;border-bottom:1px solid #1a2a1a;display:flex;justify-content:space-between;align-items:center'>";
-  html+="<span style='color:#10b981;font-size:14px;font-weight:700'>📤 Importar Itens de Inventário</span>";
+  html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:700px;padding:0;overflow:hidden;margin-bottom:40px'>";
+  html+="<div style='background:#2a1c10;padding:14px 18px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center'>";
+  html+="<span style='color:#D9A53C;font-size:14px;font-weight:700'>📤 Importar Itens de Inventário</span>";
   html+="<button onclick=\"document.getElementById('modal-inv-import').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html+="</div>";
   html+="<div style='padding:18px;display:flex;flex-direction:column;gap:14px'>";
 
   // Abas
-  html+="<div style='display:flex;gap:0;border-bottom:1px solid #1a2a1a;margin-bottom:4px'>";
-  html+="<button id='imp-tab-btn-texto' onclick='_invImportTab(\"texto\")' style='padding:7px 16px;border:none;border-bottom:2px solid #10b981;background:transparent;color:#10b981;font-size:12px;cursor:pointer;font-weight:700'>📋 Colar do PDF</button>";
-  html+="<button id='imp-tab-btn-csv' onclick='_invImportTab(\"csv\")' style='padding:7px 16px;border:none;border-bottom:2px solid transparent;background:transparent;color:#666;font-size:12px;cursor:pointer'>📊 Upload CSV</button>";
+  html+="<div style='display:flex;gap:0;border-bottom:1px solid #DBC79E;margin-bottom:4px'>";
+  html+="<button id='imp-tab-btn-texto' onclick='_invImportTab(\"texto\")' style='padding:7px 16px;border:none;border-bottom:2px solid #D9A53C;background:transparent;color:#D9A53C;font-size:12px;cursor:pointer;font-weight:700'>📋 Colar do PDF</button>";
+  html+="<button id='imp-tab-btn-csv' onclick='_invImportTab(\"csv\")' style='padding:7px 16px;border:none;border-bottom:2px solid transparent;background:transparent;color:#a07c58;font-size:12px;cursor:pointer'>📊 Upload CSV</button>";
   html+="</div>";
 
   // Aba colar texto
   html+="<div id='imp-tab-texto'>";
-  html+="<div style='background:#1a2a1a;border-radius:8px;padding:12px;font-size:11px;color:#aaa;margin-bottom:10px'>";
-  html+="<b style='color:#10b981'>Como usar:</b> Abra o PDF no computador → selecione tudo (Ctrl+A) → copie (Ctrl+C) → cole abaixo (Ctrl+V). O sistema detecta as colunas automaticamente.";
+  html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;font-size:11px;color:#6B5236;margin-bottom:10px'>";
+  html+="<b style='color:#D9A53C'>Como usar:</b> Abra o PDF no computador → selecione tudo (Ctrl+A) → copie (Ctrl+C) → cole abaixo (Ctrl+V). O sistema detecta as colunas automaticamente.";
   html+="</div>";
-  html+="<textarea id='imp-texto' placeholder='Cole aqui o texto copiado do PDF...' rows='10' oninput='_invPreviewTexto()' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:10px;border-radius:8px;font-size:12px;resize:vertical;box-sizing:border-box;font-family:monospace'></textarea>";
+  html+="<textarea id='imp-texto' placeholder='Cole aqui o texto copiado do PDF...' rows='10' oninput='_invPreviewTexto()' style='width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:10px;border-radius:8px;font-size:12px;resize:vertical;box-sizing:border-box;font-family:monospace'></textarea>";
   html+="</div>";
 
   // Aba CSV
   html+="<div id='imp-tab-csv' style='display:none'>";
-  html+="<div style='background:#1a2a1a;border-radius:8px;padding:12px;font-size:11px;color:#aaa;margin-bottom:10px'>";
-  html+="<b style='color:#10b981'>Como usar:</b> Salve a planilha como CSV (separador vírgula ou ponto-e-vírgula) e faça upload abaixo. Primeira linha deve ter os cabeçalhos.";
+  html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;font-size:11px;color:#6B5236;margin-bottom:10px'>";
+  html+="<b style='color:#D9A53C'>Como usar:</b> Salve a planilha como CSV (separador vírgula ou ponto-e-vírgula) e faça upload abaixo. Primeira linha deve ter os cabeçalhos.";
   html+="</div>";
-  html+="<label style='display:block;border:2px dashed #2a3a2a;border-radius:8px;padding:24px;text-align:center;cursor:pointer;color:#666'>";
-  html+="📂 Clique para selecionar arquivo CSV<br><small style='font-size:10px;color:#555'>.csv — separado por vírgula ou ponto-e-vírgula</small>";
+  html+="<label style='display:block;border:2px dashed #A87B22;border-radius:8px;padding:24px;text-align:center;cursor:pointer;color:#6B5236'>";
+  html+="📂 Clique para selecionar arquivo CSV<br><small style='font-size:10px;color:#a07c58'>.csv — separado por vírgula ou ponto-e-vírgula</small>";
   html+="<input type='file' accept='.csv,.txt' onchange='_invLerCSV(this)' style='display:none'>";
   html+="</label>";
   html+="</div>";
 
   // Preview e mapeamento de colunas
   html+="<div id='imp-preview-area' style='display:none'>";
-  html+="<div style='color:#10b981;font-size:12px;font-weight:700;margin-bottom:8px'>📊 Prévia — <span id='imp-preview-count'>0</span> linhas detectadas</div>";
+  html+="<div style='color:#D9A53C;font-size:12px;font-weight:700;margin-bottom:8px'>📊 Prévia — <span id='imp-preview-count'>0</span> linhas detectadas</div>";
   html+="<div id='imp-col-map' style='display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px'></div>";
-  html+="<div style='overflow-x:auto;max-height:220px;border:1px solid #2a2a2a;border-radius:6px'>";
+  html+="<div style='overflow-x:auto;max-height:220px;border:1px solid #DBC79E;border-radius:6px'>";
   html+="<table id='imp-preview-table' style='border-collapse:collapse;font-size:10px;width:100%'></table>";
   html+="</div>";
   html+="<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:12px'>";
-  html+="<button onclick=\"document.getElementById('modal-inv-import').remove()\" style='background:transparent;border:1px solid #333;color:#888;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
-  html+="<button id='imp-btn-importar' onclick='_invExecutarImport()' style='background:#10b981;border:none;color:#fff;padding:8px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✓ Importar Itens</button>";
+  html+="<button onclick=\"document.getElementById('modal-inv-import').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
+  html+="<button id='imp-btn-importar' onclick='_invExecutarImport()' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✓ Importar Itens</button>";
   html+="</div></div>";
 
   html+="</div></div></div>";
@@ -22070,7 +22073,7 @@ function _invImportTab(tab){
     var el=document.getElementById("imp-tab-"+t);
     var btn=document.getElementById("imp-tab-btn-"+t);
     if(el) el.style.display=t===tab?"block":"none";
-    if(btn){ btn.style.borderBottomColor=t===tab?"#10b981":"transparent"; btn.style.color=t===tab?"#10b981":"#666"; btn.style.fontWeight=t===tab?"700":"400"; }
+    if(btn){ btn.style.borderBottomColor=t===tab?"#D9A53C":"transparent"; btn.style.color=t===tab?"#D9A53C":"#a07c58"; btn.style.fontWeight=t===tab?"700":"400"; }
   });
 }
 
@@ -22169,23 +22172,23 @@ function _invRenderPreview(cols, rows){
       });
       sel+="</select>";
       mapEl.innerHTML+="<div style='background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px'>";
-      mapEl.innerHTML+="<div style='color:#888;font-size:9px;margin-bottom:3px'>Coluna: <b style='color:#d4a87a'>"+esc(col)+"</b></div>"+sel+"</div>";
+      mapEl.innerHTML+="<div style='color:#a07c58;font-size:9px;margin-bottom:3px'>Coluna: <b style='color:#D9A53C'>"+esc(col)+"</b></div>"+sel+"</div>";
     });
   }
 
   // Tabela prévia (max 5 linhas)
   var tbl=document.getElementById("imp-preview-table");
   if(tbl){
-    var th="<tr style='position:sticky;top:0;background:#1a2a1a'>";
-    cols.forEach(function(c){ th+="<th style='padding:4px 6px;border:1px solid #2a2a2a;color:#10b981;white-space:nowrap;font-size:9px'>"+esc(c)+"</th>"; });
+    var th="<tr style='position:sticky;top:0;background:#DBC79E'>";
+    cols.forEach(function(c){ th+="<th style='padding:4px 6px;border:1px solid #C8A84B;color:#3D2B1A;white-space:nowrap;font-size:9px'>"+esc(c)+"</th>"; });
     th+="</tr>";
     var td="";
     rows.slice(0,8).forEach(function(row,ri){
-      td+="<tr style='background:"+(ri%2?"#111":"#161616")+"'>";
-      row.forEach(function(cell){ td+="<td style='padding:3px 6px;border:1px solid #1a1a1a;color:#ccc;font-size:9px;white-space:nowrap'>"+esc(cell)+"</td>"; });
+      td+="<tr style='background:"+(ri%2?"#EAD9B8":"#F2E4C8")+"'>";
+      row.forEach(function(cell){ td+="<td style='padding:3px 6px;border:1px solid #DBC79E;color:#3D2B1A;font-size:9px;white-space:nowrap'>"+esc(cell)+"</td>"; });
       td+="</tr>";
     });
-    if(rows.length>8) td+="<tr><td colspan='"+cols.length+"' style='color:#555;font-size:9px;padding:4px 6px;text-align:center'>... mais "+(rows.length-8)+" linhas</td></tr>";
+    if(rows.length>8) td+="<tr><td colspan='"+cols.length+"' style='color:#a07c58;font-size:9px;padding:4px 6px;text-align:center'>... mais "+(rows.length-8)+" linhas</td></tr>";
     tbl.innerHTML=th+td;
   }
 }
