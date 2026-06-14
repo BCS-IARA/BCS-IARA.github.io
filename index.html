@@ -14319,24 +14319,14 @@ function _renderPatrimonioCadastro(h,IS){
   h.push("<button onclick='_armMigrarParaInventario()' style='background:#0a2a1a;border:1px solid #10b981;color:#10b981;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>"+(_naoMigrados>0?"📥 Migrar para Inventário":"🔄 Atualizar Inventário")+"</button>");
   h.push("</div>");
 
-  // Formulário de cadastro
-  h.push("<div style='background:#0a1428;border:2px solid #1a3a6a;border-radius:12px;padding:18px;margin-bottom:18px'>");
-  h.push("<h3 style='color:#a0c0ff;font-size:13px;font-weight:800;margin:0 0 14px'>➕ Cadastrar Novo Material</h3>");
-  h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px'>");
-  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Código / Nº Patrimônio <span style='color:#ef4444'>*</span></label>");
-  h.push("<input id='mat-cod' type='text' placeholder='Ex: COL-001 ou ARM-007' style='"+IS+"' oninput='this.value=this.value.toUpperCase()'/></div>");
-  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Tipo <span style='color:#ef4444'>*</span></label>");
-  h.push("<select id='mat-tipo' style='"+IS+"'><option value=''>Selecione...</option>");
-  TIPOS_MAT.forEach(function(t){ h.push("<option>"+t+"</option>"); });
-  h.push("</select></div>");
-  h.push("<div style='grid-column:1/-1'><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Descrição <span style='color:#ef4444'>*</span></label>");
-  h.push("<input id='mat-desc' type='text' placeholder='Ex: Pistola Glock G17 calibre .40' style='"+IS+"'/></div>");
-  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Nº de Série</label>");
-  h.push("<input id='mat-serie' type='text' placeholder='Ex: TM123456' style='"+IS+"' oninput='this.value=this.value.toUpperCase()'/></div>");
-  h.push("<div><label style='color:#4a7ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px'>Observação</label>");
-  h.push("<input id='mat-obs' type='text' placeholder='Opcional' style='"+IS+"'/></div>");
+  // Banner legado — novos itens devem ir para o Inventário (Trilho B)
+  h.push("<div style='background:var(--papel-2);border:2px solid var(--ambar);border-radius:10px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:14px'>");
+  h.push("<span style='font-size:26px'>⚠️</span>");
+  h.push("<div style='flex:1'>");
+  h.push("<p style='font-family:Georgia,serif;font-size:13px;font-weight:700;color:var(--tinta);margin:0 0 4px'>Módulo Legado — somente consulta</p>");
+  h.push("<p style='font-size:12px;color:var(--tinta-2);margin:0'>Novos itens devem ser cadastrados no <b>Inventário</b> (Trilho B). Este módulo mantém os registros históricos do período anterior à migração.</p>");
   h.push("</div>");
-  h.push("<button onclick='_matSalvar()' style='margin-top:14px;width:100%;background:linear-gradient(135deg,#1a3a8a,#0f2a6a);border:2px solid #3a6ae8;color:#a0c0ff;padding:11px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer'>✅ Cadastrar Material</button>");
+  h.push("<button onclick='setTela(\"inventario\")' style='background:var(--ambar);color:var(--madeira-3);border:none;border-radius:7px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0'>📦 Ir para o Inventário</button>");
   h.push("</div>");
 
   // Filtros da lista
@@ -19256,6 +19246,16 @@ function _invAbrirConferencia(confId){
   html+="<div><label style='color:#999;font-size:11px'>Responsável 1*</label><input id='conf-resp1' value='"+esc(conf.responsavel1||"")+"' placeholder='Nome e graduação' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
   html+="<div><label style='color:#999;font-size:11px'>Responsável 2</label><input id='conf-resp2' value='"+esc(conf.responsavel2||"")+"' placeholder='Nome e graduação' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
   html+="</div>";
+  // Parecer da comissão
+  html+="<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:2px'>";
+  html+="<div><label style='color:#999;font-size:11px'>Resultado da Comissão</label><select id='conf-resultado' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'>";
+  ["","aprovado","pendencia","reprovado"].forEach(function(v){
+    var l={"":" — Selecione —",aprovado:"✅ Aprovado",pendencia:"⚠️ Com Pendências",reprovado:"❌ Reprovado"}[v]||v;
+    html+="<option value='"+v+"'"+(conf.resultado===v?" selected":"")+">"+l+"</option>";
+  });
+  html+="</select></div>";
+  html+="<div><label style='color:#999;font-size:11px'>Observações da Comissão</label><input id='conf-parecer-obs' value='"+esc(conf.parecer_obs||"")+"' placeholder='Observações, ressalvas, prazos...' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
+  html+="</div>";
   // Lista de itens por categoria
   cats.forEach(function(cat){
     var catItens=itensAtivos.filter(function(x){return x.categoria===cat;});
@@ -19331,6 +19331,8 @@ function _invSalvarConferencia(confId, concluir){
   if(!window._invConfAtual) return;
   var conf=window._invConfAtual;
   conf.responsavel1=resp1; conf.responsavel2=resp2;
+  conf.resultado = (document.getElementById("conf-resultado")||{value:""}).value||"";
+  conf.parecer_obs = (document.getElementById("conf-parecer-obs")||{value:""}).value.trim();
   ["1","2"].forEach(function(n){
     var pc=document.getElementById("conf-pad"+n);
     if(pc){
@@ -20258,6 +20260,16 @@ function _invGerarPDFConferencia(confId){
   h+="</div>";
   // Tabela de itens
   h+="<h2>Itens Conferidos</h2>";
+  // Parecer
+  if(conf.resultado){
+    var pCor={aprovado:"#10b981",pendencia:"#f59e0b",reprovado:"#ef4444"}[conf.resultado]||"#888";
+    var pLabel={aprovado:"✅ Aprovado",pendencia:"⚠️ Com Pendências",reprovado:"❌ Reprovado"}[conf.resultado]||conf.resultado;
+    h+="<h2>Parecer da Comissão</h2>";
+    h+="<div style='border:2px solid "+pCor+";border-radius:8px;padding:10px 16px;margin-bottom:12px'>";
+    h+="<b style='color:"+pCor+";font-size:13px'>"+pLabel+"</b>";
+    if(conf.parecer_obs) h+="<p style='margin:6px 0 0;font-size:11px;color:#333'>"+esc(conf.parecer_obs)+"</p>";
+    h+="</div>";
+  }
   h+="<table><tr><th>#</th><th>Tombamento</th><th>Descrição</th><th>Localização</th><th>Estado</th><th>Resultado</th><th>Obs</th></tr>";
   itens.forEach(function(item,i){
     var res=conf.itens[item.id]||"pendente";
