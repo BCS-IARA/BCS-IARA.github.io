@@ -4040,22 +4040,52 @@ function renderDashboardVCM(main){
   }
   h+="</div>";
 
-  // CARDS
-  h+="<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px'>";
-  var cards=[
-    {id:"card-ativas",n:ativas.length,label:"Vítimas Ativas",icon:"👩",cor:"#ff69b4",sub:"acompanhamento em curso",list:ativas},
-    {id:"card-mp",n:comMp.length,label:"Medida Protetiva",icon:"🛡",cor:"#d4a87a",sub:"com MP vigente",list:comMp},
-    {id:"card-risco",n:riscoE.length,label:"Risco Elevado",icon:"🔴",cor:"#ef4444",sub:"FRIDA nível E",list:riscoE},
-    {id:"card-pend",n:visitasPend.length,label:"Visitas Agendadas",icon:"📅",cor:"#10b981",sub:"aguardando realização",list:visitasPend}
-  ];
-  cards.forEach(function(c){
-    h+="<div id='"+c.id+"' data-vcm-card='"+c.id+"' style='background:#0e0808;border:1px solid "+c.cor+"33;border-top:3px solid "+c.cor+";border-radius:10px;padding:16px;cursor:pointer;transition:background 0.15s' onmouseover=\"this.style.background='#1a1010'\" onmouseout=\"this.style.background='#0e0808'\">";
-    h+="<div style='display:flex;justify-content:space-between;align-items:start'>";
-    h+="<div><p style='color:"+c.cor+";font-size:28px;font-weight:700;margin:0'>"+c.n+"</p>";
-    h+="<p style='color:#f5ede0;font-size:12px;font-weight:600;margin:2px 0 0'>"+c.label+"</p>";
-    h+="<p style='color:#5a4040;font-size:10px;margin:2px 0 0'>"+c.sub+"</p></div>";
-    h+="<span style='font-size:22px'>"+c.icon+"</span></div></div>";
+  // BLOCO 1 — 5 MÉTRICAS COM DELTA
+  var _now=new Date(), _yrNow=_now.getFullYear(), _moNow=_now.getMonth();
+  var _msNow=String(_yrNow)+"-"+String(_moNow+1).padStart(2,"0");
+  var _msPrev=_moNow===0?(String(_yrNow-1)+"-12"):(String(_yrNow)+"-"+String(_moNow).padStart(2,"0"));
+  function _vcmDataMes(o){
+    var d=(o.data||o.criadoEm||"");
+    if(!d)return "";
+    d=String(d).trim();
+    if(d.match(/^\d{4}-\d{2}/))return d.slice(0,7);
+    if(d.match(/^\d{2}\/\d{2}\/\d{4}$/)){var p=d.split("/");return p[2]+"-"+p[1];}
+    var dt=new Date(d);
+    if(!isNaN(dt.getTime()))return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0");
+    return "";
+  }
+  var ocsVDAll=(state.db.ocorrencias||[]).filter(function(o){
+    var t=(o.tipo||"").toLowerCase();
+    return o.violencia_domestica||t.includes("maria da penha")||t.includes("violên?cia dom[eé]stica")||t.includes("violencia domestica")||t.includes("violência doméstica");
   });
+  var _novosEm=function(mes){return ocsVDAll.filter(function(o){return _vcmDataMes(o)===mes;}).length;};
+  var _novosMes=_novosEm(_msNow), _novosPrev=_novosEm(_msPrev);
+  var _fridaE=riscoE.length;
+  var _fridaEMes=(state.db.frida||[]).filter(function(f){return f.nivel==="E"&&_vcmDataMes(f)===_msNow;}).length;
+  var _fridaEPrev=(state.db.frida||[]).filter(function(f){return f.nivel==="E"&&_vcmDataMes(f)===_msPrev;}).length;
+  var _cobNow=ativas.length?Math.round((ativas.filter(function(v){return v.fridaRecente;}).length/ativas.length)*100):0;
+  var _cobPrev=ativas.length?Math.round(((ativas.length-semFrida.length)/ativas.length)*100):0;
+  var _visMes=(state.db.atendimentos||[]).filter(function(a){return _vcmDataMes(a)===_msNow;}).length;
+  var _visPrev=(state.db.atendimentos||[]).filter(function(a){return _vcmDataMes(a)===_msPrev;}).length;
+  function _metrica(id,val,label,icon,cor,sub,list,delta,meta){
+    var dSeta=delta>0?"▲ "+delta+" vs mês ant.":delta<0?"▼ "+Math.abs(delta)+" vs mês ant.":"= mesmo que mês ant.";
+    var dCor=delta>0?"#ef4444":delta<0?"#10b981":"#8a6a4a";
+    var metaBar=meta?("<div style='margin-top:6px'><div style='display:flex;justify-content:space-between;margin-bottom:2px'><span style='color:#7a5050;font-size:9px'>Cobertura</span><span style='color:"+(val>=meta?"#10b981":"#d4a87a")+";font-size:9px;font-weight:700'>"+val+"% / meta "+meta+"%</span></div><div style='background:#1a1010;border-radius:4px;height:5px'><div style='background:"+(val>=meta?"#10b981":"#d4a87a")+";width:"+Math.min(100,val)+"%;height:5px;border-radius:4px;transition:width 0.4s'></div></div></div>"):"";
+    return "<div id='"+id+"' data-vcm-card='"+id+"' style='background:#0e0808;border:1px solid "+cor+"33;border-top:3px solid "+cor+";border-radius:10px;padding:14px;cursor:pointer;transition:background 0.15s' onmouseover=\"this.style.background='#1a1010'\" onmouseout=\"this.style.background='#0e0808'\">"
+      +"<div style='display:flex;justify-content:space-between;align-items:start;margin-bottom:4px'>"
+      +"<div><p style='color:"+cor+";font-size:26px;font-weight:700;margin:0'>"+val+(meta?"%":"")+"</p>"
+      +"<p style='color:#f5ede0;font-size:11px;font-weight:600;margin:2px 0 0'>"+label+"</p>"
+      +"<p style='color:#5a4040;font-size:9px;margin:2px 0 0'>"+sub+"</p>"
+      +"<p style='color:"+dCor+";font-size:9px;margin:4px 0 0'>"+dSeta+"</p></div>"
+      +"<span style='font-size:20px'>"+icon+"</span></div>"
+      +metaBar+"</div>";
+  }
+  h+="<div style='display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px'>";
+  h+=_metrica("card-ativas",ativas.length,"Casos VD Ativos","👩","#ff69b4","acompanhamento em curso",ativas,_novosMes-_novosPrev,null);
+  h+=_metrica("card-risco",_fridaE,"FRIDA Nível E","🔴","#ef4444","risco elevado",riscoE,_fridaEMes-_fridaEPrev,null);
+  h+=_metrica("card-cob",_cobNow,"Cobertura FRIDA","📋","#d4a87a","% avaliadas",[],((_cobNow-_cobPrev)||0),80);
+  h+=_metrica("card-mp",comMp.length,"Medidas Protetivas","🛡","#60a5fa","MP vigente",comMp,0,null);
+  h+=_metrica("card-vis",_visMes,"Visitas este Mês","📅","#10b981","realizadas",visitasPend,_visMes-_visPrev,null);
   h+="</div>";
 
   // TERMÔMETRO DE RISCO
@@ -4077,20 +4107,18 @@ function renderDashboardVCM(main){
   });
   h+="</div>";
 
-  // GRÁFICOS
-  // linha 1: bairro + tipo
-  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px'>";
+  // BLOCO 3 — TENDÊNCIAS
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px'>";
   h+="<div style='background:#0e0808;border:1px solid #2a1a1a;border-radius:10px;padding:14px'>";
-  h+="<p style='color:#ff69b4;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 10px'>Ocorrências por Bairro</p>";
-  h+="<div style='height:170px'><canvas id='vcm-chart-bairro'></canvas></div></div>";
+  h+="<p style='color:#ff69b4;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px'>Casos VD por mês — 2025 vs 2026</p>";
+  h+="<div style='height:160px'><canvas id='vcm-chart-bairro'></canvas></div></div>";
   h+="<div style='background:#0e0808;border:1px solid #2a1a1a;border-radius:10px;padding:14px'>";
-  h+="<p style='color:#ff69b4;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 10px'>Tipos de Violência</p>";
-  h+="<div style='height:170px'><canvas id='vcm-chart-tipo'></canvas></div></div>";
-  h+="</div>";
-  // linha 2: linha do tempo (largura total)
-  h+="<div style='background:#0e0808;border:1px solid #2a1a1a;border-radius:10px;padding:14px;margin-bottom:18px'>";
-  h+="<p style='color:#ff69b4;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 10px'>Tendência — Ocorrências no Tempo</p>";
+  h+="<p style='color:#ff69b4;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px'>Medidas Protetivas — evolução</p>";
+  h+="<div style='height:160px'><canvas id='vcm-chart-tipo'></canvas></div></div>";
+  h+="<div style='background:#0e0808;border:1px solid #2a1a1a;border-radius:10px;padding:14px'>";
+  h+="<p style='color:#ff69b4;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px'>Cobertura FRIDA %</p>";
   h+="<div style='height:160px'><canvas id='vcm-chart-linha'></canvas></div></div>";
+  h+="</div>";
 
   // ALERTAS
   if(semVisita30.length||reincidentes.length){
@@ -4149,99 +4177,70 @@ function renderDashboardVCM(main){
 
   main.innerHTML=h;
 
-  // Base: todas as VCM dos bairros BCS (sem filtro de data) — para bairro e tipo
+  // Base: todas as VCM dos bairros BCS
   var ocsBase=(state.db.ocorrencias||[]).filter(function(o){
     var t=(o.tipo||"").toLowerCase();
-    var vcm=o.violencia_domestica||t.includes("maria da penha")||t.includes("violência doméstica")||t.includes("violencia domestica")||t.includes("vcm")||t.includes("violência contra a mulher")||t.includes("violencia contra a mulher");
-    return vcm&&_bairroBCS(o);
+    return (o.violencia_domestica||t.includes("maria da penha")||t.includes("violência doméstica")||t.includes("violencia domestica")||t.includes("vcm")||t.includes("violência contra a mulher")||t.includes("violencia contra a mulher"))&&_bairroBCS(o);
   });
-
-  // Gráfico 1 — Bairro: sempre todo o histórico
-  var bC={};ocsBase.forEach(function(o){if(o.bairro)bC[o.bairro]=(bC[o.bairro]||0)+1;});
-  var bData=Object.entries(bC).sort(function(a,b){return b[1]-a[1];}).slice(0,7);
-  var bcEl=document.getElementById("vcm-chart-bairro");
-  if(bcEl){if(state.charts.vcmBairro)state.charts.vcmBairro.destroy();
-    state.charts.vcmBairro=new Chart(bcEl,{type:"bar",data:{labels:bData.map(function(e){return e[0];}),datasets:[{data:bData.map(function(e){return e[1];}),backgroundColor:"#ff69b499",borderColor:"#ff1493",borderWidth:1,borderRadius:4}]},options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#7a5050",font:{size:9}},grid:{color:"#1a1010"}},y:{ticks:{color:"#d4c0a8",font:{size:10}},grid:{display:false}}}}});}
-
-  // Gráfico 2 — Tipo de violência: sempre todo o histórico
-  function catViolencia(o){
-    // busca em tipo + descricao + texto_original
-    var t=(o.tipo||"").toLowerCase()+" "+(o.descricao||"").toLowerCase()+" "+(o.texto_original||"").toLowerCase();
-    if(t.includes("lesão corp")||t.includes("lesao corp")||t.includes("vias de fato")||t.includes("espancamento")||t.includes("murro")||t.includes("soco")||t.includes("chute")||t.includes("tapa")||t.includes("agrediu fisicamente")||t.includes("violência física")||t.includes("violencia fisica")) return "Física";
-    if(t.includes("agressão")||t.includes("agressao")) return "Física";
-    if(t.includes("ameaça de morte")||t.includes("ameaca de morte")||t.includes("ameaçou matar")||t.includes("ameacou matar")) return "Psicológica";
-    if(t.includes("ameaça")||t.includes("ameaca")||t.includes("intimidação")||t.includes("intimidacao")||t.includes("humilhação")||t.includes("humilhacao")||t.includes("xingou")||t.includes("xingamento")||t.includes("psicológ")||t.includes("psicolog")||t.includes("coação")||t.includes("coacao")||t.includes("assédio")||t.includes("assedio")) return "Psicológica";
-    if(t.includes("moral")||t.includes("calúnia")||t.includes("calúnia")||t.includes("difamação")||t.includes("difamacao")||t.includes("injúria")||t.includes("injuria")) return "Moral";
-    if(t.includes("sexual")||t.includes("estupro")||t.includes("abuso sexual")||t.includes("importunação")||t.includes("importunacao")||t.includes("violação")||t.includes("violacao sexual")) return "Sexual";
-    if(t.includes("patrimon")||t.includes("destruiu")||t.includes("quebrou")||t.includes("dano")||t.includes("subtração")||t.includes("subtracao")||t.includes("furto de bem")) return "Patrimonial";
-    if(t.includes("stalking")||t.includes("perseguição")||t.includes("perseguicao")||t.includes("monitoramento")||t.includes("vigiando")) return "Perseguição";
-    if(t.includes("averiguação")||t.includes("averiguacao")||t.includes("apoio")||t.includes("visita solidária")||t.includes("visita solidaria")) return "Averiguação/Apoio";
-    return "Não especificado";
-  }
-  var tC={};ocsBase.forEach(function(o){var c=catViolencia(o);tC[c]=(tC[c]||0)+1;});
-  var tData=Object.entries(tC).sort(function(a,b){return b[1]-a[1];});
-  var tCores=["#ef4444","#d4a87a","#ff69b4","#f97316","#8b5cf6","#10b981","#3b82f6"];
-  var tcEl=document.getElementById("vcm-chart-tipo");
-  if(tcEl){if(state.charts.vcmTipo)state.charts.vcmTipo.destroy();
-    state.charts.vcmTipo=new Chart(tcEl,{type:"bar",data:{labels:tData.map(function(e){return e[0];}),datasets:[{data:tData.map(function(e){return e[1];}),backgroundColor:tData.map(function(_,i){return tCores[i%tCores.length]+"99";}),borderColor:tData.map(function(_,i){return tCores[i%tCores.length];}),borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#d4c0a8",font:{size:9},maxRotation:35},grid:{color:"#1a1010"}},y:{ticks:{color:"#7a5050",font:{size:9}},grid:{color:"#1a1010"}}}}});}
-
-  // Gráfico 3 — Linha de tendência ancorada na data mais recente dos dados
-  // Normaliza qualquer formato de data para "YYYY-MM-DD"
   function normData(o){
     var d=(o.data||o.criadoEm||"");
     if(!d)return "";
     d=String(d).trim();
-    // YYYY-MM-DD ou ISO com tempo
-    if(d.match(/^\d{4}-\d{2}-\d{2}/)) return d.slice(0,10);
-    // Formato BR: "15/03/2025"
+    if(d.match(/^\d{4}-\d{2}-\d{2}/))return d.slice(0,10);
     if(d.match(/^\d{2}\/\d{2}\/\d{4}$/)){var p=d.split("/");return p[2]+"-"+p[1]+"-"+p[0];}
-    // Qualquer outro formato (ex: "Wed Apr 22 2026..."): tenta parsear via Date
     var dt=new Date(d);
-    if(!isNaN(dt.getTime())){
-      var y=dt.getFullYear(),mo=String(dt.getMonth()+1).padStart(2,"0"),dy=String(dt.getDate()).padStart(2,"0");
-      return y+"-"+mo+"-"+dy;
-    }
+    if(!isNaN(dt.getTime())){var y=dt.getFullYear(),mo=String(dt.getMonth()+1).padStart(2,"0"),dy=String(dt.getDate()).padStart(2,"0");return y+"-"+mo+"-"+dy;}
     return "";
   }
-  var datas=ocsBase.map(normData).filter(function(d){
-    if(d.length!==10)return false;
-    var dt=new Date(d+"T12:00");
-    return !isNaN(dt.getTime());
-  }).sort();
-  var llEl=document.getElementById("vcm-chart-linha");
-  if(llEl&&datas.length){
-    if(state.charts.vcmLinha)state.charts.vcmLinha.destroy();
-    var ancora=new Date(datas[datas.length-1]+"T12:00");
-    if(isNaN(ancora.getTime()))ancora=new Date();
-    var labels=[],counts=[];
-    var ancMs=ancora.getTime();
-    if(periodo==="semana"){
-      for(var d=6;d>=0;d--){var dt=new Date(ancMs-d*86400000);var k=dt.toISOString().slice(0,10);labels.push(dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}));counts.push(ocsBase.filter(function(o){return normData(o)===k;}).length);}
-    } else if(periodo==="mes"){
-      for(var d=29;d>=0;d--){var dt=new Date(ancMs-d*86400000);var k=dt.toISOString().slice(0,10);labels.push(dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}));counts.push(ocsBase.filter(function(o){return normData(o)===k;}).length);}
-    } else if(periodo==="trimestre"){
-      var ancBase=ancora.getTime();
-      for(var w=12;w>=0;w--){
-        var ini=new Date(ancBase-w*7*86400000);
-        var fim=new Date(ancBase-w*7*86400000+6*86400000);
-        var iStr=ini.toISOString().slice(0,10);
-        var fStr=fim.toISOString().slice(0,10);
-        labels.push(ini.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}));
-        counts.push(ocsBase.filter(function(o){var nd=normData(o);return nd&&nd>=iStr&&nd<=fStr;}).length);
-      }
-    } else if(periodo==="semestre"){
-      for(var m=5;m>=0;m--){var mo=new Date(ancora.getFullYear(),ancora.getMonth()-m,1);var moStr=mo.toISOString().slice(0,7);labels.push(mo.toLocaleDateString("pt-BR",{month:"short",year:"2-digit"}));counts.push(ocsBase.filter(function(o){return normData(o).slice(0,7)===moStr;}).length);}
-    } else {
-      var cur=new Date(datas[0].slice(0,7)+"-01");
-      var end=new Date(ancora.getFullYear(),ancora.getMonth(),1);
-      while(cur<=end){
-        var curStr=cur.toISOString().slice(0,7);
-        labels.push(cur.toLocaleDateString("pt-BR",{month:"short",year:"2-digit"}));
-        counts.push(ocsBase.filter(function(o){return normData(o).slice(0,7)===curStr;}).length);
-        cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
-      }
+
+  // Gráfico 1 — Casos VD por mês: 2025 vs 2026
+  var bcEl=document.getElementById("vcm-chart-bairro");
+  if(bcEl){
+    if(state.charts.vcmBairro)state.charts.vcmBairro.destroy();
+    var _meses=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    var _data25=Array(12).fill(0), _data26=Array(12).fill(0);
+    ocsBase.forEach(function(o){
+      var nd=normData(o);
+      if(!nd)return;
+      var yr=parseInt(nd.slice(0,4)), mo=parseInt(nd.slice(5,7))-1;
+      if(yr===2025)_data25[mo]++;
+      else if(yr===2026)_data26[mo]++;
+    });
+    var _maxMo=new Date().getMonth();
+    var _lbls=_meses.slice(0,_maxMo+1);
+    state.charts.vcmBairro=new Chart(bcEl,{type:"bar",data:{labels:_lbls,datasets:[{label:"2025",data:_data25.slice(0,_maxMo+1),backgroundColor:"#ff69b444",borderColor:"#ff69b4",borderWidth:1,borderRadius:3},{label:"2026",data:_data26.slice(0,_maxMo+1),backgroundColor:"#ef444499",borderColor:"#ef4444",borderWidth:1,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#c8a0a0",font:{size:9}}}},scales:{x:{ticks:{color:"#7a5050",font:{size:9}},grid:{color:"#1a1010"}},y:{ticks:{color:"#7a5050",font:{size:9},stepSize:1},grid:{color:"#1a1010"},beginAtZero:true}}}});
+  }
+
+  // Gráfico 2 — Medidas protetivas: evolução mensal (últimos 6 meses)
+  var tcEl=document.getElementById("vcm-chart-tipo");
+  if(tcEl){
+    if(state.charts.vcmTipo)state.charts.vcmTipo.destroy();
+    var _mpLbls=[],_mpData=[];
+    for(var _mi=5;_mi>=0;_mi--){
+      var _mo2=new Date(_now.getFullYear(),_now.getMonth()-_mi,1);
+      var _moStr=_mo2.getFullYear()+"-"+String(_mo2.getMonth()+1).padStart(2,"0");
+      _mpLbls.push(_mo2.toLocaleDateString("pt-BR",{month:"short",year:"2-digit"}));
+      _mpData.push(ocsBase.filter(function(o){return o.medida_protetiva==="Sim"&&normData(o).slice(0,7)===_moStr;}).length);
     }
-    state.charts.vcmLinha=new Chart(llEl,{type:"line",data:{labels:labels,datasets:[{label:"Ocorrências VCM",data:counts,borderColor:"#ff69b4",backgroundColor:"#ff69b422",borderWidth:2,pointBackgroundColor:"#ff1493",pointRadius:3,tension:0.35,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#7a5050",font:{size:9},maxRotation:40},grid:{color:"#1a1010"}},y:{ticks:{color:"#7a5050",font:{size:9},stepSize:1},grid:{color:"#1a1010"},beginAtZero:true}}}});
+    state.charts.vcmTipo=new Chart(tcEl,{type:"line",data:{labels:_mpLbls,datasets:[{label:"MPs ativas",data:_mpData,borderColor:"#60a5fa",backgroundColor:"#60a5fa22",borderWidth:2,pointRadius:3,tension:0.35,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#7a5050",font:{size:9}},grid:{color:"#1a1010"}},y:{ticks:{color:"#7a5050",font:{size:9},stepSize:1},grid:{color:"#1a1010"},beginAtZero:true}}}});
+  }
+
+  // Gráfico 3 — Cobertura FRIDA % com meta 80%
+  var llEl=document.getElementById("vcm-chart-linha");
+  if(llEl){
+    if(state.charts.vcmLinha)state.charts.vcmLinha.destroy();
+    var _cobLbls=[],_cobData=[],_metaData=[];
+    for(var _mi=5;_mi>=0;_mi--){
+      var _mo3=new Date(_now.getFullYear(),_now.getMonth()-_mi,1);
+      var _moStr3=_mo3.getFullYear()+"-"+String(_mo3.getMonth()+1).padStart(2,"0");
+      _cobLbls.push(_mo3.toLocaleDateString("pt-BR",{month:"short",year:"2-digit"}));
+      var _vdMes=ocsBase.filter(function(o){return normData(o).slice(0,7)===_moStr3;});
+      var _fridaMes=(state.db.frida||[]).filter(function(f){return _vcmDataMes(f)===_moStr3;});
+      var _cob=_vdMes.length?Math.round((_vdMes.filter(function(o){return _fridaMes.some(function(f){return f.ocorrenciaId===o.id;});}).length/_vdMes.length)*100):0;
+      _cobData.push(_cob);
+      _metaData.push(80);
+    }
+    state.charts.vcmLinha=new Chart(llEl,{type:"line",data:{labels:_cobLbls,datasets:[{label:"Cobertura %",data:_cobData,borderColor:"#d4a87a",backgroundColor:"#d4a87a22",borderWidth:2,pointRadius:3,tension:0.35,fill:true},{label:"Meta 80%",data:_metaData,borderColor:"#10b981",borderWidth:1,borderDash:[5,5],pointRadius:0,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#c8a0a0",font:{size:9}}}},scales:{x:{ticks:{color:"#7a5050",font:{size:9}},grid:{color:"#1a1010"}},y:{ticks:{color:"#7a5050",font:{size:9},callback:function(v){return v+"%";}},grid:{color:"#1a1010"},beginAtZero:true,max:100}}}});
   }
 
   // Cards clicáveis
@@ -4249,7 +4248,8 @@ function renderDashboardVCM(main){
     "card-ativas":{titulo:"Vítimas Ativas",list:ativas},
     "card-mp":{titulo:"Com Medida Protetiva",list:comMp},
     "card-risco":{titulo:"Risco Elevado (FRIDA E)",list:riscoE},
-    "card-pend":{titulo:"Visitas Agendadas",list:visitasPend}
+    "card-vis":{titulo:"Visitas este Mês",list:visitasPend},
+    "card-cob":{titulo:"Cobertura FRIDA",list:ativas.filter(function(v){return !v.fridaRecente;})}
   };
   main.querySelectorAll("[data-vcm-card]").forEach(function(el){
     el.onclick=function(){var d=cardData[this.dataset.vcmCard];if(d&&d.list.length)_modalVcm(d.titulo,d.list);};
@@ -5008,7 +5008,7 @@ function renderDashComandante(main){
 
   // ── Tabs principais ───────────────────────────────
   h.push("<div style='display:flex;gap:4px;margin-bottom:18px;flex-wrap:wrap'>");
-  [['inicio','🏠 Início'],['crime','📊 Criminalidade'],['visitas','🤝 Visitas Solidárias'],['escolar','🏫 Ronda Escolar'],['vcm','🌸 Monitor VCM'],['projetos','🟢 Projetos'],['instrutores','👨‍🏫 Instrutores'],['auditoria','🔍 Auditoria'],['iara','✦ IARA']].forEach(function(tb){
+  [['inicio','🏠 Início'],['crime','📊 Criminalidade'],['visitas','🤝 Visitas Solidárias'],['escolar','🏫 Ronda Escolar'],['vcm','🌸 Monitor VCM'],['gestao','📁 Gestão'],['projetos','🟢 Proj. Sociais'],['instrutores','👨‍🏫 Instrutores'],['auditoria','🔍 Auditoria'],['iara','✦ IARA']].forEach(function(tb){
     var ativ=tabAtiva===tb[0];
     h.push("<button onclick=\"state._cmdTab='"+tb[0]+"';renderDashComandante(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid "+(ativ?"#d4a87a":"#5e4636")+";background:"+(ativ?"#d4a87a22":"#2a1c10")+";color:"+(ativ?"#d4a87a":"#8a6a4a")+"'>"+tb[1]+"</button>");
   });
@@ -5546,6 +5546,13 @@ function renderDashComandante(main){
   }
 
   // ══════════════════════════════════════════════════
+  // ABA: GESTÃO E PLANEJAMENTO
+  // ══════════════════════════════════════════════════
+  if(tabAtiva==="gestao"){
+    h.push("<div id='gestao-cmd-embed'></div>");
+  }
+
+  // ══════════════════════════════════════════════════
   // ABA: IARA — Assistente Inteligente
   // ══════════════════════════════════════════════════
   if(tabAtiva==="iara"){
@@ -5738,6 +5745,12 @@ function renderDashComandante(main){
   if(tabAtiva==="projetos"){
     var _projEmbed = document.getElementById("proj-cmd-embed");
     if(_projEmbed) renderGestaoProjectos(_projEmbed);
+  }
+
+  // Gestão e Planejamento — renderizar no container embutido
+  if(tabAtiva==="gestao"){
+    var _gestaoEmbed = document.getElementById("gestao-cmd-embed");
+    if(_gestaoEmbed) renderGestaoProjectos(_gestaoEmbed);
   }
 
   // Instrutores — renderizar no container embutido
@@ -14746,22 +14759,26 @@ function render(){
       <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="color:${state.tela==='importar_zap'?'#d4a87a':'#d4a87a66'};border-color:${state.tela==='importar_zap'?'#d4a87a':'transparent'}">📥 Importar Dados</button>
       <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#10b981':'#10b98166'};border-color:${state.tela==='inventario'?'#10b981':'transparent'}">📦 Inventário</button>
     `:`
-      <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="background:${state.tela==='importar_zap'?'rgba(212,168,122,0.15)':'rgba(200,168,75,0.06)'};border:1px solid ${state.tela==='importar_zap'?'#d4a87a':'rgba(200,168,75,0.3)'};color:#d4a87a;font-weight:700;margin-bottom:6px">📥 Importar Dados</button>
+      <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="background:${state.tela==='importar_zap'?'rgba(212,168,122,0.15)':'rgba(200,168,75,0.06)'};border:1px solid ${state.tela==='importar_zap'?'#d4a87a':'rgba(200,168,75,0.3)'};color:#d4a87a;font-weight:700;margin-bottom:8px">📥 Importar Dados</button>
+      <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:4px 0 2px">Operacional</p>
+      <button class="nav-btn${state.tela==="dashboard"?" active":""}" data-tela="dashboard" onclick="setTela('dashboard')">📊 Painel</button>
+      <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" data-tela="ocorrencias" onclick="setTela('ocorrencias')">🔍 Ocorrências</button>
+      <button class="nav-btn${state.tela==="calendario"?" active":""}" data-tela="calendario" onclick="setTela('calendario')">🗓 Calendário</button>
+      <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:8px 0 2px">Central de Atendimento</p>
       ${(function(){
         var _ativo=state.tela==="fila_auxiliar";
         var _nPend=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length + (state.db.agendamentos||[]).filter(function(a){return a.data===hoje()&&(a.status||"Agendado")==="Agendado";}).length;
         var _badge=_nPend>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";"+"color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nPend+"</span>":"";
         return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"fila_auxiliar\")'>📋 Fila do Dia"+_badge+"</button>";
       })()}
-      <button class="nav-btn${state.tela==="dashboard"?" active":""}" data-tela="dashboard" onclick="setTela('dashboard')">📊 Painel</button>
-      <button class="nav-btn${state.tela==="dashcomandante"?" active":""}" data-tela="dashcomandante" onclick="setTela('dashcomandante')" style="color:${state.tela==="dashcomandante"?"#d4a87a":"#b0805088"};border-color:${state.tela==="dashcomandante"?"#d4a87a":"transparent"}">${(function(){ var nP=(state.alertasProjetos||[]).filter(function(a){return !a.lido;}).length; var nC=(state.alertasCrescimento||[]).filter(function(a){return !a.lido;}).length; var total=nP+nC; if(nC>0) return "⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>🚨 "+total+"</span>"; if(nP>0) return "⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>"+nP+"</span>"; return "⚔️ Painel do Comando"; })()}</button>
-      <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" data-tela="ocorrencias" onclick="setTela('ocorrencias')">🔍 Analisar Ocorrências</button>
       ${(function(){
         var _nTriar=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length;
         var _ativo=state.tela==="triagem";
         var _badge=_nTriar>0?"<span style='background:"+(_ativo?"#fff":"var(--verm)")+";"+"color:"+(_ativo?"var(--verm)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nTriar+"</span>":"";
         return "<button class='nav-btn"+(_ativo?" active":"")+"' data-tela='triagem' onclick='setTela(\"triagem\")' style='"+((_nTriar>0&&!_ativo)?"color:var(--verm);animation:piscar-suave 2s infinite;":"")+"'>📥 Triagem"+_badge+"</button>";
       })()}
+      <button class="nav-btn${state.tela==="dashvcm"?" active":""}" data-tela="dashvcm" onclick="setTela('dashvcm')" style="${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0&&state.tela!=="dashvcm"?"animation:piscar-rosa 1.4s infinite;color:#ff69b4;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";";})()}">🌸 VCM${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0?` <span style="background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${_n}</span>`:"";})()}</button>
+      <button class="nav-btn${state.tela==="cadastrosvcm"?" active":""}" data-tela="cadastrosvcm" onclick="setTela('cadastrosvcm')" style="color:#ff69b4;border-color:${state.tela==="cadastrosvcm"?"#ff1493":"transparent"}">💜 Atendimentos VCM</button>
       ${(function(){
         var _nEnc=(state.encaminhamentos||[]).filter(function(e){return e.status!=="concluido";}).length;
         var _ativo=state.tela==="encaminhamentos";
@@ -14774,15 +14791,16 @@ function render(){
         var _badge=_nDev>0?"<span style='background:"+(_ativo?"#fff":"#22c55e")+";"+"color:"+(_ativo?"#22c55e":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nDev+" novo</span>":"";
         return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"devolutivas\")' style='color:#22c55e;border-color:"+(_ativo?"#22c55e":"transparent")+((_nDev>0&&!_ativo)?";animation:piscar-suave 2s infinite":"")+"'>↩ Devolutivas"+_badge+"</button>";
       })()}
-      <button class="nav-btn${state.tela==="calendario"?" active":""}" data-tela="calendario" onclick="setTela('calendario')">🗓 Calendário</button>
-      <button class="nav-btn${state.tela==="dashvcm"?" active":""}" data-tela="dashvcm" onclick="setTela('dashvcm')" style="${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0&&state.tela!=="dashvcm"?"animation:piscar-rosa 1.4s infinite;color:#ff69b4;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";";})()}">🌸 Dashboard VCM${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return _n>0?` <span style="background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${_n}</span>`:"";})()}</button>
-      <button class="nav-btn${state.tela==="cadastrosvcm"?" active":""}" data-tela="cadastrosvcm" onclick="setTela('cadastrosvcm')" style="color:#ff69b4;border-color:${state.tela==="cadastrosvcm"?"#ff1493":"transparent"}">💜 Atendimentos Realizados</button>
-      <button class="nav-btn${state.tela==="assistente"?" active":""}" data-tela="assistente" onclick="setTela('assistente')" style="color:${state.tela==="assistente"?"#6B5236":"#6B523688"};border-color:${state.tela==="assistente"?"#6B5236":"transparent"}">🤖 Assistente IA</button>
-      <button class="nav-btn${state.tela==="escolas"?" active":""}" data-tela="escolas" onclick="setTela('escolas')" style="color:${state.tela==="escolas"?"#38bdf8":"#38bdf888"};border-color:${state.tela==="escolas"?"#38bdf8":"transparent"}">🏫 Módulo Escolar</button>
+      <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:8px 0 2px">Gestão Comunitária</p>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" data-tela="projetossociais" onclick="setTela('projetossociais')" style="color:${state.tela==='projetossociais'?'#6B5236':'#6B523688'};border-color:${state.tela==='projetossociais'?'#6B5236':'transparent'}">🌱 Projetos Sociais</button>
+      <button class="nav-btn${state.tela==="escolas"?" active":""}" data-tela="escolas" onclick="setTela('escolas')" style="color:${state.tela==="escolas"?"#38bdf8":"#38bdf888"};border-color:${state.tela==="escolas"?"#38bdf8":"transparent"}">🏫 Módulo Escolar</button>
+      <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:8px 0 2px">Módulos</p>
       <button class="nav-btn${state.tela==="armamento"?" active":""}" data-tela="armamento" onclick="setTela('armamento')" style="color:${state.tela==='armamento'?'#60a5fa':'#60a5fa66'};border-color:${state.tela==='armamento'?'#60a5fa':'transparent'}">🔫 Livro de Parte</button>
       <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#10b981':'#10b98166'};border-color:${state.tela==='inventario'?'#10b981':'transparent'}">📦 Inventário</button>
       <button class="nav-btn${state.tela==="solicitacoes"?" active":""}" data-tela="solicitacoes" onclick="setTela('solicitacoes')" style="color:${state.tela==='solicitacoes'?'#d4a87a':'#d4a87a66'};border-color:${state.tela==='solicitacoes'?'#d4a87a':'transparent'}">${(function(){ var n=(state.solicitacoes||[]).filter(function(s){return s.status==="pendente";}).length; return "📄 Solicitações"+(n>0?" <span style='background:#d4a87a;color:#1a0e00;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+n+"</span>":""); })()}</button>
+      <button class="nav-btn${state.tela==="assistente"?" active":""}" data-tela="assistente" onclick="setTela('assistente')" style="color:${state.tela==="assistente"?"#6B5236":"#6B523688"};border-color:${state.tela==="assistente"?"#6B5236":"transparent"}">🤖 Assistente IA</button>
+      <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:8px 0 2px">Comando</p>
+      <button class="nav-btn${state.tela==="dashcomandante"?" active":""}" data-tela="dashcomandante" onclick="setTela('dashcomandante')" style="color:${state.tela==="dashcomandante"?"#d4a87a":"#b0805088"};border-color:${state.tela==="dashcomandante"?"#d4a87a":"transparent"}">${(function(){ var nP=(state.alertasProjetos||[]).filter(function(a){return !a.lido;}).length; var nC=(state.alertasCrescimento||[]).filter(function(a){return !a.lido;}).length; var total=nP+nC; if(nC>0) return "⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>🚨 "+total+"</span>"; if(nP>0) return "⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>"+nP+"</span>"; return "⚔️ Painel do Comando"; })()}</button>
           `}
     <div style="margin-top:auto;border-top:1px solid #42301e;padding-top:10px">
       <button onclick="setTela('config')" style="background:${state.tela==='config'?'rgba(100,120,140,0.15)':'transparent'};border:none;border-left:2px solid ${state.tela==='config'?'#6a9aba':'transparent'};color:${state.tela==='config'?'#a0bcd0':'#6a7a8a'};font-size:11px;width:100%;text-align:left;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;border-radius:0 6px 6px 0">⚙️ <span>Configurações</span></button>
