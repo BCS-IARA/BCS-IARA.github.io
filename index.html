@@ -20951,6 +20951,15 @@ function _invAbrirConferencia(confId){
   html+="</select></div>";
   html+="<div><label style='color:#999;font-size:11px'>Observações da Comissão</label><input id='conf-parecer-obs' value='"+esc(conf.parecer_obs||"")+"' placeholder='Observações, ressalvas, prazos...' style='width:100%;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box'></div>";
   html+="</div>";
+  // Busca + barra de progresso
+  var _totalConf=Object.values(conf.itens||{}).filter(function(v){return v==="ok"||v==="divergencia"||v==="ausente";}).length;
+  var _totalItens=itensAtivos.length;
+  var _pct=_totalItens?Math.round(_totalConf/_totalItens*100):0;
+  html+="<div style='background:#1a1208;border-radius:8px;padding:10px 14px'>";
+  html+="<div style='display:flex;justify-content:space-between;margin-bottom:6px'><span style='color:#d4a87a;font-size:11px;font-weight:700'>Progresso</span><span style='color:#e8e0d0;font-size:11px;font-weight:700'>"+_totalConf+"/"+_totalItens+" itens · "+_pct+"%</span></div>";
+  html+="<div style='background:#2a2a1a;border-radius:4px;height:6px'><div style='background:"+(_pct===100?"#22c55e":_pct>50?"#d4a87a":"#4a9fd4")+";width:"+_pct+"%;height:6px;border-radius:4px;transition:width 0.3s'></div></div>";
+  html+="</div>";
+  html+="<input id='inv-conf-busca' type='text' placeholder='🔍 Buscar por nome, n.º série ou categoria…' oninput='_invConfFiltrar()' style='width:100%;box-sizing:border-box;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:9px 12px;border-radius:7px;font-size:13px'>";
   // Lista de itens por categoria
   cats.forEach(function(cat){
     var catItens=itensAtivos.filter(function(x){return x.categoria===cat;});
@@ -20961,7 +20970,7 @@ function _invAbrirConferencia(confId){
     html+="</div><div style='padding:8px 14px'>";
     catItens.forEach(function(item){
       var status=conf.itens[item.id]||"pendente";
-      html+="<div style='display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1a1a1a'>";
+      html+="<div class='inv-conf-item' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' style='display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1a1a1a'>";
       html+="<span style='flex:1;color:#e8e0d0;font-size:12px'>"+esc(item.descricao)+(item.tombamento?" <span style='color:#666;font-size:10px'>#"+esc(item.tombamento)+"</span>":"")+"</span>";
       html+="<span style='color:#888;font-size:11px'>"+esc(item.localizacao||"—")+"</span>";
       html+="<div style='display:flex;gap:4px'>";
@@ -21058,6 +21067,15 @@ function _invAplicarFiltros(){
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
 }
+
+window._invConfFiltrar=function(){
+  var inp=document.getElementById("inv-conf-busca");
+  if(!inp) return;
+  var q=inp.value.toLowerCase().trim();
+  document.querySelectorAll(".inv-conf-item").forEach(function(el){
+    el.style.display=(q&&!el.dataset.busca.includes(q))?"none":"flex";
+  });
+};
 
 // ══════════════════════════════════════════════════════════════════
 // PAINEL DE DEVOLUTIVAS
