@@ -3262,6 +3262,19 @@ function renderCharts() {
 // ══════════════════════════════════════════════════
 // CALENDAR
 // ══════════════════════════════════════════════════
+function confirmarVisita(id, resultado){
+  var ag=(state.db.agendamentos||[]).find(function(a){return a.id===id;});
+  if(!ag){showToast("Agendamento não encontrado","error");return;}
+  ag.status=resultado;
+  ag.resultado_guarnicao=resultado;
+  ag.data_confirmacao=new Date().toISOString();
+  salvarLocal();
+  sincronizarSheets();
+  showToast(resultado==="Realizado"?"✅ Visita confirmada como realizada!":"❌ Visita marcada como não realizada.","success");
+  renderCalendar();
+}
+window.confirmarVisita=confirmarVisita;
+
 function renderCalendar() {
   const cal = document.getElementById("cal-container");
   if(!cal) return;
@@ -3408,7 +3421,13 @@ function renderCalendar() {
         <button onclick="abrirModalEventoAvulso('${diaSel}')" style="background:#1a2810;border:1px solid #6a8a50;color:#a8d890;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">+ Evento neste dia</button>
       </div>`;
     if(!totalEvs) html+=`<div style="text-align:center;padding:24px 0"><p style="font-size:20px;margin-bottom:6px">✓</p><p style="color:#5e4636;font-size:13px;font-weight:600">Nenhum evento neste dia — tudo em dia</p></div>`;
-    ev.ags.forEach(a=>{const c=COR_VISITA[a.tipo]||"#d4a87a";html+=`<div class="cal-ag-item" data-ag-id="${a.id}" style="background:#36221a;border-left:3px solid ${c};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onmouseover="this.style.background='#3c2818'" onmouseout="this.style.background='#36221a'"><div style="display:flex;justify-content:space-between;margin-bottom:4px">${tag(a.tipo,c)}<span style="color:#a07c58;font-size:12px">${normHora(a.hora)}</span></div><p style="color:#f5ede0;font-size:14px;font-weight:500">${a.vitima_nome}</p>${a.endereco?`<p style="color:#a07c58;font-size:12px">📍 ${a.endereco}</p>`:""}</div>`;});
+    ev.ags.forEach(a=>{
+      const c=COR_VISITA[a.tipo]||"#d4a87a";
+      var _stCor=a.status==="Realizado"?"#22c55e":a.status==="NaoRealizado"?"#ef4444":c;
+      var _stBadge=a.status==="Realizado"?"<span style='background:#22c55e22;color:#22c55e;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>✅ Realizado</span>":a.status==="NaoRealizado"?"<span style='background:#ef444422;color:#ef4444;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>❌ Não realizado</span>":"";
+      var _btnsGuarnicao=state.perfil==="guarnicao"&&a.status!=="Realizado"&&a.status!=="NaoRealizado"?`<div style="display:flex;gap:6px;margin-top:8px"><button onclick="event.stopPropagation();confirmarVisita('${a.id}','Realizado')" style="flex:1;background:#10b98133;border:1px solid #22c55e;color:#22c55e;padding:8px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Realizei</button><button onclick="event.stopPropagation();confirmarVisita('${a.id}','NaoRealizado')" style="flex:1;background:#ef444411;border:1px solid #ef4444;color:#ef4444;padding:8px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✗ Não fui</button></div>`:"";
+      html+=`<div class="cal-ag-item" data-ag-id="${a.id}" style="background:#36221a;border-left:3px solid ${_stCor};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;opacity:${a.status==="Realizado"||a.status==="NaoRealizado"?0.75:1}" onmouseover="this.style.background='#3c2818'" onmouseout="this.style.background='#36221a'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">${tag(a.tipo,_stCor)}<span style="color:#a07c58;font-size:12px">${normHora(a.hora)}</span></div><p style="color:#f5ede0;font-size:14px;font-weight:500">${a.vitima_nome}</p>${a.endereco?`<p style="color:#a07c58;font-size:12px">📍 ${a.endereco}</p>`:""} ${_stBadge}${_btnsGuarnicao}</div>`;
+    });
     ev.vis.forEach(v=>{html+=`<div style="background:#36221a;border-left:3px solid #10b981;border-radius:8px;padding:12px;margin-bottom:8px">${tag("✓ Realizada","#10b981")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${v.vitima_nome}</p>${v.resultado?`<p style="color:#a07c58;font-size:12px;margin-top:4px">${v.resultado}</p>`:""}</div>`;});
     escDia.forEach(a=>{html+=`<div style="background:#0f2035;border-left:3px solid #38bdf8;border-radius:8px;padding:12px;margin-bottom:8px">${tag("🏫 "+esc(a.subtipo||a.tipo||"Visita Escolar"),"#38bdf8")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${esc(a.escolaNome||"Escola")}</p>${a.responsavel?`<p style="color:#a07c58;font-size:12px;margin-top:4px">👮 ${esc(a.responsavel)}</p>`:""}${a.tema?`<p style="color:#a07c58;font-size:11px;margin-top:2px">${esc(a.tema)}</p>`:""}</div>`;});
     chamDia.forEach(c=>{html+=`<div style="background:#EAD9B8;border-left:3px solid #6B5236;border-radius:8px;padding:12px;margin-bottom:8px">${tag("📚 "+esc(c.projetoNome||"Aula"),"#6B5236")}<p style="color:#6B5236;font-size:12px;margin-top:6px">👨‍🏫 ${esc(c.instrutor||"Instrutor")}</p>${c.presencas?`<p style="color:#a07c58;font-size:11px;margin-top:2px">Presenças: ${Array.isArray(c.presencas)?c.presencas.filter(Boolean).length:c.presencas}</p>`:""}</div>`;});
