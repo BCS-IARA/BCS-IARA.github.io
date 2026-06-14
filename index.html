@@ -19578,49 +19578,49 @@ function renderModuloConselho(main){
   if(!main) return;
   var tab = state.conselho_tab || "atas";
   var h = [];
-  var IS = "width:100%;background:#0a1a12;border:1px solid #1a3a22;color:#d0f0d8;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
-  var LS = "color:#22c55e88;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
+  var IS = "width:100%;background:#1a1208;border:1px solid #5e4636;color:#f5ede0;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
+  var LS = "color:#a07c58;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
 
   h.push("<div style='max-width:860px;margin:0 auto;padding:16px 20px 60px'>");
 
   // Header
-  h.push("<div style='display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:14px 18px;background:linear-gradient(135deg,#EAD9B8,#0a2a14);border:1px solid #22c55e33;border-radius:12px'>");
-  h.push("<div style='width:44px;height:44px;background:#0a2a14;border:2px solid #22c55e;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0'>🏛</div>");
-  h.push("<div style='flex:1'><h2 style='color:#e8ffe8;font-size:16px;font-weight:700;margin:0 0 2px'>Conselho Comunitário de Segurança</h2><p style='color:#22c55e88;font-size:10px;margin:0;letter-spacing:.5px'>77ª CIPM · Nova Cidade / BCS</p></div>");
+  h.push("<div style='display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:14px 18px;background:linear-gradient(135deg,#EAD9B8,#2a1c10);border:1px solid #C8A84B44;border-radius:12px'>");
+  h.push("<div style='width:44px;height:44px;background:#2a1c10;border:2px solid #C8A84B;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0'>🏛</div>");
+  h.push("<div style='flex:1'><h2 style='color:#f5ede0;font-size:16px;font-weight:700;margin:0 0 2px'>Conselho Comunitário de Segurança</h2><p style='color:#a07c5888;font-size:10px;margin:0;letter-spacing:.5px'>77ª CIPM · Nova Cidade / BCS</p></div>");
   h.push("</div>");
 
   // Tabs
   var tabs=[["atas","📋 Atas"],["associados","👥 Associados"],["diretoria","🏅 Diretoria"],["calendario","📅 Calendário"]];
-  h.push("<div style='display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid #1a3a22;padding-bottom:12px;flex-wrap:wrap'>");
+  h.push("<div style='display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid #5e4636;padding-bottom:12px;flex-wrap:wrap'>");
   tabs.forEach(function(t){
     var sel = tab===t[0];
-    h.push("<button onclick=\"state.conselho_tab='"+t[0]+"';renderModuloConselho(document.getElementById('main'))\" style='background:"+(sel?"#0a3a1a":"#EAD9B8")+";border:1px solid "+(sel?"#22c55e":"#1a3a22")+";color:"+(sel?"#c8ffd8":"#22c55e88")+";padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>"+t[1]+"</button>");
+    h.push("<button onclick=\"state.conselho_tab='"+t[0]+"';renderModuloConselho(document.getElementById('main'))\" style='background:"+(sel?"#2a1c10":"#EAD9B8")+";border:1px solid "+(sel?"#C8A84B":"#5e4636")+";color:"+(sel?"#f5ede0":"#6B5236")+";padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>"+t[1]+"</button>");
   });
   h.push("</div>");
 
   // ── ABA: ATAS ──────────────────────────────────────────────────
   if(tab==="atas"){
     h.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>");
-    h.push("<p style='color:#22c55e;font-size:13px;font-weight:700;margin:0'>"+((state.conselho_atas||[]).length)+" ata(s) registrada(s)</p>");
-    h.push("<button onclick='abrirModalAta()' style='background:#0a3a1a;border:1px solid #22c55e;color:#22c55e;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>+ Nova Ata</button>");
+    h.push("<p style='color:#C8A84B;font-size:13px;font-weight:700;margin:0'>"+((state.conselho_atas||[]).length)+" ata(s) registrada(s)</p>");
+    h.push("<button onclick='abrirModalAta()' style='background:#2a1c10;border:1px solid #C8A84B;color:#C8A84B;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>+ Nova Ata</button>");
     h.push("</div>");
     if(!(state.conselho_atas||[]).length){
-      h.push("<div style='text-align:center;padding:60px 20px;color:#1a4a2a'><div style='font-size:40px;margin-bottom:12px'>📋</div><p style='font-size:14px;color:#22c55e44'>Nenhuma ata registrada</p></div>");
+      h.push("<div style='text-align:center;padding:60px 20px'><div style='font-size:40px;margin-bottom:12px'>📋</div><p style='font-size:14px;color:#a07c5866'>Nenhuma ata registrada</p></div>");
     } else {
       var atasOrd = (state.conselho_atas||[]).slice().sort(function(a,b){return (b.data||"")>(a.data||"")?1:-1;});
       atasOrd.forEach(function(a){
-        h.push("<div style='background:#EAD9B8;border:1px solid #1a3a22;border-left:3px solid #22c55e;border-radius:8px;padding:14px 16px;margin-bottom:8px'>");
+        h.push("<div style='background:#EAD9B8;border:1px solid #5e4636;border-left:3px solid #C8A84B;border-radius:8px;padding:14px 16px;margin-bottom:8px'>");
         h.push("<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:10px'>");
         h.push("<div style='flex:1'>");
         h.push("<div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>");
-        h.push("<span style='background:#22c55e22;color:#22c55e;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>Nº "+esc(a.numero||"--")+"</span>");
-        h.push("<span style='color:#4a7a5a;font-size:11px'>"+fmtData(a.data)+(a.hora?" · "+a.hora:"")+"</span>");
+        h.push("<span style='background:#C8A84B22;color:#6B5236;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>Nº "+esc(a.numero||"--")+"</span>");
+        h.push("<span style='color:#6B5236;font-size:11px'>"+fmtData(a.data)+(a.hora?" · "+a.hora:"")+"</span>");
         h.push("</div>");
-        h.push("<p style='color:#c8ffd8;font-size:13px;font-weight:600;margin:0 0 4px'>"+esc(a.pauta||"Sem título")+"</p>");
-        if(a.presentes&&a.presentes.length) h.push("<p style='color:#4a7a5a;font-size:11px;margin:0'>"+a.presentes.length+" presente(s)</p>");
+        h.push("<p style='color:#2a1c10;font-size:13px;font-weight:600;margin:0 0 4px'>"+esc(a.pauta||"Sem título")+"</p>");
+        if(a.presentes&&a.presentes.length) h.push("<p style='color:#6B5236;font-size:11px;margin:0'>"+a.presentes.length+" presente(s)</p>");
         h.push("</div>");
         h.push("<div style='display:flex;gap:6px'>");
-        h.push("<button onclick='verAta(\""+a.id+"\")' style='background:#0a2a14;border:1px solid #22c55e44;color:#22c55e;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer'>Ver</button>");
+        h.push("<button onclick='verAta(\""+a.id+"\")' style='background:#2a1c10;border:1px solid #C8A84B44;color:#C8A84B;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer'>Ver</button>");
         h.push("<button onclick='excluirAta(\""+a.id+"\")' style='background:#1a0808;border:1px solid #c0505044;color:#c05050;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer'>🗑</button>");
         h.push("</div></div></div>");
       });
@@ -19631,22 +19631,22 @@ function renderModuloConselho(main){
   if(tab==="associados"){
     var assocAtivos = (state.conselho_associados||[]).filter(function(a){return a.status!=="inativo";});
     h.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>");
-    h.push("<p style='color:#22c55e;font-size:13px;font-weight:700;margin:0'>"+assocAtivos.length+" associado(s) ativo(s)</p>");
-    h.push("<button onclick='abrirModalAssociado()' style='background:#0a3a1a;border:1px solid #22c55e;color:#22c55e;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>+ Cadastrar</button>");
+    h.push("<p style='color:#C8A84B;font-size:13px;font-weight:700;margin:0'>"+assocAtivos.length+" associado(s) ativo(s)</p>");
+    h.push("<button onclick='abrirModalAssociado()' style='background:#2a1c10;border:1px solid #C8A84B;color:#C8A84B;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>+ Cadastrar</button>");
     h.push("</div>");
     if(!(state.conselho_associados||[]).length){
-      h.push("<div style='text-align:center;padding:60px 20px;color:#1a4a2a'><div style='font-size:40px;margin-bottom:12px'>👥</div><p style='font-size:14px;color:#22c55e44'>Nenhum associado cadastrado</p></div>");
+      h.push("<div style='text-align:center;padding:60px 20px'><div style='font-size:40px;margin-bottom:12px'>👥</div><p style='font-size:14px;color:#a07c5866'>Nenhum associado cadastrado</p></div>");
     } else {
       (state.conselho_associados||[]).slice().sort(function(a,b){return (a.nome||"")>(b.nome||"")?1:-1;}).forEach(function(a){
         var ativo = a.status !== "inativo";
-        h.push("<div style='background:#EAD9B8;border:1px solid #1a3a22;border-radius:8px;padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px'>");
-        h.push("<div style='width:36px;height:36px;background:#0a2a14;border:1px solid #22c55e44;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0'>👤</div>");
+        h.push("<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:8px;padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px'>");
+        h.push("<div style='width:36px;height:36px;background:#2a1c10;border:1px solid #C8A84B44;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0'>👤</div>");
         h.push("<div style='flex:1'>");
-        h.push("<p style='color:#c8ffd8;font-size:13px;font-weight:600;margin:0 0 2px'>"+esc(a.nome||"--")+"</p>");
-        h.push("<p style='color:#4a7a5a;font-size:11px;margin:0'>"+esc(a.bairro||"")+(a.telefone?" · "+esc(a.telefone):"")+"</p>");
+        h.push("<p style='color:#2a1c10;font-size:13px;font-weight:600;margin:0 0 2px'>"+esc(a.nome||"--")+"</p>");
+        h.push("<p style='color:#6B5236;font-size:11px;margin:0'>"+esc(a.bairro||"")+(a.telefone?" · "+esc(a.telefone):"")+"</p>");
         h.push("</div>");
-        h.push("<span style='background:"+(ativo?"#22c55e22":"#4a4a4a22")+";color:"+(ativo?"#22c55e":"#6a6a6a")+";padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+(ativo?"Ativo":"Inativo")+"</span>");
-        h.push("<button onclick='verAssociado(\""+a.id+"\")' style='background:#0a2a14;border:1px solid #22c55e44;color:#22c55e;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer'>Ver</button>");
+        h.push("<span style='background:"+(ativo?"#3a7a4a22":"#4a4a4a22")+";color:"+(ativo?"#3a7a4a":"#6a6a6a")+";padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+(ativo?"Ativo":"Inativo")+"</span>");
+        h.push("<button onclick='verAssociado(\""+a.id+"\")' style='background:#2a1c10;border:1px solid #C8A84B44;color:#C8A84B;padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer'>Ver</button>");
         h.push("</div>");
       });
     }
@@ -19655,11 +19655,11 @@ function renderModuloConselho(main){
   // ── ABA: DIRETORIA ─────────────────────────────────────────────
   if(tab==="diretoria"){
     h.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>");
-    h.push("<p style='color:#22c55e;font-size:13px;font-weight:700;margin:0'>Composição da Diretoria</p>");
-    h.push("<button onclick='abrirModalDiretoria()' style='background:#0a3a1a;border:1px solid #22c55e;color:#22c55e;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>+ Adicionar</button>");
+    h.push("<p style='color:#C8A84B;font-size:13px;font-weight:700;margin:0'>Composição da Diretoria</p>");
+    h.push("<button onclick='abrirModalDiretoria()' style='background:#2a1c10;border:1px solid #C8A84B;color:#C8A84B;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>+ Adicionar</button>");
     h.push("</div>");
     if(!(state.conselho_diretoria||[]).length){
-      h.push("<div style='text-align:center;padding:60px 20px;color:#1a4a2a'><div style='font-size:40px;margin-bottom:12px'>🏅</div><p style='font-size:14px;color:#22c55e44'>Nenhum membro da diretoria cadastrado</p></div>");
+      h.push("<div style='text-align:center;padding:60px 20px'><div style='font-size:40px;margin-bottom:12px'>🏅</div><p style='font-size:14px;color:#a07c5866'>Nenhum membro da diretoria cadastrado</p></div>");
     } else {
       var cargosOrdem=["Presidente","Vice-Presidente","Secretário","Tesoureiro","Conselheiro"];
       var dirOrd=(state.conselho_diretoria||[]).slice().sort(function(a,b){
@@ -19667,16 +19667,16 @@ function renderModuloConselho(main){
       });
       dirOrd.forEach(function(m){
         var ativo=!m.mandato_fim||(m.mandato_fim>=hoje());
-        h.push("<div style='background:#EAD9B8;border:1px solid #1a3a22;border-radius:8px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px'>");
-        h.push("<div style='flex-shrink:0;width:44px;height:44px;background:#0a2a14;border:2px solid #22c55e44;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px'>🏅</div>");
+        h.push("<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:8px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px'>");
+        h.push("<div style='flex-shrink:0;width:44px;height:44px;background:#2a1c10;border:2px solid #C8A84B44;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px'>🏅</div>");
         h.push("<div style='flex:1'>");
-        h.push("<p style='color:#c8ffd8;font-size:14px;font-weight:700;margin:0 0 2px'>"+esc(m.nome||"--")+"</p>");
-        h.push("<p style='color:#22c55e;font-size:11px;font-weight:700;margin:0 0 2px;text-transform:uppercase;letter-spacing:.5px'>"+esc(m.cargo||"")+"</p>");
-        if(m.telefone) h.push("<p style='color:#4a7a5a;font-size:11px;margin:0'>📞 "+esc(m.telefone)+"</p>");
-        if(m.mandato_inicio) h.push("<p style='color:#3a5a3a;font-size:10px;margin:2px 0 0'>Mandato: "+fmtData(m.mandato_inicio)+(m.mandato_fim?" até "+fmtData(m.mandato_fim):"")+"</p>");
+        h.push("<p style='color:#2a1c10;font-size:14px;font-weight:700;margin:0 0 2px'>"+esc(m.nome||"--")+"</p>");
+        h.push("<p style='color:#6B5236;font-size:11px;font-weight:700;margin:0 0 2px;text-transform:uppercase;letter-spacing:.5px'>"+esc(m.cargo||"")+"</p>");
+        if(m.telefone) h.push("<p style='color:#6B5236;font-size:11px;margin:0'>📞 "+esc(m.telefone)+"</p>");
+        if(m.mandato_inicio) h.push("<p style='color:#a07c58;font-size:10px;margin:2px 0 0'>Mandato: "+fmtData(m.mandato_inicio)+(m.mandato_fim?" até "+fmtData(m.mandato_fim):"")+"</p>");
         h.push("</div>");
         h.push("<div style='display:flex;flex-direction:column;align-items:flex-end;gap:6px'>");
-        h.push("<span style='background:"+(ativo?"#22c55e22":"#4a4a4a22")+";color:"+(ativo?"#22c55e":"#6a6a6a")+";padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+(ativo?"Em exercício":"Mandato encerrado")+"</span>");
+        h.push("<span style='background:"+(ativo?"#3a7a4a22":"#4a4a4a22")+";color:"+(ativo?"#3a7a4a":"#6a6a6a")+";padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+(ativo?"Em exercício":"Mandato encerrado")+"</span>");
         h.push("<button onclick='excluirDiretoria(\""+m.id+"\")' style='background:#1a0808;border:1px solid #c0505044;color:#c05050;padding:3px 8px;border-radius:5px;font-size:10px;cursor:pointer'>🗑</button>");
         h.push("</div></div>");
       });
@@ -19689,17 +19689,17 @@ function renderModuloConselho(main){
     var evFut=evConselho.filter(function(e){return e.data>=hoje();});
     var evPass=evConselho.filter(function(e){return e.data<hoje();});
     h.push("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>");
-    h.push("<p style='color:#22c55e;font-size:13px;font-weight:700;margin:0'>"+evFut.length+" evento(s) próximo(s)</p>");
-    h.push("<button onclick='abrirModalEventoConselho()' style='background:#0a3a1a;border:1px solid #22c55e;color:#22c55e;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>+ Agendar</button>");
+    h.push("<p style='color:#C8A84B;font-size:13px;font-weight:700;margin:0'>"+evFut.length+" evento(s) próximo(s)</p>");
+    h.push("<button onclick='abrirModalEventoConselho()' style='background:#2a1c10;border:1px solid #C8A84B;color:#C8A84B;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer'>+ Agendar</button>");
     h.push("</div>");
     function _renderEvs(lista,titulo){
       if(!lista.length) return;
-      h.push("<p style='color:#22c55e88;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:14px 0 6px'>"+titulo+"</p>");
+      h.push("<p style='color:#a07c58;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:14px 0 6px'>"+titulo+"</p>");
       lista.forEach(function(e){
-        h.push("<div style='background:#EAD9B8;border:1px solid #1a3a22;border-left:3px solid "+esc(e.cor||"#22c55e")+";border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px'>");
+        h.push("<div style='background:#EAD9B8;border:1px solid #5e4636;border-left:3px solid "+esc(e.cor||"#C8A84B")+";border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px'>");
         h.push("<div style='flex:1'>");
-        h.push("<p style='color:#c8ffd8;font-size:13px;font-weight:600;margin:0 0 2px'>"+esc(e.titulo||"Evento")+"</p>");
-        h.push("<p style='color:#4a7a5a;font-size:11px;margin:0'>"+fmtData(e.data)+(e.hora?" · "+e.hora:"")+(e.local?" · "+esc(e.local):"")+"</p>");
+        h.push("<p style='color:#2a1c10;font-size:13px;font-weight:600;margin:0 0 2px'>"+esc(e.titulo||"Evento")+"</p>");
+        h.push("<p style='color:#6B5236;font-size:11px;margin:0'>"+fmtData(e.data)+(e.hora?" · "+e.hora:"")+(e.local?" · "+esc(e.local):"")+"</p>");
         h.push("</div>");
         h.push("<button onclick='excluirEventoConselho(\""+e.id+"\")' style='background:#1a0808;border:1px solid #c0505044;color:#c05050;padding:3px 8px;border-radius:5px;font-size:10px;cursor:pointer'>🗑</button>");
         h.push("</div>");
@@ -19708,7 +19708,7 @@ function renderModuloConselho(main){
     _renderEvs(evFut,"Próximos");
     _renderEvs(evPass,"Realizados");
     if(!evConselho.length){
-      h.push("<div style='text-align:center;padding:60px 20px'><div style='font-size:40px;margin-bottom:12px'>📅</div><p style='font-size:14px;color:#22c55e44'>Nenhum evento agendado</p></div>");
+      h.push("<div style='text-align:center;padding:60px 20px'><div style='font-size:40px;margin-bottom:12px'>📅</div><p style='font-size:14px;color:#a07c5866'>Nenhum evento agendado</p></div>");
     }
   }
 
@@ -19720,13 +19720,13 @@ function renderModuloConselho(main){
 window.abrirModalAta = function(){
   var m=document.createElement("div");
   m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto";
-  var IS="width:100%;background:#0a1a12;border:1px solid #1a3a22;color:#d0f0d8;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
-  var LS="color:#22c55e88;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
+  var IS="width:100%;background:#1a1208;border:1px solid #5e4636;color:#f5ede0;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
+  var LS="color:#a07c58;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
   m.innerHTML=[
-    "<div style='background:#EAD9B8;border:1px solid #22c55e33;border-radius:14px;max-width:640px;width:100%;margin:auto;padding:22px'>",
+    "<div style='background:#EAD9B8;border:1px solid #C8A84B44;border-radius:14px;max-width:640px;width:100%;margin:auto;padding:22px'>",
     "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px'>",
-    "<h3 style='color:#c8ffd8;font-size:15px;font-weight:700;margin:0'>📋 Nova Ata de Reunião</h3>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a3a22;border:1px solid #2a4a2a;color:#4a7a5a;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
+    "<h3 style='color:#2a1c10;font-size:15px;font-weight:700;margin:0'>📋 Nova Ata de Reunião</h3>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#2a1c10;border:1px solid #5e4636;color:#a07c58;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
     "</div>",
     "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px'>",
     "<div><label style='"+LS+"'>Número</label><input id='ata-num' type='text' placeholder='001/2026' style='"+IS+"'></div>",
@@ -19738,8 +19738,8 @@ window.abrirModalAta = function(){
     "<div style='margin-bottom:12px'><label style='"+LS+"'>Presentes (um por linha)</label><textarea id='ata-presentes' rows='4' placeholder='João Silva\nMaria Souza\n...' style='"+IS+";resize:vertical;font-family:inherit'></textarea></div>",
     "<div style='margin-bottom:16px'><label style='"+LS+"'>Deliberações / Resumo</label><textarea id='ata-deliberacoes' rows='5' placeholder='Decisões tomadas, encaminhamentos, observações...' style='"+IS+";resize:vertical;font-family:inherit'></textarea></div>",
     "<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px'>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#0a1a12;border:1px solid #1a3a22;color:#4a7a5a;padding:11px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>",
-    "<button id='btn-salvar-ata' style='background:linear-gradient(135deg,#0a3a1a,#1a5a2a);border:1px solid #22c55e;color:#c8ffd8;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✓ Salvar Ata</button>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a1208;border:1px solid #5e4636;color:#a07c58;padding:11px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>",
+    "<button id='btn-salvar-ata' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✓ Salvar Ata</button>",
     "</div></div>"
   ].join("");
   document.body.appendChild(m);
@@ -19770,18 +19770,18 @@ window.verAta = function(id){
   var m=document.createElement("div");
   m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto";
   m.innerHTML=[
-    "<div style='background:#EAD9B8;border:1px solid #22c55e33;border-radius:14px;max-width:640px;width:100%;margin:auto;padding:22px'>",
+    "<div style='background:#EAD9B8;border:1px solid #C8A84B44;border-radius:14px;max-width:640px;width:100%;margin:auto;padding:22px'>",
     "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px'>",
-    "<div><span style='background:#22c55e22;color:#22c55e;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;display:block;margin-bottom:4px'>Nº "+esc(a.numero||"--")+"</span><h3 style='color:#c8ffd8;font-size:15px;font-weight:700;margin:0'>"+esc(a.pauta||"Sem título")+"</h3></div>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a3a22;border:1px solid #2a4a2a;color:#4a7a5a;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
+    "<div><span style='background:#C8A84B22;color:#6B5236;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;display:block;margin-bottom:4px'>Nº "+esc(a.numero||"--")+"</span><h3 style='color:#2a1c10;font-size:15px;font-weight:700;margin:0'>"+esc(a.pauta||"Sem título")+"</h3></div>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#2a1c10;border:1px solid #5e4636;color:#a07c58;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
     "</div>",
     "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px'>",
-    "<div><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Data</p><p style='color:#c8ffd8;font-size:12px;margin:0'>"+fmtData(a.data)+(a.hora?" às "+a.hora:"")+"</p></div>",
-    "<div><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Local</p><p style='color:#c8ffd8;font-size:12px;margin:0'>"+esc(a.local||"--")+"</p></div>",
+    "<div><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Data</p><p style='color:#2a1c10;font-size:12px;margin:0'>"+fmtData(a.data)+(a.hora?" às "+a.hora:"")+"</p></div>",
+    "<div><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Local</p><p style='color:#2a1c10;font-size:12px;margin:0'>"+esc(a.local||"--")+"</p></div>",
     "</div>",
-    a.presentes&&a.presentes.length?"<div style='background:#0a2a14;border:1px solid #1a3a22;border-radius:8px;padding:12px;margin-bottom:12px'><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 8px'>Presentes ("+a.presentes.length+")</p><div style='display:flex;flex-wrap:wrap;gap:5px'>"+a.presentes.map(function(p){return "<span style='background:#0a3a1a;border:1px solid #22c55e22;color:#a8e8b8;padding:3px 8px;border-radius:12px;font-size:11px'>"+esc(p)+"</span>";}).join("")+"</div></div>":"",
-    a.deliberacoes?"<div style='background:#0a2a14;border:1px solid #1a3a22;border-radius:8px;padding:12px;margin-bottom:14px'><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 8px'>Deliberações</p><p style='color:#c8ffd8;font-size:12px;line-height:1.7;margin:0;white-space:pre-wrap'>"+esc(a.deliberacoes)+"</p></div>":"",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='width:100%;background:#0a1a12;border:1px solid #1a3a22;color:#4a7a5a;padding:10px;border-radius:8px;font-size:13px;cursor:pointer'>Fechar</button>",
+    a.presentes&&a.presentes.length?"<div style='background:#f0e6d0;border:1px solid #5e4636;border-radius:8px;padding:12px;margin-bottom:12px'><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 8px'>Presentes ("+a.presentes.length+")</p><div style='display:flex;flex-wrap:wrap;gap:5px'>"+a.presentes.map(function(p){return "<span style='background:#EAD9B8;border:1px solid #C8A84B44;color:#6B5236;padding:3px 8px;border-radius:12px;font-size:11px'>"+esc(p)+"</span>";}).join("")+"</div></div>":"",
+    a.deliberacoes?"<div style='background:#f0e6d0;border:1px solid #5e4636;border-radius:8px;padding:12px;margin-bottom:14px'><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 8px'>Deliberações</p><p style='color:#2a1c10;font-size:12px;line-height:1.7;margin:0;white-space:pre-wrap'>"+esc(a.deliberacoes)+"</p></div>":"",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='width:100%;background:#1a1208;border:1px solid #5e4636;color:#a07c58;padding:10px;border-radius:8px;font-size:13px;cursor:pointer'>Fechar</button>",
     "</div>"
   ].join("");
   document.body.appendChild(m);
@@ -19798,13 +19798,13 @@ window.excluirAta=function(id){
 window.abrirModalAssociado = function(){
   var m=document.createElement("div");
   m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto";
-  var IS="width:100%;background:#0a1a12;border:1px solid #1a3a22;color:#d0f0d8;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
-  var LS="color:#22c55e88;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
+  var IS="width:100%;background:#1a1208;border:1px solid #5e4636;color:#f5ede0;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
+  var LS="color:#a07c58;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
   m.innerHTML=[
-    "<div style='background:#EAD9B8;border:1px solid #22c55e33;border-radius:14px;max-width:640px;width:100%;margin:auto;padding:22px'>",
+    "<div style='background:#EAD9B8;border:1px solid #C8A84B44;border-radius:14px;max-width:640px;width:100%;margin:auto;padding:22px'>",
     "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px'>",
-    "<h3 style='color:#c8ffd8;font-size:15px;font-weight:700;margin:0'>👤 Cadastrar Associado</h3>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a3a22;border:1px solid #2a4a2a;color:#4a7a5a;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
+    "<h3 style='color:#2a1c10;font-size:15px;font-weight:700;margin:0'>👤 Cadastrar Associado</h3>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#2a1c10;border:1px solid #5e4636;color:#a07c58;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
     "</div>",
     "<div style='display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:12px'>",
     "<div><label style='"+LS+"'>Nome Completo</label><input id='as-nome' type='text' style='"+IS+"'></div>",
@@ -19820,8 +19820,8 @@ window.abrirModalAssociado = function(){
     "<div><label style='"+LS+"'>Profissão</label><input id='as-profissao' type='text' style='"+IS+"'></div>",
     "</div>",
     "<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px'>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#0a1a12;border:1px solid #1a3a22;color:#4a7a5a;padding:11px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>",
-    "<button id='btn-salvar-assoc' style='background:linear-gradient(135deg,#0a3a1a,#1a5a2a);border:1px solid #22c55e;color:#c8ffd8;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✓ Salvar</button>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a1208;border:1px solid #5e4636;color:#a07c58;padding:11px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>",
+    "<button id='btn-salvar-assoc' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✓ Salvar</button>",
     "</div></div>"
   ].join("");
   document.body.appendChild(m);
@@ -19853,19 +19853,19 @@ window.verAssociado=function(id){
   var m=document.createElement("div");
   m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto";
   m.innerHTML=[
-    "<div style='background:#EAD9B8;border:1px solid #22c55e33;border-radius:14px;max-width:560px;width:100%;margin:auto;padding:22px'>",
+    "<div style='background:#EAD9B8;border:1px solid #C8A84B44;border-radius:14px;max-width:560px;width:100%;margin:auto;padding:22px'>",
     "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px'>",
-    "<h3 style='color:#c8ffd8;font-size:15px;font-weight:700;margin:0'>👤 "+esc(a.nome)+"</h3>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a3a22;border:1px solid #2a4a2a;color:#4a7a5a;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
+    "<h3 style='color:#2a1c10;font-size:15px;font-weight:700;margin:0'>👤 "+esc(a.nome)+"</h3>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#2a1c10;border:1px solid #5e4636;color:#a07c58;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
     "</div>",
     "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px'>",
-    "<div><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>CPF</p><p style='color:#c8ffd8;font-size:12px;margin:0'>"+esc(a.cpf||"--")+"</p></div>",
-    "<div><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Telefone</p><p style='color:#c8ffd8;font-size:12px;margin:0'>"+esc(a.telefone||"--")+"</p></div>",
-    "<div><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Bairro</p><p style='color:#c8ffd8;font-size:12px;margin:0'>"+esc(a.bairro||"--")+"</p></div>",
-    "<div><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Profissão</p><p style='color:#c8ffd8;font-size:12px;margin:0'>"+esc(a.profissao||"--")+"</p></div>",
-    "<div style='grid-column:1/-1'><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Endereço</p><p style='color:#c8ffd8;font-size:12px;margin:0'>"+esc(a.endereco||"--")+"</p></div>",
-    "<div><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Inscrito em</p><p style='color:#c8ffd8;font-size:12px;margin:0'>"+fmtData(a.data_inscricao||"")+"</p></div>",
-    "<div><p style='color:#22c55e88;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Status</p><p style='color:"+(a.status==="ativo"?"#22c55e":"#6a6a6a")+";font-size:12px;font-weight:700;margin:0'>"+(a.status==="ativo"?"Ativo":"Inativo")+"</p></div>",
+    "<div><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>CPF</p><p style='color:#2a1c10;font-size:12px;margin:0'>"+esc(a.cpf||"--")+"</p></div>",
+    "<div><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Telefone</p><p style='color:#2a1c10;font-size:12px;margin:0'>"+esc(a.telefone||"--")+"</p></div>",
+    "<div><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Bairro</p><p style='color:#2a1c10;font-size:12px;margin:0'>"+esc(a.bairro||"--")+"</p></div>",
+    "<div><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Profissão</p><p style='color:#2a1c10;font-size:12px;margin:0'>"+esc(a.profissao||"--")+"</p></div>",
+    "<div style='grid-column:1/-1'><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Endereço</p><p style='color:#2a1c10;font-size:12px;margin:0'>"+esc(a.endereco||"--")+"</p></div>",
+    "<div><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Inscrito em</p><p style='color:#2a1c10;font-size:12px;margin:0'>"+fmtData(a.data_inscricao||"")+"</p></div>",
+    "<div><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 2px'>Status</p><p style='color:"+(a.status==="ativo"?"#3a7a4a":"#6a6a6a")+";font-size:12px;font-weight:700;margin:0'>"+(a.status==="ativo"?"Ativo":"Inativo")+"</p></div>",
     "</div>",
     "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>",
     "<button onclick='inativarAssociado(\""+a.id+"\")' style='background:#1a1a12;border:1px solid #4a4a22;color:#8a8a4a;padding:9px;border-radius:7px;font-size:12px;cursor:pointer'>"+(a.status==="ativo"?"Inativar":"Reativar")+"</button>",
@@ -19895,14 +19895,14 @@ window.excluirAssociado=function(id){
 window.abrirModalDiretoria=function(){
   var m=document.createElement("div");
   m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px";
-  var IS="width:100%;background:#0a1a12;border:1px solid #1a3a22;color:#d0f0d8;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
-  var LS="color:#22c55e88;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
+  var IS="width:100%;background:#1a1208;border:1px solid #5e4636;color:#f5ede0;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
+  var LS="color:#a07c58;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
   var cargos=["Presidente","Vice-Presidente","Secretário","Tesoureiro","Conselheiro","Suplente"];
   m.innerHTML=[
-    "<div style='background:#EAD9B8;border:1px solid #22c55e33;border-radius:14px;max-width:500px;width:100%;padding:22px'>",
+    "<div style='background:#EAD9B8;border:1px solid #C8A84B44;border-radius:14px;max-width:500px;width:100%;padding:22px'>",
     "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px'>",
-    "<h3 style='color:#c8ffd8;font-size:15px;font-weight:700;margin:0'>🏅 Membro da Diretoria</h3>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a3a22;border:1px solid #2a4a2a;color:#4a7a5a;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
+    "<h3 style='color:#2a1c10;font-size:15px;font-weight:700;margin:0'>🏅 Membro da Diretoria</h3>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#2a1c10;border:1px solid #5e4636;color:#a07c58;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
     "</div>",
     "<div style='margin-bottom:12px'><label style='"+LS+"'>Nome</label><input id='dir-nome' type='text' style='"+IS+"'></div>",
     "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>",
@@ -19914,8 +19914,8 @@ window.abrirModalDiretoria=function(){
     "<div><label style='"+LS+"'>Fim do Mandato</label><input id='dir-fim' type='date' style='"+IS+"'></div>",
     "</div>",
     "<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px'>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#0a1a12;border:1px solid #1a3a22;color:#4a7a5a;padding:11px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>",
-    "<button id='btn-salvar-dir' style='background:linear-gradient(135deg,#0a3a1a,#1a5a2a);border:1px solid #22c55e;color:#c8ffd8;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✓ Salvar</button>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a1208;border:1px solid #5e4636;color:#a07c58;padding:11px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>",
+    "<button id='btn-salvar-dir' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✓ Salvar</button>",
     "</div></div>"
   ].join("");
   document.body.appendChild(m);
@@ -19948,13 +19948,13 @@ window.excluirDiretoria=function(id){
 window.abrirModalEventoConselho=function(){
   var m=document.createElement("div");
   m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px";
-  var IS="width:100%;background:#0a1a12;border:1px solid #1a3a22;color:#d0f0d8;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
-  var LS="color:#22c55e88;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
+  var IS="width:100%;background:#1a1208;border:1px solid #5e4636;color:#f5ede0;padding:9px 11px;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box";
+  var LS="color:#a07c58;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px";
   m.innerHTML=[
-    "<div style='background:#EAD9B8;border:1px solid #22c55e33;border-radius:14px;max-width:480px;width:100%;padding:22px'>",
+    "<div style='background:#EAD9B8;border:1px solid #C8A84B44;border-radius:14px;max-width:480px;width:100%;padding:22px'>",
     "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px'>",
-    "<h3 style='color:#c8ffd8;font-size:15px;font-weight:700;margin:0'>📅 Agendar Evento</h3>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a3a22;border:1px solid #2a4a2a;color:#4a7a5a;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
+    "<h3 style='color:#2a1c10;font-size:15px;font-weight:700;margin:0'>📅 Agendar Evento</h3>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#2a1c10;border:1px solid #5e4636;color:#a07c58;width:30px;height:30px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1'>×</button>",
     "</div>",
     "<div style='margin-bottom:12px'><label style='"+LS+"'>Título</label><input id='cev-titulo' type='text' placeholder='Ex: Reunião Ordinária' style='"+IS+"'></div>",
     "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>",
@@ -19963,8 +19963,8 @@ window.abrirModalEventoConselho=function(){
     "</div>",
     "<div style='margin-bottom:16px'><label style='"+LS+"'>Local</label><input id='cev-local' type='text' placeholder='Ex: Sede da BCS' style='"+IS+"'></div>",
     "<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px'>",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#0a1a12;border:1px solid #1a3a22;color:#4a7a5a;padding:11px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>",
-    "<button id='btn-salvar-cev' style='background:linear-gradient(135deg,#0a3a1a,#1a5a2a);border:1px solid #22c55e;color:#c8ffd8;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✓ Agendar</button>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a1208;border:1px solid #5e4636;color:#a07c58;padding:11px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>",
+    "<button id='btn-salvar-cev' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>✓ Agendar</button>",
     "</div></div>"
   ].join("");
   document.body.appendChild(m);
@@ -19977,7 +19977,7 @@ window.abrirModalEventoConselho=function(){
       tipo:"Conselho",titulo:titulo,data:data,
       hora:(document.getElementById("cev-hora")||{value:""}).value,
       local:(document.getElementById("cev-local")||{value:""}).value.trim(),
-      cor:"#22c55e"};
+      cor:"#C8A84B"};
     if(!state.eventosAvulsos) state.eventosAvulsos=[];
     state.eventosAvulsos.push(ev);
     salvarLocal();
