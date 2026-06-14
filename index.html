@@ -5008,7 +5008,7 @@ function renderDashComandante(main){
 
   // ── Tabs principais ───────────────────────────────
   h.push("<div style='display:flex;gap:4px;margin-bottom:18px;flex-wrap:wrap'>");
-  [['inicio','🏠 Início'],['crime','📊 Criminalidade'],['visitas','🤝 Visitas Solidárias'],['escolar','🏫 Ronda Escolar'],['vcm','🌸 Monitor VCM'],['projetos','🟢 Projetos'],['instrutores','👨‍🏫 Instrutores'],['auditoria','🔍 Auditoria']].forEach(function(tb){
+  [['inicio','🏠 Início'],['crime','📊 Criminalidade'],['visitas','🤝 Visitas Solidárias'],['escolar','🏫 Ronda Escolar'],['vcm','🌸 Monitor VCM'],['projetos','🟢 Projetos'],['instrutores','👨‍🏫 Instrutores'],['auditoria','🔍 Auditoria'],['iara','✦ IARA']].forEach(function(tb){
     var ativ=tabAtiva===tb[0];
     h.push("<button onclick=\"state._cmdTab='"+tb[0]+"';renderDashComandante(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid "+(ativ?"#d4a87a":"#5e4636")+";background:"+(ativ?"#d4a87a22":"#2a1c10")+";color:"+(ativ?"#d4a87a":"#8a6a4a")+"'>"+tb[1]+"</button>");
   });
@@ -5546,6 +5546,13 @@ function renderDashComandante(main){
   }
 
   // ══════════════════════════════════════════════════
+  // ABA: IARA — Assistente Inteligente
+  // ══════════════════════════════════════════════════
+  if(tabAtiva==="iara"){
+    h.push("<div id='iara-cmd-embed' style='min-height:500px'></div>");
+  }
+
+  // ══════════════════════════════════════════════════
   // ABA: AUDITORIA DO COMANDANTE
   // ══════════════════════════════════════════════════
   if(tabAtiva==="auditoria"){
@@ -5737,6 +5744,12 @@ function renderDashComandante(main){
   if(tabAtiva==="instrutores"){
     var _instr = document.getElementById("instrutores-cmd-embed");
     if(_instr) renderTabInstrutores(_instr);
+  }
+
+  // ── IARA — Assistente inteligente com dados reais ─
+  if(tabAtiva==="iara"){
+    var _iaMain = document.getElementById("iara-cmd-embed");
+    if(_iaMain) _renderIARA(_iaMain);
   }
 
   // ── Auto-análise IA de crescimento de crimes (silenciosa, máx 1x/6h) ──
@@ -11760,6 +11773,232 @@ function renderAssistenteIA(main){
 }
 
 // ── TRIAGEM ────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// IARA — Assistente do Comandante com dados reais
+// ══════════════════════════════════════════════════════════════════
+function _topTiposIARA(ocs, n){
+  var m={}; ocs.forEach(function(o){if(o.tipo)m[o.tipo]=(m[o.tipo]||0)+1;});
+  return Object.entries(m).sort(function(a,b){return b[1]-a[1];}).slice(0,n).map(function(e){return e[0]+"("+e[1]+")";});
+}
+
+function gerarSystemPromptIARA(){
+  var d=state.db||{}; var ocs=d.ocorrencias||[];
+  var vd=ocs.filter(function(o){return o.violencia_domestica;}).length;
+  var semTriagem=ocs.filter(function(o){return o.situacao==="nova";}).length;
+  var fridaE=(d.frida||[]).filter(function(f){return f.nivel==="E";}).length;
+  var cobertura=vd?Math.round((d.frida||[]).length/vd*100):0;
+  var projCrit=(state.projetos||[]).filter(function(p){return p.status==="Crítico";}).length;
+  var projAnd=(state.projetos||[]).filter(function(p){return p.status==="Em Andamento";}).length;
+  var encsVenc=(state.encaminhamentos||[]).filter(function(e){
+    var dt=e.data_envio?new Date(e.data_envio):null;
+    return dt&&(Date.now()-dt.getTime())>15*864e5&&!e.relato_devolutiva;
+  }).length;
+  var hojeD=new Date(); var m=hojeD.getMonth(); var y=hojeD.getFullYear();
+  var mAnt=m===0?11:m-1; var yAnt=m===0?y-1:y;
+  var nMes=ocs.filter(function(o){var dt=new Date(o.data||"");return dt.getMonth()===m&&dt.getFullYear()===y;}).length;
+  var nMesAnt=ocs.filter(function(o){var dt=new Date(o.data||"");return dt.getMonth()===mAnt&&dt.getFullYear()===yAnt;}).length;
+  var topTipos=_topTiposIARA(ocs,5);
+  return "Você é a IARA, assistente inteligente da 77ª CIPM BCS, Vitória da Conquista-BA.\n"+
+    "Conheço todos os dados da base em tempo real. Converso com o Comandante.\n\n"+
+    "DADOS ATUAIS ("+new Date().toLocaleDateString("pt-BR")+"):\n"+
+    "- Total ocorrências cadastradas: "+ocs.length+"\n"+
+    "- Sem triagem: "+semTriagem+(semTriagem>5?" ⚠":"")+" \n"+
+    "- Casos VD: "+vd+"\n"+
+    "- FRIDA nível E (urgentes): "+fridaE+(fridaE>0?" 🔴":"")+"\n"+
+    "- Cobertura FRIDA: "+cobertura+"% (meta: 80%)"+(cobertura<50?" ⚠":"")+"\n"+
+    "- Ocorrências este mês: "+nMes+" (mês ant.: "+nMesAnt+", delta: "+(nMes>nMesAnt?"+":"")+(nMes-nMesAnt)+")\n"+
+    "- Tipos principais: "+topTipos.join(", ")+"\n"+
+    "- Projetos críticos: "+projCrit+"  |  Em andamento: "+projAnd+"\n"+
+    "- Encaminhamentos vencidos (>15d sem resposta): "+encsVenc+"\n\n"+
+    "COMPORTAMENTO:\n"+
+    "- Responda de forma fluente, direta e operacional\n"+
+    "- Use os dados reais acima — não invente números\n"+
+    "- Formate com seções, rankings e destaques (use ** para negrito e ## para títulos)\n"+
+    "- Ao identificar lacunas, aponte com clareza e proponha ação concreta\n"+
+    "- Priorize o que o Comandante precisa saber e fazer AGORA\n"+
+    "- Recomendações em destaque: comece com '▶ '";
+}
+
+function _renderIARA(container){
+  if(!state.iaraCmdChat) state.iaraCmdChat=[];
+  var iaKey=localStorage.getItem("bcs_anthropic_key")||"";
+
+  // Saudação inicial automática
+  if(state.iaraCmdChat.length===0){
+    var hr=new Date().getHours();
+    var saud=hr<12?"Bom dia":hr<18?"Boa tarde":"Boa noite";
+    var d=state.db||{}; var ocs=d.ocorrencias||[];
+    var semTriagem=ocs.filter(function(o){return o.situacao==="nova";}).length;
+    var fridaE=(d.frida||[]).filter(function(f){return f.nivel==="E";}).length;
+    var projCrit=(state.projetos||[]).filter(function(p){return p.status==="Crítico";}).length;
+    var auto=saud+", Comandante. Dados do dia:\n\n**"+semTriagem+"** ocorrência(s) aguardando triagem";
+    if(fridaE>0) auto+="\n**"+fridaE+"** caso(s) FRIDA nível E — atenção imediata";
+    if(projCrit>0) auto+="\n**"+projCrit+"** projeto(s) em situação crítica";
+    auto+="\n\nEstou aqui para análises, relatórios ou qualquer pergunta sobre a base. O que precisa?";
+    state.iaraCmdChat.push({role:"assistant",content:auto});
+  }
+
+  var chips=[
+    {ico:"📍",q:"Quais bairros estão mais críticos esta semana?"},
+    {ico:"📈",q:"Como evoluiu a VCM nos últimos 3 meses?"},
+    {ico:"⏰",q:"Qual o horário de pico das ocorrências?"},
+    {ico:"🔴",q:"Qual o status das vítimas nível E? O que precisa de ação imediata?"},
+    {ico:"📋",q:"Gere o relatório semanal resumido para enviar à guarnição."},
+    {ico:"📁",q:"Como estão os projetos em andamento? Quais precisam de atenção?"},
+    {ico:"⚠️",q:"O que devo priorizar hoje? Liste as 3 ações mais urgentes."},
+    {ico:"🔍",q:"Analise as ocorrências dos últimos 30 dias e aponte padrões ou anomalias."}
+  ];
+
+  var h=[];
+  h.push("<div style='display:flex;gap:14px;height:calc(100vh - 250px);min-height:480px'>");
+  // Sidebar esquerda
+  h.push("<div style='width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:10px'>");
+  // Avatar IARA
+  h.push("<div style='background:#1a0a2e;border:1px solid #6d28d966;border-radius:12px;padding:14px;text-align:center'>");
+  h.push("<div style='width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a3a6a,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 8px'>✦</div>");
+  h.push("<p style='color:#d4a87a;font-size:14px;font-weight:800;margin:0'>IARA</p>");
+  h.push("<p style='color:#5e4636;font-size:10px;margin:2px 0 0'>Assistente da 77ª CIPM</p>");
+  if(state.ultimaSinc) h.push("<p style='color:#3a5a3a;font-size:9px;margin:6px 0 0'>✓ Dados de "+state.ultimaSinc.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</p>");
+  h.push("</div>");
+  // Contexto rápido
+  (function(){
+    var d=state.db||{}; var ocs=d.ocorrencias||[];
+    var semTriagem=ocs.filter(function(o){return o.situacao==="nova";}).length;
+    var fridaE=(d.frida||[]).filter(function(f){return f.nivel==="E";}).length;
+    var projCrit=(state.projetos||[]).filter(function(p){return p.status==="Crítico";}).length;
+    var encsVenc=(state.encaminhamentos||[]).filter(function(e){var dt=e.data_envio?new Date(e.data_envio):null;return dt&&(Date.now()-dt.getTime())>15*864e5&&!e.relato_devolutiva;}).length;
+    var items=[
+      ["Total ocorrências",ocs.length,"#d4a87a"],
+      ["Sem triagem",semTriagem,semTriagem>5?"#ef4444":semTriagem>0?"#f59e0b":"#22c55e"],
+      ["FRIDA nível E",fridaE,fridaE>0?"#ef4444":"#22c55e"],
+      ["Proj. críticos",projCrit,projCrit>0?"#ef4444":"#22c55e"],
+      ["Enc. vencidos",encsVenc,encsVenc>0?"#f59e0b":"#22c55e"]
+    ];
+    h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:10px;padding:12px'>");
+    h.push("<p style='color:#5e4636;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>Contexto atual</p>");
+    items.forEach(function(it){
+      h.push("<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #3a2818'>");
+      h.push("<span style='color:#6a5040;font-size:10px'>"+it[0]+"</span>");
+      h.push("<span style='color:"+it[2]+";font-size:11px;font-weight:700'>"+it[1]+"</span>");
+      h.push("</div>");
+    });
+    h.push("</div>");
+  })();
+  // Perguntas rápidas
+  h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:10px;padding:12px;overflow-y:auto;flex:1'>");
+  h.push("<p style='color:#5e4636;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>Perguntas rápidas</p>");
+  chips.forEach(function(c,i){
+    h.push("<button onclick='_enviarIARA("+JSON.stringify(c.q)+")' style='width:100%;text-align:left;background:transparent;border:1px solid #3a2818;color:#8a6a4a;padding:7px 10px;border-radius:7px;font-size:11px;cursor:pointer;margin-bottom:5px;display:flex;align-items:center;gap:6px;transition:all .15s' onmouseover=\"this.style.background='#36221a';this.style.color='#d4a87a'\" onmouseout=\"this.style.background='transparent';this.style.color='#8a6a4a'\">"+c.ico+" <span style='flex:1'>"+c.q.substring(0,46)+(c.q.length>46?"…":"")+"</span></button>");
+  });
+  h.push("</div>");
+  h.push("</div>"); // fim sidebar
+
+  // Chat principal
+  h.push("<div style='flex:1;display:flex;flex-direction:column;gap:0;background:#2a1c10;border:1px solid #4a3224;border-radius:12px;overflow:hidden'>");
+  // Toolbar
+  h.push("<div style='padding:10px 14px;background:#36221a;border-bottom:1px solid #4a3224;display:flex;align-items:center;justify-content:space-between'>");
+  h.push("<span style='color:#d4a87a;font-size:12px;font-weight:700'>✦ IARA — Análise Inteligente</span>");
+  h.push("<div style='display:flex;gap:6px'>");
+  if(!iaKey) h.push("<button onclick=\"var s=document.getElementById('iara-key-sec');s.style.display=s.style.display==='none'?'block':'none'\" style='background:#1a0e00;border:1px solid #4a3224;color:#d4a87a;padding:5px 10px;border-radius:6px;font-size:10px;cursor:pointer'>🔑 Chave API</button>");
+  h.push("<button onclick=\"state.iaraCmdChat=[];_renderIARAChatEl()\" style='background:transparent;border:1px solid #4a3224;color:#5e4636;padding:5px 10px;border-radius:6px;font-size:10px;cursor:pointer'>↺ Nova conversa</button>");
+  h.push("</div></div>");
+  // Seção chave
+  h.push("<div id='iara-key-sec' style='display:none;padding:12px 14px;background:#1a0e00;border-bottom:1px solid #4a3224'>");
+  h.push("<div style='display:flex;gap:8px'>");
+  h.push("<input id='iara-key-inp' type='password' placeholder='sk-ant-api03-...' style='flex:1;background:#2a1c10;border:1px solid #5e4636;color:#f2eada;padding:8px 10px;border-radius:7px;font-size:12px;font-family:monospace'/>");
+  h.push("<button onclick='_salvarIARAKey()' style='background:#d4a87a;border:none;color:#2a1c10;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>Salvar</button>");
+  h.push("</div></div>");
+  // Mensagens
+  h.push("<div id='iara-cmd-msgs' style='flex:1;overflow-y:auto;padding:16px;min-height:0'></div>");
+  // Input
+  h.push("<div style='padding:10px 12px;background:#36221a;border-top:1px solid #4a3224;display:flex;gap:8px'>");
+  h.push("<textarea id='iara-cmd-inp' rows='2' placeholder='Pergunte qualquer coisa sobre as ocorrências, projetos ou situação da área...' style='flex:1;background:#2a1c10;border:1px solid #4a3224;color:#f2eada;padding:9px 11px;border-radius:7px;font-size:12px;resize:none;font-family:inherit;line-height:1.4' onkeydown=\"if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();var v=this.value.trim();if(v){this.value='';_enviarIARA(v);}}\"></textarea>");
+  h.push("<button onclick=\"var v=document.getElementById('iara-cmd-inp').value.trim();if(v){document.getElementById('iara-cmd-inp').value='';_enviarIARA(v);}\" style='background:linear-gradient(135deg,#4c1d95,#8b5cf6);border:none;color:#fff;padding:9px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;align-self:flex-end'>↑</button>");
+  h.push("</div></div>"); // fim chat
+  h.push("</div>"); // fim flex
+  container.innerHTML=h.join("");
+  _renderIARAChatEl();
+}
+
+function _renderIARAChatEl(){
+  var el=document.getElementById("iara-cmd-msgs");
+  if(!el) return;
+  if(!state.iaraCmdChat||!state.iaraCmdChat.length){
+    el.innerHTML="<div style='text-align:center;padding:40px 20px;color:#5e4636'><div style='font-size:48px;margin-bottom:10px'>✦</div><p>Faça uma pergunta ou escolha uma análise rápida.</p></div>";
+    return;
+  }
+  el.innerHTML="";
+  state.iaraCmdChat.forEach(function(msg){
+    var isUser=msg.role==="user";
+    var div=document.createElement("div");
+    div.style.cssText="display:flex;gap:10px;margin-bottom:14px;align-items:flex-start"+(isUser?";flex-direction:row-reverse":"");
+    var avatar=isUser
+      ?"<div style='width:28px;height:28px;border-radius:50%;background:#d4a87a;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0'>⚔️</div>"
+      :"<div style='width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1a3a6a,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0'>✦</div>";
+    var texto=esc(msg.content)
+      .replace(/\*\*(.*?)\*\*/g,"<strong style='color:#d4a87a'>$1</strong>")
+      .replace(/\*(.*?)\*/g,"<em style='color:#c8b07a'>$1</em>")
+      .replace(/^## (.*?)$/gm,"<div style='font-size:12px;font-weight:800;color:#d4a87a;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.6px'>$1</div>")
+      .replace(/▶ (.*?)(<br>|$)/g,"<div style='background:#1a0a2e;border-left:3px solid #8b5cf6;padding:6px 10px;border-radius:0 6px 6px 0;margin:4px 0;color:#c4b5fd;font-size:11.5px'>▶ $1</div>")
+      .replace(/\n/g,"<br>");
+    var bubble="<div style='max-width:88%;background:"+(isUser?"#1a2a08":"#3c2818")+";border:1px solid "+(isUser?"#3a5a18":"#5e4636")+";border-radius:"+(isUser?"10px 0 10px 10px":"0 10px 10px 10px")+";padding:11px 14px;font-size:12px;line-height:1.75;color:#f2eada'>"+texto+"</div>";
+    div.innerHTML=avatar+bubble;
+    el.appendChild(div);
+  });
+  el.scrollTop=el.scrollHeight;
+}
+
+window._salvarIARAKey=function(){
+  var v=(document.getElementById("iara-key-inp")||{}).value||"";
+  if(!v){showToast("Informe a chave","error");return;}
+  localStorage.setItem("bcs_anthropic_key",v.trim());
+  showToast("✓ Chave Claude salva!");
+  var s=document.getElementById("iara-key-sec");
+  if(s) s.style.display="none";
+};
+
+window._enviarIARA=async function(pergunta){
+  if(!state.iaraCmdChat) state.iaraCmdChat=[];
+  state.iaraCmdChat.push({role:"user",content:pergunta});
+  _renderIARAChatEl();
+  var inp=document.getElementById("iara-cmd-inp"); if(inp) inp.value="";
+  // Typing
+  var el=document.getElementById("iara-cmd-msgs");
+  if(el){
+    var tp=document.createElement("div");
+    tp.id="iara-typing";
+    tp.style.cssText="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start";
+    tp.innerHTML="<div style='width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1a3a6a,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0'>✦</div><div style='background:#3c2818;border:1px solid #5e4636;border-radius:0 10px 10px 10px;padding:10px 13px;color:#8a6a4a;font-size:11px;animation:pulse 1.2s infinite'>Analisando dados...</div>";
+    el.appendChild(tp);
+    el.scrollTop=el.scrollHeight;
+  }
+  var iaKey=localStorage.getItem("bcs_anthropic_key")||"";
+  if(!iaKey){
+    var tp2=document.getElementById("iara-typing"); if(tp2) tp2.remove();
+    state.iaraCmdChat.push({role:"assistant",content:"🔑 Configure a chave da API Claude para ativar a IARA. Clique em **Chave API** acima."});
+    _renderIARAChatEl();
+    var s=document.getElementById("iara-key-sec"); if(s) s.style.display="block";
+    return;
+  }
+  try{
+    var sys=gerarSystemPromptIARA();
+    var msgs=state.iaraCmdChat.slice(-14).map(function(m){return {role:m.role,content:m.content};});
+    var res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":iaKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2048,system:sys,messages:msgs})
+    });
+    var data=await res.json();
+    var tp3=document.getElementById("iara-typing"); if(tp3) tp3.remove();
+    if(data.error) state.iaraCmdChat.push({role:"assistant",content:"❌ "+data.error.message});
+    else state.iaraCmdChat.push({role:"assistant",content:data.content&&data.content[0]?data.content[0].text:"Resposta vazia."});
+  } catch(err){
+    var tp4=document.getElementById("iara-typing"); if(tp4) tp4.remove();
+    state.iaraCmdChat.push({role:"assistant",content:"❌ Erro de conexão: "+err.message});
+  }
+  _renderIARAChatEl();
+};
+
 function renderFichaVitima(main, vitimaId) {
   var vit = (state.vitimas||[]).find(function(v){ return v.id===vitimaId; });
   if(!vit && vitimaId) {
@@ -11774,9 +12013,10 @@ function renderFichaVitima(main, vitimaId) {
     .sort(function(a,b){ return (b.data||"").localeCompare(a.data||""); });
 
   var h = "<div style='max-width:820px;margin:0 auto'>";
-  h += "<div style='display:flex;align-items:center;gap:12px;margin-bottom:22px'>";
+  h += "<div style='display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap'>";
   h += "<button onclick='history.back()' style='background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer'>← Voltar</button>";
-  h += "<h2 style='font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--tinta);margin:0'>👤 Ficha — "+esc(nome)+"</h2>";
+  h += "<h2 style='font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--tinta);margin:0;flex:1'>👤 Ficha — "+esc(nome)+"</h2>";
+  h += "<button onclick=\"_gerarDossie('"+esc(vitimaId)+"')\" style='background:#1a0a2e;border:1px solid #6d28d9;color:#a78bfa;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer'>📄 Gerar Dossiê PDF</button>";
   h += "</div>";
 
   // Card de dados da vítima
@@ -11885,6 +12125,83 @@ window._salvarEncaminhamento = function(vitimaId) {
   showToast("✓ Encaminhamento salvo");
   var main = document.getElementById("main");
   if(main) renderFichaVitima(main, vitimaId);
+};
+
+window._gerarDossie = function(vitimaId){
+  var vit=(state.vitimas||[]).find(function(v){return v.id===vitimaId;});
+  if(!vit){showToast("Vítima não encontrada","error");return;}
+  var ocsVit=(state.db.ocorrencias||[]).filter(function(o){
+    return o.vitima_id===vitimaId||(!o.vitima_id&&o.vitima_nome===vit.nome);
+  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var encs=(state.encaminhamentos||[]).filter(function(e){return e.vitima_id===vitimaId;})
+    .sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var fridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId&&ocsVit.some(function(o){return o.id===f.ocorrenciaId;});}
+  ).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var dataDossie=new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+  var html="<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Dossiê — "+vit.nome+"</title><style>";
+  html+="*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;max-width:720px;margin:40px auto;color:#1a0e00;line-height:1.6;padding:0 20px}";
+  html+=".header{border-bottom:3px solid #5a2a0a;padding-bottom:14px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between}";
+  html+=".logo{font-size:11px;color:#5a2a0a;font-weight:700;text-align:right}";
+  html+=".titulo{font-size:22px;font-weight:700;color:#3c1810}h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a2a0a;margin:22px 0 8px;border-bottom:1px solid #e8d5b7;padding-bottom:5px}";
+  html+=".campo{display:grid;grid-template-columns:150px 1fr;gap:6px;margin-bottom:6px;font-size:13px}";
+  html+=".label{color:#8a6a4a;font-weight:700}.valor{color:#1a0e00}";
+  html+=".oc-item{border:1px solid #e8d5b7;border-left:4px solid #5a2a0a;border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:12px}";
+  html+=".badge-vd{background:#dc2626;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px}";
+  html+=".enc-item{border:1px solid #e8d5b7;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:12px}";
+  html+=".frida-badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px}";
+  html+=".frida-E{background:#dc2626;color:#fff}.frida-M{background:#f59e0b;color:#1a0e00}.frida-B{background:#22c55e;color:#fff}";
+  html+=".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e8d5b7;font-size:11px;color:#8a6a4a;display:flex;justify-content:space-between}";
+  html+="@media print{body{margin:20px;padding:0}button{display:none!important}}";
+  html+="</style></head><body>";
+  html+="<div class='header'><div><div class='titulo'>Dossiê da Vítima</div><div style='font-size:13px;color:#5a2a0a;margin-top:4px'>77ª Companhia Independente de Polícia Militar</div></div>";
+  html+="<div class='logo'>Base Comunitária de Segurança<br>Nova Cidade · Vitória da Conquista-BA<br><strong>Emitido em "+dataDossie+"</strong><br><span style='color:#dc2626;font-weight:700'>CONFIDENCIAL</span></div></div>";
+  // Identificação
+  html+="<h2>Identificação</h2>";
+  var idCampos=[["Nome",vit.nome||"—"],["Sexo",vit.sexo==="F"?"Feminino":vit.sexo==="M"?"Masculino":(vit.sexo||"—")],["Idade",vit.idade?vit.idade+" anos":"—"],["Telefone",vit.telefone||"—"],["Endereço",vit.endereco||"—"]];
+  idCampos.forEach(function(c){html+="<div class='campo'><div class='label'>"+c[0]+"</div><div class='valor'>"+c[1]+"</div></div>";});
+  // FRIDAs
+  if(fridas.length){
+    html+="<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
+    fridas.forEach(function(f){
+      var nivelCls=f.nivel==="E"?"frida-E":f.nivel==="M"?"frida-M":"frida-B";
+      var nivelLabel=f.nivel==="E"?"ELEVADO":f.nivel==="M"?"MÉDIO":"BAIXO";
+      html+="<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+esc(f.data||"—")+"</strong>"+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
+    });
+  }
+  // Ocorrências
+  html+="<h2>Histórico de Ocorrências ("+ocsVit.length+")</h2>";
+  if(!ocsVit.length) html+="<p style='color:#8a6a4a;font-size:12px'>Nenhuma ocorrência vinculada.</p>";
+  ocsVit.forEach(function(o){
+    var isVD=o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
+    html+="<div class='oc-item'>";
+    html+="<div style='display:flex;align-items:center;margin-bottom:6px'>";
+    html+="<strong style='font-size:13px'>"+esc(o.tipo||"—")+"</strong>";
+    if(isVD) html+="<span class='badge-vd'>VD</span>";
+    html+="<span style='margin-left:auto;color:#8a6a4a;font-size:11px'>"+esc(o.data||"—")+(o.hora?" · "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+"</span></div>";
+    if(o.descricao) html+="<p style='font-size:12px;color:#3a2818'>"+esc(o.descricao)+"</p>";
+    if(o.situacao) html+="<p style='font-size:11px;color:#8a6a4a;margin-top:4px'>Situação: "+esc(o.situacao.replace(/_/g," "))+"</p>";
+    html+="</div>";
+  });
+  // Encaminhamentos
+  html+="<h2>Encaminhamentos ("+encs.length+")</h2>";
+  if(!encs.length) html+="<p style='color:#8a6a4a;font-size:12px'>Nenhum encaminhamento registrado.</p>";
+  encs.forEach(function(e){
+    html+="<div class='enc-item'>";
+    html+="<div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>";
+    html+="<strong>"+esc(e.tipo||e.orgao||"—")+"</strong>";
+    var stLabel={pendente:"Pendente",enviado:"Enviado",aguardando_devolutiva:"Aguardando resposta",concluido:"Concluído",encerrado:"Encerrado"};
+    html+="<span style='background:#f5ede0;border:1px solid #e8d5b7;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:#5a2a0a'>"+(stLabel[e.status]||e.status||"—")+"</span>";
+    html+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+esc(e.data||"—")+"</span></div>";
+    if(e.descricao) html+="<p style='font-size:12px;color:#3a2818'>"+esc(e.descricao)+"</p>";
+    if(e.relato_devolutiva) html+="<p style='font-size:12px;color:#1a4a1a;margin-top:4px;padding:6px 8px;background:#f0fff0;border-radius:4px'>Devolutiva: "+esc(e.relato_devolutiva)+"</p>";
+    html+="</div>";
+  });
+  html+="<div class='footer'><span>77ª CIPM BCS — Sistema IARA</span><span>Dossiê emitido em "+dataDossie+"</span></div>";
+  html+="<br><button onclick='window.print()' style='padding:10px 24px;font-size:14px;cursor:pointer;background:#3c1810;color:#f5ede0;border:none;border-radius:6px;font-weight:700'>⬇ Imprimir / Salvar PDF</button>";
+  html+="</body></html>";
+  var win=window.open("","_blank");
+  win.document.write(html);
+  win.document.close();
 };
 
 window._concluirEnc = function(encId, vitimaId) {
