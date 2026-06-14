@@ -11182,6 +11182,156 @@ window._triarOcFichaSet = function(ocId, situacao, vitimaId) {
   }, 200);
 };
 
+function renderFilaAuxiliar(main) {
+  var hoje_str = hoje();
+  var diaSemana = new Date().getDay(); // 5 = sexta
+  var ocs = state.db.ocorrencias||[];
+  var ags = state.db.agendamentos||[];
+  var avisos = state.db.avisos||[];
+
+  // 1. Avisos do comandante
+  var avisosCmd = avisos.filter(function(a){ return a.origem==="auditoria_comandante" && !a.resolvido && !a.lido; });
+  var avisosGerais = avisos.filter(function(a){ return a.origem!=="auditoria_comandante" && !a.resolvido && !a.lido; });
+
+  // 2. Para lançar agora — agendamentos de hoje sem resultado
+  var agHoje = ags.filter(function(a){ return a.data===hoje_str && (a.status||"Agendado")==="Agendado"; })
+    .sort(function(a,b){ return (a.hora||"").localeCompare(b.hora||""); });
+
+  // 3. Para triar — OCs novas, VD first
+  var ocsNovas = ocs.filter(function(o){ return (o.situacao||"nova")==="nova"; });
+  var vds = ocsNovas.filter(function(o){ return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||""); });
+  var resto = ocsNovas.filter(function(o){ return !vds.includes(o); });
+  function porDataAsc(a,b){ return (a.data||"").localeCompare(b.data||""); }
+  vds.sort(porDataAsc); resto.sort(porDataAsc);
+  var filaTri = vds.concat(resto);
+
+  // 4. Encaminhamentos a enviar (só sexta, ou se houver pendentes há >6 dias)
+  var encPend = (state.encaminhamentos||[]).filter(function(e){ return e.status==="pendente"||e.status==="a_encaminhar"; });
+  var showEnc = diaSemana===5 || encPend.some(function(e){ return e.data && (new Date()-new Date(e.data+"T12:00"))>6*864e5; });
+
+  // 5. FRIDAs incompletos
+  var fridaInc = (state.db.frida||[]).filter(function(f){ return !f.nivel||f.nivel==="?"; });
+
+  var IS = "width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px;box-sizing:border-box";
+
+  var h = "<div style='max-width:900px;margin:0 auto'>";
+  h += "<div style='display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap'>";
+  h += "<h2 style='font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--tinta);margin:0'>📋 Fila de Trabalho</h2>";
+  h += "<span style='color:var(--tinta-2);font-size:12px'>"+hoje_str+"</span>";
+  h += "<button onclick='setTela(\"lancar\")' style='margin-left:auto;background:var(--ambar);color:var(--madeira-3);border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer'>+ Lançar OC</button>";
+  h += "</div>";
+
+  // Seção 1 — Avisos do comandante
+  if(avisosCmd.length){
+    h += "<div style='background:#EDD6C8;border:2px solid var(--verm);border-radius:10px;padding:14px 16px;margin-bottom:16px'>";
+    h += "<p style='font-size:10px;font-weight:700;color:var(--verm-2);text-transform:uppercase;letter-spacing:.8px;margin:0 0 10px'>⚠️ Avisos do Comandante</p>";
+    avisosCmd.forEach(function(a){
+      h += "<div style='background:#fff5f5;border:1px solid var(--verm);border-radius:6px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px'>";
+      h += "<div style='flex:1'><p style='font-size:13px;color:var(--tinta);font-weight:600;margin:0 0 3px'>"+esc(a.texto||"")+"</p>";
+      if(a.expira) h += "<p style='font-size:10px;color:var(--verm-2);margin:0'>Prazo: "+esc(a.expira)+"</p>";
+      h += "</div>";
+      if(a.indicador) h += "<button onclick='_avisoAbrirFila(\""+esc(a.indicador)+"\")' style='background:var(--verm);color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>Abrir fila</button>";
+      h += "</div>";
+    });
+    h += "</div>";
+  }
+
+  // Avisos gerais
+  if(avisosGerais.length){
+    h += "<div class='card' style='margin-bottom:14px;padding:12px 14px;border-left:3px solid var(--ambar)'>";
+    h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0 0 8px'>📣 Avisos Gerais ("+avisosGerais.length+")</p>";
+    avisosGerais.slice(0,3).forEach(function(a){
+      h += "<p style='font-size:12px;color:var(--tinta);margin:0 0 4px;padding-left:8px;border-left:2px solid var(--papel-3)'>"+esc(a.texto||"")+"</p>";
+    });
+    if(avisosGerais.length>3) h += "<p style='font-size:11px;color:var(--tinta-2);margin:4px 0 0'>+"+( avisosGerais.length-3)+" mais...</p>";
+    h += "</div>";
+  }
+
+  // Seção 2 — Para lançar agora
+  h += "<div class='card' style='margin-bottom:14px;padding:12px 16px'>";
+  h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:10px'>";
+  h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0'>📅 Para Registrar Hoje</p>";
+  h += "<span style='background:var(--ambar);color:var(--madeira-3);border-radius:8px;padding:1px 7px;font-size:10px;font-weight:900'>"+agHoje.length+"</span>";
+  h += "</div>";
+  if(!agHoje.length){
+    h += "<p style='font-size:12px;color:var(--tinta-2);text-align:center;padding:10px 0'>✓ Nenhum agendamento pendente para hoje.</p>";
+  } else {
+    agHoje.slice(0,5).forEach(function(a){
+      var vit = a.vitima_id ? (state.vitimas||[]).find(function(v){ return v.id===a.vitima_id; }) : null;
+      var nomeVit = vit ? vit.nome : (a.vitima_id||"");
+      h += "<div style='display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--papel-3)'>";
+      h += "<div style='flex:1'>";
+      h += "<p style='font-size:12px;font-weight:700;color:var(--tinta);margin:0'>"+esc(a.tipo||"Visita")+(nomeVit?" — "+esc(nomeVit):"")+"</p>";
+      h += "<p style='font-size:11px;color:var(--tinta-2);margin:0'>"+(a.hora||"—")+(a.responsavel?" · "+esc(a.responsavel):"")+"</p>";
+      h += "</div>";
+      h += "<button onclick='setTela(\"calendario\")' style='background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer'>Ver calendário</button>";
+      h += "</div>";
+    });
+    if(agHoje.length>5) h += "<p style='font-size:11px;color:var(--tinta-2);margin:6px 0 0'>+"+(agHoje.length-5)+" mais — <a href='#' onclick='setTela(\"calendario\");return false' style='color:var(--ambar)'>abrir calendário</a></p>";
+  }
+  h += "</div>";
+
+  // Seção 3 — Para triar
+  h += "<div class='card' style='margin-bottom:14px;padding:12px 16px'>";
+  h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:10px'>";
+  h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0'>📥 Para Triar</p>";
+  h += "<span style='background:"+(filaTri.length?"var(--verm)":"var(--verde)")+";color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:900'>"+filaTri.length+"</span>";
+  if(vds.length) h += "<span style='font-size:10px;color:var(--verm);font-weight:700'>"+vds.length+" VD</span>";
+  h += "<button onclick='setTela(\"triagem\")' style='margin-left:auto;background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);border-radius:5px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer'>Abrir triagem →</button>";
+  h += "</div>";
+  if(!filaTri.length){
+    h += "<p style='font-size:12px;color:var(--verde);text-align:center;padding:8px 0;font-weight:700'>✓ Fila de triagem zerada</p>";
+  } else {
+    filaTri.slice(0,4).forEach(function(o){
+      var isVD = o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
+      h += "<div onclick='state._triagemOcId=\""+esc(o.id)+"\";setTela(\"triagem\")' style='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--papel-3);cursor:pointer'>";
+      if(isVD) h += "<span style='background:var(--verm);color:#fff;border-radius:3px;padding:0 5px;font-size:9px;font-weight:900;flex-shrink:0'>VD</span>";
+      h += "<div style='flex:1'><p style='font-size:12px;font-weight:700;color:var(--tinta);margin:0'>"+esc(o.tipo||"—")+(o.vitima_nome?" — "+esc(o.vitima_nome):"")+"</p>";
+      h += "<p style='font-size:10px;color:var(--tinta-2);margin:0'>"+esc(o.data||"—")+(o.bairro?" · "+esc(o.bairro):"")+"</p></div>";
+      h += "<span style='font-size:18px;color:var(--ambar)'>›</span>";
+      h += "</div>";
+    });
+    if(filaTri.length>4) h += "<p style='font-size:11px;color:var(--tinta-2);margin:6px 0 0'>+"+(filaTri.length-4)+" mais na fila</p>";
+  }
+  h += "</div>";
+
+  // Seção 4 — Encaminhamentos de sexta
+  if(showEnc){
+    h += "<div class='card' style='margin-bottom:14px;padding:12px 16px;border-left:3px solid var(--ambar)'>";
+    h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:10px'>";
+    h += "<p style='font-size:10px;font-weight:700;color:var(--ambar);text-transform:uppercase;letter-spacing:.8px;margin:0'>📤 Encaminhamentos "+(diaSemana===5?"desta Sexta":"Pendentes")+"</p>";
+    h += "<span style='background:var(--ambar);color:var(--madeira-3);border-radius:8px;padding:1px 7px;font-size:10px;font-weight:900'>"+encPend.length+"</span>";
+    h += "<button onclick='setTela(\"encaminhamentos\")' style='margin-left:auto;background:var(--ambar);color:var(--madeira-3);border:none;border-radius:5px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer'>Abrir fila →</button>";
+    h += "</div>";
+    var porOrgao={};
+    encPend.forEach(function(e){ var o=e.tipo||"Outro"; if(!porOrgao[o])porOrgao[o]=0; porOrgao[o]++; });
+    Object.keys(porOrgao).forEach(function(org){
+      h += "<p style='font-size:12px;color:var(--tinta);margin:4px 0'>"+esc(org)+": <b>"+porOrgao[org]+"</b></p>";
+    });
+    h += "</div>";
+  }
+
+  // Seção 5 — FRIDAs incompletos
+  if(fridaInc.length){
+    h += "<div class='card' style='margin-bottom:14px;padding:12px 16px;border-left:3px solid #ff69b4'>";
+    h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px'>";
+    h += "<p style='font-size:10px;font-weight:700;color:#c04080;text-transform:uppercase;letter-spacing:.8px;margin:0'>🌸 FRIDAs Incompletos</p>";
+    h += "<span style='background:#ff69b4;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:900'>"+fridaInc.length+"</span>";
+    h += "<button onclick='setTela(\"dashvcm\")' style='margin-left:auto;background:transparent;border:1px solid #ff69b4;color:#c04080;border-radius:5px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer'>Ver VCM →</button>";
+    h += "</div>";
+    h += "<p style='font-size:12px;color:var(--tinta-2);margin:0'>"+fridaInc.length+" avaliação(ões) sem nível registrado — abrir Monitor VCM para completar.</p>";
+    h += "</div>";
+  }
+
+  h += "</div>";
+  main.innerHTML = h;
+}
+
+window._avisoAbrirFila = function(indicador) {
+  var mapa = {triagem:"triagem",frida:"dashvcm",visitas:"calendario",encaminhamentos:"encaminhamentos"};
+  setTela(mapa[indicador]||"dashboard");
+};
+
 function renderFilaEncaminhamentos(main) {
   var todos = (state.encaminhamentos||[]);
   var pendentes = todos.filter(function(e){ return e.status !== "concluido"; })
@@ -12942,6 +13092,10 @@ function renderTela() {
     return;
   }
 
+  if(tela==="fila_auxiliar"){
+    renderFilaAuxiliar(main);
+    return;
+  }
   if(tela==="triagem"){
     renderTriagem(main);
     return;
@@ -13530,6 +13684,12 @@ function render(){
       <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#10b981':'#10b98166'};border-color:${state.tela==='inventario'?'#10b981':'transparent'}">📦 Inventário</button>
     `:`
       <button class="nav-btn${state.tela==="importar_zap"?" active":""}" onclick="setTela('importar_zap')" style="background:${state.tela==='importar_zap'?'rgba(212,168,122,0.15)':'rgba(200,168,75,0.06)'};border:1px solid ${state.tela==='importar_zap'?'#d4a87a':'rgba(200,168,75,0.3)'};color:#d4a87a;font-weight:700;margin-bottom:6px">📥 Importar Dados</button>
+      ${(function(){
+        var _ativo=state.tela==="fila_auxiliar";
+        var _nPend=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length + (state.db.agendamentos||[]).filter(function(a){return a.data===hoje()&&(a.status||"Agendado")==="Agendado";}).length;
+        var _badge=_nPend>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";"+"color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nPend+"</span>":"";
+        return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"fila_auxiliar\")'>📋 Fila do Dia"+_badge+"</button>";
+      })()}
       <button class="nav-btn${state.tela==="dashboard"?" active":""}" data-tela="dashboard" onclick="setTela('dashboard')">📊 Painel</button>
       <button class="nav-btn${state.tela==="dashcomandante"?" active":""}" data-tela="dashcomandante" onclick="setTela('dashcomandante')" style="color:${state.tela==="dashcomandante"?"#d4a87a":"#b0805088"};border-color:${state.tela==="dashcomandante"?"#d4a87a":"transparent"}">${(function(){ var nP=(state.alertasProjetos||[]).filter(function(a){return !a.lido;}).length; var nC=(state.alertasCrescimento||[]).filter(function(a){return !a.lido;}).length; var total=nP+nC; if(nC>0) return "⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>🚨 "+total+"</span>"; if(nP>0) return "⚔️ Painel do Comando <span style='background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;animation:piscar-suave 2s infinite'>"+nP+"</span>"; return "⚔️ Painel do Comando"; })()}</button>
       <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" data-tela="ocorrencias" onclick="setTela('ocorrencias')">🔍 Analisar Ocorrências</button>
