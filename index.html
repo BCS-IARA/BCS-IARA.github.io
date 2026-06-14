@@ -6234,8 +6234,10 @@ function exportarRelatorioMensalPDF(){
 // ══════════════════════════════════════════════════
 var PROJ_TIPOS   = ["Operação","Capacitação","Comunitário","Administrativo","Meta Institucional","Outro"];
 var PROJ_CORES   = {Operação:"#ef4444",Capacitação:"#f59e0b",Comunitário:"#22c55e",Administrativo:"#6366f1","Meta Institucional":"#d4a87a",Outro:"#6b7280"};
-var PROJ_STATUS  = ["Planejamento","Em Andamento","Concluído","Cancelado"];
-var PROJ_SCORS   = {Planejamento:"#6366f1","Em Andamento":"#f59e0b",Concluído:"#22c55e",Cancelado:"#6b7280"};
+var PROJ_STATUS  = ["Planejamento","Em Andamento","Crítico","Concluído","Cancelado"];
+var PROJ_SCORS   = {Planejamento:"#6366f1","Em Andamento":"#f59e0b",Crítico:"#ef4444",Concluído:"#22c55e",Cancelado:"#6b7280"};
+var PROJ_PRIOR   = {Critica:"#ef4444",Alta:"#f97316",Media:"#3b82f6",Baixa:"#22c55e"};
+var PROJ_PRIOR_LABEL = ["Critica","Alta","Media","Baixa"];
 var TAREFA_ST    = ["Pendente","Em Andamento","Concluída","Atrasada"];
 
 function _projetosAlerta(){
@@ -6285,24 +6287,45 @@ function renderGestaoProjectos(main){
     return { st:st, cor:PROJ_SCORS[st], items:projetos.filter(function(p){return p.status===st;}) };
   });
 
-  state.projetosView = state.projetosView||'kanban';
+  state.projetosView = state.projetosView||'grade';
   if(state.projetosView==='dashboard'){ renderDashProjetos(main); return; }
   var totalAlertas = _projetosAlerta();
 
   var h=[];
+  // Status automático Crítico
+  projetos.forEach(function(p){
+    if(p.status==="Concluído"||p.status==="Cancelado") return;
+    var temAtrasada=(p.tarefas||[]).some(function(t){return t.status!=="Concluída"&&_pdLocal(t.dataPrevista)&&_pdLocal(t.dataPrevista)<hojeDate;});
+    var proxVencer=p.dataFim&&_pdLocal(p.dataFim)&&(_pdLocal(p.dataFim)-hojeDate)<7*864e5&&progresso(p)<70;
+    if((temAtrasada||proxVencer)&&p.status==="Em Andamento") p.status="Crítico";
+  });
+
   // ── Abas de visualização ──
-  var _abas=[['kanban','🗂 Kanban'],['grade','⊞ Grade'],['dashboard','📊 Visão Geral']];
+  var _abas=[['grade','⊞ Grade'],['kanban','🗂 Kanban'],['lista','≡ Lista'],['dashboard','📊 Visão Geral']];
   h.push("<div style='display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #4a3224'>");
   _abas.forEach(function(ab){
     var ativ=state.projetosView===ab[0];
     h.push("<button onclick=\"state.projetosView='"+ab[0]+"';_reRenderProjetos()\" style='padding:10px 20px;background:transparent;border:none;border-bottom:3px solid "+(ativ?"#d4a87a":"transparent")+";color:"+(ativ?"#d4a87a":"#8a6a4a")+";font-size:13px;font-weight:700;cursor:pointer'>"+ab[1]+"</button>");
   });
+  // Filtros rápidos por prioridade
+  h.push("<div style='margin-left:auto;display:flex;align-items:center;gap:4px;padding-bottom:2px'>");
+  var _fpAtivo = state._projFiltPrior||"";
+  PROJ_PRIOR_LABEL.forEach(function(pr){
+    var _pc=PROJ_PRIOR[pr]||"#888";
+    var _ativ=_fpAtivo===pr;
+    h.push("<button onclick=\"state._projFiltPrior=state._projFiltPrior==='"+pr+"'?'':'"+pr+"';_reRenderProjetos()\" style='padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid "+(_ativ?_pc:"#4a3224")+";background:"+(_ativ?_pc+"22":"transparent")+";color:"+(_ativ?_pc:"#6a5030")+"'>"+pr+"</button>");
+  });
+  if(_fpAtivo) h.push("<button onclick=\"state._projFiltPrior='';_reRenderProjetos()\" style='padding:3px 8px;border-radius:10px;font-size:9px;border:1px solid #6a2a2a;background:transparent;color:#f87171;cursor:pointer'>✕</button>");
+  h.push("</div>");
   h.push("</div>");
   h.push("<div style='max-width:1200px;margin:0 auto'>");
 
+  // Aplicar filtro de prioridade
+  var _projetosVis = _fpAtivo ? projetos.filter(function(p){return p.prioridade===_fpAtivo;}) : projetos;
+
   // Header
   h.push("<div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px'>");
-  h.push("<div><h2 style='font-size:20px;font-weight:800;color:#f5ede0;margin:0'>🗂 Gestão de Projetos</h2><p style='color:#8a6a4a;font-size:12px;margin:2px 0 0'>"+projetos.length+" projeto(s) · "+projetos.filter(function(p){return p.status==="Em Andamento";}).length+" em andamento</p></div>");
+  h.push("<div><h2 style='font-size:20px;font-weight:800;color:#f5ede0;margin:0'>📁 Gestão e Planejamento</h2><p style='color:#8a6a4a;font-size:12px;margin:2px 0 0'>"+projetos.length+" projeto(s) · "+projetos.filter(function(p){return p.status==="Em Andamento"||p.status==="Crítico";}).length+" em andamento · "+projetos.filter(function(p){return p.status==="Crítico";}).length+" crítico(s)</p></div>");
   h.push("<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center'>");
   // Exportar
   h.push("<button onclick='exportarDadosBCS()' title='Exportar todos os dados para backup / outro navegador' style='background:#0a1a2a;border:1px solid #1a3a4a;color:#3a8ab0;padding:8px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer'>⬇ Exportar Dados</button>");
@@ -6324,18 +6347,23 @@ function renderGestaoProjectos(main){
   function renderCardProjeto(p, colCor){
     var pct=progresso(p), nAl=alertasTarefa(p);
     var tcor=PROJ_CORES[p.tipo]||"#6b7280";
-    var temAtrasada=(p.tarefas||[]).some(function(t){ return t.status!=="Concluída"&&_pdLocal(t.dataPrevista)&&_pdLocal(t.dataPrevista)<hojeDate; });
+    var scor=PROJ_SCORS[p.status]||"#6b7280";
+    var pcor=PROJ_PRIOR[p.prioridade||"Media"]||"#3b82f6";
+    var temAtrasada=p.status==="Crítico"||(p.tarefas||[]).some(function(t){ return t.status!=="Concluída"&&_pdLocal(t.dataPrevista)&&_pdLocal(t.dataPrevista)<hojeDate; });
     var r=[];
-    r.push("<div onclick=\"verProjeto('"+p.id+"')\" style='background:#36221a;border:1px solid "+(temAtrasada?"#f59e0b44":"#4a3224")+";border-left:4px solid "+tcor+";border-radius:10px;padding:14px;cursor:pointer"+(temAtrasada?";animation:piscar-lento 3s infinite":"")+";transition:background 0.15s'>");
+    r.push("<div onclick=\"verProjeto('"+p.id+"')\" style='background:#36221a;border:1px solid "+(temAtrasada?"#f59e0b44":"#4a3224")+";border-left:4px solid "+scor+";border-radius:10px;padding:14px;cursor:pointer"+(temAtrasada?";animation:piscar-lento 3s infinite":"")+";transition:background 0.15s'>");
     r.push("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px'>");
     r.push("<span style='background:"+tcor+"22;color:"+tcor+";padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700'>"+p.tipo+"</span>");
-    if(nAl>0) r.push("<span style='background:#f59e0b22;color:#f59e0b;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700'>⚠ "+nAl+" atrasada(s)</span>");
+    r.push("<div style='display:flex;gap:5px;align-items:center'>");
+    if(p.prioridade) r.push("<span style='background:"+pcor+"22;color:"+pcor+";padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700'>"+p.prioridade+"</span>");
+    if(nAl>0) r.push("<span style='background:#f59e0b22;color:#f59e0b;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700'>⚠ "+nAl+"</span>");
+    r.push("</div>");
     r.push("</div>");
     r.push("<p style='color:#f5ede0;font-size:13px;font-weight:700;margin:0 0 5px;line-height:1.3'>"+esc(p.nome)+"</p>");
     if(p.responsavel) r.push("<p style='color:#8a6a4a;font-size:11px;margin:0 0 5px'>👤 "+esc(p.responsavel)+"</p>");
     if(p.dataFim) r.push("<p style='color:#5a4a2a;font-size:11px;margin:0 0 8px'>📅 até "+fmtData(p.dataFim)+"</p>");
     r.push("<div style='display:flex;justify-content:space-between;margin-bottom:4px'><span style='color:#5e4636;font-size:10px'>"+(p.tarefas||[]).length+" tarefa(s)</span><span style='color:"+(pct===100?"#22c55e":"#8a6a4a")+";font-size:10px;font-weight:700'>"+pct+"%</span></div>");
-    r.push("<div style='background:#3c2818;border-radius:4px;height:6px'><div style='height:100%;width:"+pct+"%;background:"+(pct===100?"#22c55e":(colCor||tcor))+";border-radius:4px'></div></div>");
+    r.push("<div style='background:#3c2818;border-radius:4px;height:6px'><div style='height:100%;width:"+pct+"%;background:"+(pct===100?"#22c55e":(colCor||scor||tcor))+";border-radius:4px'></div></div>");
     r.push("</div>");
     return r.join("");
   }
@@ -6344,19 +6372,46 @@ function renderGestaoProjectos(main){
   var statusAtivo = state._projStatusMobile || "Planejamento";
 
   // ── GRADE ────────────────────────────────────────────
+  // ── GRADE (Cards panorâmicos) ─────────────────────
   if(state.projetosView==='grade'){
-    if(!projetos.length){
+    if(!_projetosVis.length){
       h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:12px;padding:60px;text-align:center'>");
-      h.push("<p style='font-size:40px;margin-bottom:12px'>🗂</p><p style='color:#5e4636;font-size:14px;margin-bottom:16px'>Nenhum projeto cadastrado ainda.</p>");
+      h.push("<p style='font-size:40px;margin-bottom:12px'>📁</p><p style='color:#5e4636;font-size:14px;margin-bottom:16px'>"+(_fpAtivo?"Nenhum projeto com prioridade "+_fpAtivo+".":"Nenhum projeto cadastrado ainda.")+"</p>");
       h.push("<button onclick='abrirModalNovoProjeto()' style='background:linear-gradient(135deg,#d4a87a,#a8882b);border:none;color:#3c2818;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer'>+ Criar Primeiro Projeto</button>");
       h.push("</div>");
     } else {
+      h.push("<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px'>");
+      _projetosVis.forEach(function(p){ h.push(renderCardProjeto(p, null)); });
+      // Slot "+ Novo projeto"
+      h.push("<div onclick='abrirModalNovoProjeto()' style='background:#2a1c10;border:2px dashed #4a3224;border-radius:10px;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:120px;transition:border-color .15s' onmouseover=\"this.style.borderColor='#d4a87a'\" onmouseout=\"this.style.borderColor='#4a3224'\"><span style='color:#5e4636;font-size:13px;font-weight:700'>+ Novo Projeto</span></div>");
+      h.push("</div>");
+    }
+    h.push("</div>");
+    main.innerHTML = h.join("");
+    return;
+  }
+
+  // ── LISTA (Tabela comparativa) ────────────────────
+  if(state.projetosView==='lista'){
+    if(!_projetosVis.length){
+      h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:12px;padding:60px;text-align:center'>");
+      h.push("<p style='font-size:40px;margin-bottom:12px'>📁</p><p style='color:#5e4636;font-size:14px;margin-bottom:16px'>"+(_fpAtivo?"Nenhum projeto com prioridade "+_fpAtivo+".":"Nenhum projeto cadastrado ainda.")+"</p>");
+      h.push("<button onclick='abrirModalNovoProjeto()' style='background:linear-gradient(135deg,#d4a87a,#a8882b);border:none;color:#3c2818;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer'>+ Criar Primeiro Projeto</button>");
+      h.push("</div>");
+    } else {
+      // Ordenar por criticidade
+      var _listaOrd = _projetosVis.slice().sort(function(a,b){
+        var _pOrder={Critica:0,Alta:1,Media:2,Baixa:3};
+        var pa=_pOrder[a.prioridade||"Media"]||2, pb=_pOrder[b.prioridade||"Media"]||2;
+        return pa-pb;
+      });
       h.push("<div style='overflow-x:auto;border-radius:12px;border:1px solid #4a3224'>");
       h.push("<table style='width:100%;border-collapse:collapse;font-size:13px'>");
       h.push("<thead>");
       h.push("<tr style='background:#2a1c10;border-bottom:2px solid #4a3224'>");
       h.push("<th style='padding:10px 14px;text-align:left;color:#d4a87a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap'>Nome</th>");
       h.push("<th style='padding:10px 14px;text-align:left;color:#d4a87a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap'>Tipo</th>");
+      h.push("<th style='padding:10px 14px;text-align:left;color:#d4a87a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap'>Prioridade</th>");
       h.push("<th style='padding:10px 14px;text-align:left;color:#d4a87a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap'>Status</th>");
       h.push("<th style='padding:10px 14px;text-align:left;color:#d4a87a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap'>Responsável</th>");
       h.push("<th style='padding:10px 14px;text-align:left;color:#d4a87a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap'>Prazo</th>");
@@ -6366,11 +6421,12 @@ function renderGestaoProjectos(main){
       h.push("</tr>");
       h.push("</thead>");
       h.push("<tbody>");
-      projetos.forEach(function(p, idx){
+      _listaOrd.forEach(function(p, idx){
         var pct=progresso(p), nAl=alertasTarefa(p);
         var tcor=PROJ_CORES[p.tipo]||"#6b7280";
         var scor=PROJ_SCORS[p.status]||"#6b7280";
-        var temAtrasada=(p.tarefas||[]).some(function(t){return t.status!=="Concluída"&&_pdLocal(t.dataPrevista)&&_pdLocal(t.dataPrevista)<hojeDate;});
+        var pcor=PROJ_PRIOR[p.prioridade||"Media"]||"#3b82f6";
+        var temAtrasada=p.status==="Crítico"||(p.tarefas||[]).some(function(t){return t.status!=="Concluída"&&_pdLocal(t.dataPrevista)&&_pdLocal(t.dataPrevista)<hojeDate;});
         var nTarefas=(p.tarefas||[]).length;
         var nConcluidas=(p.tarefas||[]).filter(function(t){return t.status==="Concluída";}).length;
         var rowBg=idx%2===0?"#36221a":"#311e17";
@@ -6384,6 +6440,11 @@ function renderGestaoProjectos(main){
         // Tipo
         h.push("<td style='padding:11px 14px;white-space:nowrap'>");
         h.push("<span style='background:"+tcor+"22;color:"+tcor+";padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;text-transform:uppercase'>"+esc(p.tipo||"—")+"</span>");
+        h.push("</td>");
+        // Prioridade
+        h.push("<td style='padding:11px 14px;white-space:nowrap'>");
+        if(p.prioridade) h.push("<span style='background:"+pcor+"22;color:"+pcor+";padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700'>"+esc(p.prioridade)+"</span>");
+        else h.push("<span style='color:#4a3224;font-size:12px'>—</span>");
         h.push("</td>");
         // Status
         h.push("<td style='padding:11px 14px;white-space:nowrap'>");
@@ -6863,6 +6924,7 @@ function abrirModalNovoProjeto(editId){
   h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'>");
   h.push("<div style='grid-column:1/-1'><label style='"+fl+"'>Nome do Projeto *</label><input id='pnome' type='text' value='"+esc(edit?edit.nome:"")+"' placeholder='Ex: Operação Saturação Centro' style='"+fi+"'/></div>");
   h.push("<div><label style='"+fl+"'>Tipo</label><select id='ptipo' style='"+fi+"'>"+PROJ_TIPOS.map(function(t){return"<option"+(edit&&edit.tipo===t?" selected":"")+">"+t+"</option>";}).join("")+"</select></div>");
+  h.push("<div><label style='"+fl+"'>Prioridade</label><select id='pprior' style='"+fi+"'>"+PROJ_PRIOR_LABEL.map(function(s){return"<option"+(edit&&edit.prioridade===s?" selected":"")+">"+s+"</option>";}).join("")+"</select></div>");
   h.push("<div><label style='"+fl+"'>Status</label><select id='pstatus' style='"+fi+"'>"+PROJ_STATUS.map(function(s){return"<option"+(edit&&edit.status===s?" selected":"")+">"+s+"</option>";}).join("")+"</select></div>");
   h.push("<div><label style='"+fl+"'>Responsável</label><input id='presp' type='text' value='"+esc(edit?edit.responsavel:"")+"' placeholder='Nome do gestor' style='"+fi+"'/></div>");
   h.push("<div><label style='"+fl+"'>Início</label><input id='pdinicio' type='date' value='"+(edit?edit.dataInicio:hoje())+"' style='"+fi+"'/></div>");
@@ -6884,6 +6946,7 @@ function abrirModalNovoProjeto(editId){
     if(!state.projetos) state.projetos=[];
     if(edit){
       edit.nome=nome; edit.tipo=document.getElementById("ptipo").value;
+      edit.prioridade=document.getElementById("pprior").value;
       edit.status=document.getElementById("pstatus").value;
       edit.responsavel=document.getElementById("presp").value.trim();
       edit.dataInicio=document.getElementById("pdinicio").value;
@@ -6894,6 +6957,7 @@ function abrirModalNovoProjeto(editId){
       state.projetos.push({id:"PRJ_"+Date.now(),criadoEm:new Date().toISOString(),
         _editadoEm:new Date().toISOString(),
         nome:nome,tipo:document.getElementById("ptipo").value,
+        prioridade:document.getElementById("pprior").value,
         status:document.getElementById("pstatus").value,
         responsavel:document.getElementById("presp").value.trim(),
         dataInicio:document.getElementById("pdinicio").value,
@@ -15992,7 +16056,7 @@ function renderMobileNav(){
     [["dashboard","📊","Painel",function(){setTela("dashboard");}],
      ["ocorrencias","🔍","Ocorrências",function(){setTela("ocorrencias");}],
      ["importar_zap","📥","Importar",function(){setTela("importar_zap");}],
-     ["projetos","🟢","Projetos",function(){setTela("projetos");}]
+     ["projetos","📁","Gestão",function(){setTela("projetos");}]
     ].forEach(function(x){nav.appendChild(mk(x[0],x[1],x[2],x[3]));});
     nav.appendChild(menu());
   }
