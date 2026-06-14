@@ -15106,6 +15106,7 @@ function render(){
         <button class="nav-btn${state.conselho_tab==="diretoria"&&state.tela==="conselho"?" active":""}" onclick="state.conselho_tab='diretoria';setTela('conselho')" style="color:${state.conselho_tab==='diretoria'&&state.tela==='conselho'?'#22c55e':'#22c55e88'};border-color:${state.conselho_tab==='diretoria'&&state.tela==='conselho'?'#22c55e':'transparent'}">🏅 Diretoria</button>
         <button class="nav-btn${state.conselho_tab==="calendario"&&state.tela==="conselho"?" active":""}" onclick="state.conselho_tab='calendario';setTela('conselho')" style="color:${state.conselho_tab==='calendario'&&state.tela==='conselho'?'#22c55e':'#22c55e88'};border-color:${state.conselho_tab==='calendario'&&state.tela==='conselho'?'#22c55e':'transparent'}">📅 Calendário</button>
       </div>`:""}
+      <div id="sheets-status" style="font-size:9px;color:#5e4636;padding:4px 10px;line-height:1.4">${state.ultimaSinc?"✓ Atualizado às "+state.ultimaSinc.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"Aguardando sync..."}</div>
       <button onclick="state.perfil=null;state.tela='dashboard';render()" style="background:transparent;border:none;color:#5e4636;font-size:12px;width:100%;text-align:left;padding:8px 10px;cursor:pointer">⏏ Sair</button>
     </div>
   </div>
