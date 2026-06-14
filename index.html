@@ -19781,11 +19781,36 @@ window.verAta = function(id){
     "</div>",
     a.presentes&&a.presentes.length?"<div style='background:#f0e6d0;border:1px solid #5e4636;border-radius:8px;padding:12px;margin-bottom:12px'><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 8px'>Presentes ("+a.presentes.length+")</p><div style='display:flex;flex-wrap:wrap;gap:5px'>"+a.presentes.map(function(p){return "<span style='background:#EAD9B8;border:1px solid #C8A84B44;color:#6B5236;padding:3px 8px;border-radius:12px;font-size:11px'>"+esc(p)+"</span>";}).join("")+"</div></div>":"",
     a.deliberacoes?"<div style='background:#f0e6d0;border:1px solid #5e4636;border-radius:8px;padding:12px;margin-bottom:14px'><p style='color:#a07c58;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 8px'>Deliberações</p><p style='color:#2a1c10;font-size:12px;line-height:1.7;margin:0;white-space:pre-wrap'>"+esc(a.deliberacoes)+"</p></div>":"",
-    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='width:100%;background:#1a1208;border:1px solid #5e4636;color:#a07c58;padding:10px;border-radius:8px;font-size:13px;cursor:pointer'>Fechar</button>",
+    "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>",
+    "<button onclick='this.closest(\"div[style*=fixed]\").remove()' style='background:#1a1208;border:1px solid #5e4636;color:#a07c58;padding:10px;border-radius:8px;font-size:13px;cursor:pointer'>Fechar</button>",
+    "<button id='btn-pdf-ata-"+a.id+"' style='background:linear-gradient(135deg,#1B3A6B,#0d2448);border:1px solid #4a7abf;color:#adc8ff;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>🖨 Imprimir Ata</button>",
+    "</div>",
     "</div>"
   ].join("");
   document.body.appendChild(m);
   m.onclick=function(e){if(e.target===this)this.remove();};
+  (document.getElementById("btn-pdf-ata-"+a.id)||{}).onclick=function(){
+    var win=window.open("","_blank");
+    var dataFmt=fmtData(a.data)+(a.hora?" às "+a.hora:"");
+    var presHtml=(a.presentes&&a.presentes.length)?a.presentes.map(function(p){return "<li>"+esc(p)+"</li>";}).join(""):"<li><em>Não informado</em></li>";
+    win.document.write("<html><head><title>Ata Nº "+esc(a.numero||"--")+"</title><style>body{font-family:Georgia,serif;color:#2a1c10;max-width:720px;margin:40px auto;padding:0 24px}h1{font-size:22px;margin:0 0 4px}p{font-size:13px;line-height:1.8}ul{margin:6px 0 0;padding-left:22px}li{font-size:13px;line-height:1.8}.label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#6B5236;font-weight:700;margin:14px 0 2px}hr{border:none;border-top:1px solid #C8A84B;margin:16px 0}@media print{body{margin:20px}}</style></head><body>");
+    win.document.write("<div style='background:#1B3A6B;padding:14px 20px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:0'>");
+    win.document.write("<img src='"+BCS_LOGO_B64+"' style='width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0'>");
+    win.document.write("<div><div style='color:#fff;font-size:18px;font-weight:700;font-family:Georgia,serif'>Ata de Reunião Nº "+esc(a.numero||"--")+"</div>");
+    win.document.write("<div style='color:#adc8ff;font-size:11px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade · Conselho Comunitário de Segurança</div></div></div>");
+    win.document.write("<div style='border:1px solid #C8A84B;border-top:none;border-radius:0 0 4px 4px;padding:20px;margin-bottom:20px'>");
+    win.document.write("<p class='label'>Data e Hora</p><p>"+dataFmt+"</p>");
+    win.document.write("<p class='label'>Local</p><p>"+esc(a.local||"Não informado")+"</p>");
+    win.document.write("<p class='label'>Pauta / Assunto</p><p>"+esc(a.pauta||"")+"</p>");
+    win.document.write("<hr><p class='label'>Presentes ("+((a.presentes||[]).length)+")</p><ul>"+presHtml+"</ul>");
+    if(a.deliberacoes){win.document.write("<hr><p class='label'>Deliberações</p><p style='white-space:pre-wrap'>"+esc(a.deliberacoes)+"</p>");}
+    win.document.write("<hr><div style='margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px'>");
+    win.document.write("<div style='text-align:center;border-top:1px solid #2a1c10;padding-top:8px;font-size:12px;color:#6B5236'>Presidente do CONSEG</div>");
+    win.document.write("<div style='text-align:center;border-top:1px solid #2a1c10;padding-top:8px;font-size:12px;color:#6B5236'>Secretário(a)</div>");
+    win.document.write("</div></div></body></html>");
+    win.document.close();
+    setTimeout(function(){win.print();},400);
+  };
 };
 
 window.excluirAta=function(id){
