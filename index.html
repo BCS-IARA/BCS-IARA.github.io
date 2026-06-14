@@ -715,6 +715,7 @@ function _salvarLocalSemSync(){
     localStorage.setItem("bcs_db_light",JSON.stringify(light));
     if(state.eventosAvulsos) localStorage.setItem("bcs_eventos_avulsos",JSON.stringify(state.eventosAvulsos));
     if(state.projetos) localStorage.setItem("bcs_projetos",JSON.stringify(state.projetos));
+    if(state.rascunhos) localStorage.setItem("bcs_rascunhos",JSON.stringify(state.rascunhos));
     if(state.alertasProjetos) localStorage.setItem("bcs_alertas_projetos",JSON.stringify(state.alertasProjetos));
     if(state.projetosSociais) localStorage.setItem("bcs_projetos_sociais",JSON.stringify(state.projetosSociais));
     if(state.inscricoesProjetos) localStorage.setItem("bcs_inscricoes_projetos",JSON.stringify(state.inscricoesProjetos));
@@ -1235,6 +1236,7 @@ let state = {
   ocorrenciasEncerradas: JSON.parse(localStorage.getItem("bcs_oc_encerradas")||"[]"),
   eventosAvulsos: JSON.parse(localStorage.getItem("bcs_eventos_avulsos")||"[]"),
   projetos: JSON.parse(localStorage.getItem("bcs_projetos")||"[]"),
+  rascunhos: JSON.parse(localStorage.getItem("bcs_rascunhos")||"[]"),
   alertasProjetos: JSON.parse(localStorage.getItem("bcs_alertas_projetos")||"[]"),
   projetosSociais: JSON.parse(localStorage.getItem("bcs_projetos_sociais")||"[]"),
   inscricoesProjetos: JSON.parse(localStorage.getItem("bcs_inscricoes_projetos")||"[]"),
@@ -6301,7 +6303,7 @@ function renderGestaoProjectos(main){
   });
 
   // ── Abas de visualização ──
-  var _abas=[['grade','⊞ Grade'],['kanban','🗂 Kanban'],['lista','≡ Lista'],['dashboard','📊 Visão Geral']];
+  var _abas=[['grade','⊞ Grade'],['kanban','🗂 Kanban'],['lista','≡ Lista'],['ideias','💡 Chuva de Ideias'],['relatorio','📋 Relatório Semanal'],['dashboard','📊 Visão Geral']];
   h.push("<div style='display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #4a3224'>");
   _abas.forEach(function(ab){
     var ativ=state.projetosView===ab[0];
@@ -6482,6 +6484,284 @@ function renderGestaoProjectos(main){
     }
     h.push("</div>");
     main.innerHTML = h.join("");
+    return;
+  }
+
+  // ── CHUVA DE IDEIAS ──────────────────────────────────
+  if(state.projetosView==='ideias'){
+    state.rascunhos = state.rascunhos||[];
+    var _rascAtivo = state._rascAtivoId || (state.rascunhos.length ? state.rascunhos[0].id : null);
+    var _rascObj   = _rascAtivo ? state.rascunhos.find(function(r){return r.id===_rascAtivo;}) : null;
+    var _catTags   = ["Operação","Capacitação","Comunitário","Meta Institucional","Livre"];
+    // Layout 2 colunas
+    h.push("<div style='display:flex;gap:12px;align-items:start;min-height:500px'>");
+    // Coluna esquerda — lista de rascunhos
+    h.push("<div style='width:260px;flex-shrink:0;background:#2a1c10;border:1px solid #4a3224;border-radius:12px;overflow:hidden'>");
+    h.push("<div style='padding:10px 12px;background:#36221a;border-bottom:1px solid #4a3224;display:flex;align-items:center;justify-content:space-between'>");
+    h.push("<span style='color:#d4a87a;font-size:12px;font-weight:700'>Rascunhos ("+state.rascunhos.length+")</span>");
+    h.push("<button onclick='_novoRascunho()' style='background:#1a3a0a;border:1px solid #3a6a1a;color:#6aaa3a;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>+ Novo</button>");
+    h.push("</div>");
+    if(!state.rascunhos.length){
+      h.push("<div style='padding:30px;text-align:center'><p style='color:#5e4636;font-size:12px;line-height:1.6'>Nenhum rascunho ainda.<br>Crie um para começar.</p></div>");
+    } else {
+      state.rascunhos.forEach(function(r){
+        var ativ=r.id===_rascAtivo;
+        var catCors={Operação:"#3b82f6",Capacitação:"#f59e0b",Comunitário:"#22c55e","Meta Institucional":"#a855f7",Livre:"#6b7280"};
+        var cc=catCors[r.categoria]||"#6b7280";
+        h.push("<div onclick=\"state._rascAtivoId='"+r.id+"';_reRenderProjetos()\" style='padding:10px 12px;cursor:pointer;border-bottom:1px solid #4a3224;background:"+(ativ?"#4a2e1f":"transparent")+";border-left:3px solid "+(ativ?cc:"transparent")+";transition:background .15s'>");
+        h.push("<div style='display:flex;align-items:center;gap:6px;margin-bottom:3px'>");
+        h.push("<span style='background:"+cc+"22;color:"+cc+";padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700'>"+esc(r.categoria||"Livre")+"</span>");
+        if(r.convertido) h.push("<span style='background:#22c55e22;color:#22c55e;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700'>✓ Convertido</span>");
+        h.push("</div>");
+        h.push("<p style='color:"+(ativ?"#f5ede0":"#c8b07a")+";font-size:12px;font-weight:600;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>"+esc(r.titulo||"(sem título)")+"</p>");
+        var _nPal=r.conteudo?(r.conteudo.trim().split(/\s+/).length):0;
+        h.push("<p style='color:#5e4636;font-size:10px;margin:2px 0 0'>"+_nPal+" palavras · "+(r.savedAt||"")+"</p>");
+        h.push("</div>");
+      });
+    }
+    h.push("</div>");
+    // Coluna direita — editor
+    h.push("<div style='flex:1;background:#2a1c10;border:1px solid #4a3224;border-radius:12px;overflow:hidden;display:flex;flex-direction:column'>");
+    if(!_rascObj){
+      h.push("<div style='flex:1;display:flex;align-items:center;justify-content:center;padding:60px;text-align:center'>");
+      h.push("<div><p style='font-size:48px;margin-bottom:12px'>💡</p><p style='color:#5e4636;font-size:13px;line-height:1.6'>Selecione um rascunho à esquerda<br>ou crie um novo para começar.</p><button onclick='_novoRascunho()' style='margin-top:14px;background:linear-gradient(135deg,#d4a87a,#a8882b);border:none;color:#3c2818;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Rascunho</button></div>");
+      h.push("</div>");
+    } else {
+      var catCorsE={Operação:"#3b82f6",Capacitação:"#f59e0b",Comunitário:"#22c55e","Meta Institucional":"#a855f7",Livre:"#6b7280"};
+      var ccE=catCorsE[_rascObj.categoria]||"#6b7280";
+      // Toolbar
+      h.push("<div style='padding:10px 14px;background:#36221a;border-bottom:1px solid #4a3224;display:flex;align-items:center;gap:8px;flex-wrap:wrap'>");
+      h.push("<input id='rasc-titulo' type='text' value='"+esc(_rascObj.titulo||"")+"' placeholder='Título do rascunho...' oninput='_autoSaveRascunho()' style='flex:1;min-width:150px;background:#2a1c10;border:1px solid #4a3224;color:#f5ede0;padding:6px 10px;border-radius:6px;font-size:13px;font-weight:700'/>");
+      h.push("<select id='rasc-cat' onchange='_autoSaveRascunho()' style='background:#2a1c10;border:1px solid "+ccE+";color:"+ccE+";padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>");
+      _catTags.forEach(function(ct){ h.push("<option"+((_rascObj.categoria||"Livre")===ct?" selected":"")+">"+ct+"</option>"); });
+      h.push("</select>");
+      h.push("<button onclick='_transformarEmProjeto()' style='background:linear-gradient(135deg,#7c3aed,#4c1d95);border:none;color:#f0e6ff;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap'>✦ Transformar em Projeto</button>");
+      h.push("<button onclick=\"if(confirm('Excluir este rascunho?')){_excluirRascunho('"+_rascObj.id+"')}\" style='background:none;border:1px solid #4a2a2a;color:#f87171;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer'>🗑</button>");
+      h.push("</div>");
+      // Textarea editor
+      h.push("<textarea id='rasc-conteudo' oninput='_autoSaveRascunho()' placeholder='Escreva sua ideia aqui... sem pressa, sem estrutura obrigatória.' style='flex:1;background:#2a1c10;border:none;color:#e8d5b7;padding:18px;font-size:13px;line-height:1.8;resize:none;font-family:inherit;min-height:320px;outline:none'>"+esc(_rascObj.conteudo||"")+"</textarea>");
+      // Rodapé
+      var _nPalE=_rascObj.conteudo?(_rascObj.conteudo.trim().split(/\s+/).length):0;
+      h.push("<div style='padding:8px 14px;background:#36221a;border-top:1px solid #4a3224;display:flex;align-items:center;justify-content:space-between'>");
+      h.push("<span id='rasc-status' style='color:#5e4636;font-size:10px'>✓ Salvo automaticamente · "+(_rascObj.savedAt||"")+" · "+_nPalE+" palavras</span>");
+      h.push("<span style='color:#4a3224;font-size:10px'>Ctrl+S não necessário</span>");
+      h.push("</div>");
+    }
+    h.push("</div>");
+    h.push("</div>"); // fim 2 colunas
+    h.push("</div>"); // fim max-width
+    main.innerHTML = h.join("");
+    // Funções do editor
+    window._novoRascunho = function(){
+      state.rascunhos = state.rascunhos||[];
+      var nr = {id:"rasc_"+Date.now(),titulo:"",categoria:"Livre",conteudo:"",criadoEm:new Date().toLocaleString("pt-BR"),savedAt:"",convertido:false};
+      state.rascunhos.unshift(nr);
+      state._rascAtivoId = nr.id;
+      salvarLocal();
+      _reRenderProjetos();
+    };
+    window._autoSaveRascunho = function(){
+      var r=state.rascunhos.find(function(x){return x.id===state._rascAtivoId;});
+      if(!r) return;
+      r.titulo = document.getElementById("rasc-titulo")?document.getElementById("rasc-titulo").value:"";
+      r.categoria = document.getElementById("rasc-cat")?document.getElementById("rasc-cat").value:"Livre";
+      r.conteudo = document.getElementById("rasc-conteudo")?document.getElementById("rasc-conteudo").value:"";
+      r.savedAt = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+      var nPal=r.conteudo.trim().split(/\s+/).length;
+      salvarLocal();
+      var st=document.getElementById("rasc-status");
+      if(st) st.textContent="✓ Salvo automaticamente · "+r.savedAt+" · "+nPal+" palavras";
+    };
+    window._excluirRascunho = function(id){
+      state.rascunhos = state.rascunhos.filter(function(r){return r.id!==id;});
+      state._rascAtivoId = state.rascunhos.length?state.rascunhos[0].id:null;
+      salvarLocal();
+      _reRenderProjetos();
+    };
+    window._transformarEmProjeto = function(){
+      var r=state.rascunhos.find(function(x){return x.id===state._rascAtivoId;});
+      if(!r||!r.conteudo.trim()){alert("Escreva algum conteúdo antes de transformar em projeto.");return;}
+      // Abre o chat IA com o conteúdo pré-carregado
+      state._chatPrefill = "Analise este rascunho de ideia e estruture um projeto para a 77ª CIPM (Polícia Militar da Bahia).\n\nTítulo da ideia: "+r.titulo+"\nCategoria: "+r.categoria+"\n\nConteúdo:\n"+r.conteudo+"\n\nEstruture em: nome do projeto, objetivo, entregas principais (2-4), e 3-5 tarefas iniciais com prazo estimado. Use o contexto de policiamento comunitário.";
+      state._rascOrigemId = r.id;
+      state.tela = "assistente";
+      render();
+    };
+    return;
+  }
+
+  // ── RELATÓRIO SEMANAL ─────────────────────────────────
+  if(state.projetosView==='relatorio'){
+    state._relConfig = state._relConfig||{periodo:"esta_semana",secoes:["bairros","horarios","tipos","alertas","vcm","orientacao"],formato:"ambos"};
+    var cfg=state._relConfig;
+    var _secoesOpts=[
+      {id:"bairros",ico:"📍",label:"Bairros e ruas quentes"},
+      {id:"horarios",ico:"⏰",label:"Horários de pico"},
+      {id:"tipos",ico:"🔍",label:"Tipos prevalentes"},
+      {id:"alertas",ico:"⚠️",label:"Alertas nominais"},
+      {id:"vcm",ico:"🛡️",label:"VCM urgentes"},
+      {id:"orientacao",ico:"✦",label:"Orientação da semana (IA)"}
+    ];
+    // Calcular período
+    function _semanaAtual(){
+      var hj=new Date(); var dow=hj.getDay();
+      var seg=new Date(hj); seg.setDate(hj.getDate()-((dow+6)%7));
+      var dom=new Date(seg); dom.setDate(seg.getDate()+6);
+      return {ini:seg,fim:dom};
+    }
+    function _semanaPassed(){
+      var s=_semanaAtual();
+      var ini=new Date(s.ini); ini.setDate(ini.getDate()-7);
+      var fim=new Date(s.fim); fim.setDate(fim.getDate()-7);
+      return {ini:ini,fim:fim};
+    }
+    function _fmtSem(s){return s.ini.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" a "+s.fim.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});}
+    var _semEscolhida = cfg.periodo==="semana_passada"?_semanaPassed():_semanaAtual();
+    var _iniD=cfg.dataIni?new Date(cfg.dataIni+"-01"):_semEscolhida.ini;
+    var _fimD=cfg.dataFim?new Date(cfg.dataFim+"-01"):_semEscolhida.fim;
+    if(cfg.periodo==="personalizado"&&cfg.dataIni&&cfg.dataFim){_iniD=new Date(cfg.dataIni);_fimD=new Date(cfg.dataFim);}
+
+    h.push("<div style='display:flex;gap:14px;align-items:start'>");
+    // Painel esquerdo — configurações
+    h.push("<div style='width:280px;flex-shrink:0;background:#2a1c10;border:1px solid #4a3224;border-radius:12px;overflow:hidden'>");
+    h.push("<div style='padding:12px 14px;background:#36221a;border-bottom:1px solid #4a3224'><p style='color:#d4a87a;font-size:13px;font-weight:700;margin:0'>⚙ Configurar Relatório</p></div>");
+    h.push("<div style='padding:14px'>");
+    // Período
+    h.push("<div style='margin-bottom:14px'><p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>Período</p>");
+    var _pOpts=[["esta_semana","Esta semana ("+_fmtSem(_semanaAtual())+")"],["semana_passada","Semana passada ("+_fmtSem(_semanaPassed())+")"],["personalizado","Personalizado"]];
+    _pOpts.forEach(function(op){
+      var sel=cfg.periodo===op[0];
+      h.push("<label style='display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0'>");
+      h.push("<input type='radio' name='rel-periodo' value='"+op[0]+"' "+(sel?"checked":"")+" onchange=\"state._relConfig.periodo=this.value;_reRenderProjetos()\" style='accent-color:#d4a87a'/>");
+      h.push("<span style='color:"+(sel?"#f5ede0":"#8a6a4a")+";font-size:12px'>"+op[1]+"</span>");
+      h.push("</label>");
+    });
+    if(cfg.periodo==="personalizado"){
+      h.push("<div style='margin-top:8px;display:flex;flex-direction:column;gap:6px'>");
+      h.push("<input type='date' id='rel-ini' value='"+(cfg.dataIni||"")+"' onchange=\"state._relConfig.dataIni=this.value\" style='background:#36221a;border:1px solid #4a3224;color:#f5ede0;padding:6px;border-radius:6px;font-size:11px'/>");
+      h.push("<input type='date' id='rel-fim' value='"+(cfg.dataFim||"")+"' onchange=\"state._relConfig.dataFim=this.value\" style='background:#36221a;border:1px solid #4a3224;color:#f5ede0;padding:6px;border-radius:6px;font-size:11px'/>");
+      h.push("</div>");
+    }
+    h.push("</div>");
+    // Seções
+    h.push("<div style='margin-bottom:14px'><p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>Seções do Relatório</p>");
+    _secoesOpts.forEach(function(s){
+      var ativ=cfg.secoes.indexOf(s.id)>=0;
+      h.push("<label style='display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0'>");
+      h.push("<input type='checkbox' "+(ativ?"checked":"")+" onchange=\"(function(v){var s=state._relConfig.secoes;var i=s.indexOf('"+s.id+"');if(v&&i<0)s.push('"+s.id+"');else if(!v&&i>=0)s.splice(i,1);})(!!(this.checked))\" style='accent-color:#d4a87a'/>");
+      h.push("<span style='color:"+(ativ?"#f5ede0":"#5e4636")+";font-size:11px'>"+s.ico+" "+s.label+"</span>");
+      h.push("</label>");
+    });
+    h.push("</div>");
+    // Formato
+    h.push("<div style='margin-bottom:14px'><p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>Formato de saída</p>");
+    [["pdf","⬇ PDF"],["whatsapp","💬 WhatsApp"],["ambos","Ambos"]].forEach(function(f){
+      var sel=cfg.formato===f[0];
+      h.push("<label style='display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0'>");
+      h.push("<input type='radio' name='rel-formato' value='"+f[0]+"' "+(sel?"checked":"")+" onchange=\"state._relConfig.formato=this.value;_reRenderProjetos()\" style='accent-color:#d4a87a'/>");
+      h.push("<span style='color:"+(sel?"#f5ede0":"#8a6a4a")+";font-size:12px'>"+f[1]+"</span>");
+      h.push("</label>");
+    });
+    h.push("</div>");
+    // Botão gerar
+    h.push("<button onclick='_gerarRelatorio()' style='width:100%;background:linear-gradient(135deg,#d4a87a,#a8882b);border:none;color:#3c2818;padding:10px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer'>✦ Gerar Relatório</button>");
+    h.push("</div></div>"); // fim painel esquerdo
+
+    // Painel direito — preview
+    h.push("<div style='flex:1;background:#2a1c10;border:1px solid #4a3224;border-radius:12px;overflow:hidden;min-height:480px'>");
+    h.push("<div style='padding:12px 14px;background:#36221a;border-bottom:1px solid #4a3224;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px'>");
+    h.push("<p style='color:#d4a87a;font-size:13px;font-weight:700;margin:0'>Preview do Relatório</p>");
+    h.push("<div id='rel-acoes' style='display:flex;gap:8px'>");
+    h.push("<button onclick='_relBaixarPDF()' id='btn-rel-pdf' disabled style='background:#0a1a2a;border:1px solid #1a3a4a;color:#3a8ab0;padding:7px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:not-allowed;opacity:.5'>⬇ Baixar PDF</button>");
+    h.push("<button onclick='_relCopiarWhatsApp()' id='btn-rel-wa' disabled style='background:#0a1a0a;border:1px solid #1a4a1a;color:#3a8a5a;padding:7px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:not-allowed;opacity:.5'>💬 Copiar WhatsApp</button>");
+    h.push("</div></div>");
+    h.push("<div id='rel-preview' style='padding:20px;color:#c8b07a;font-size:13px;line-height:1.8'>");
+    if(state._relPreview){
+      h.push("<div style='white-space:pre-wrap'>"+esc(state._relPreview)+"</div>");
+    } else {
+      h.push("<div style='display:flex;align-items:center;justify-content:center;height:340px;text-align:center'>");
+      h.push("<div><p style='font-size:40px;margin-bottom:12px'>📋</p><p style='color:#5e4636;font-size:13px;line-height:1.6'>Configure o período e as seções<br>e clique em <strong style='color:#d4a87a'>✦ Gerar Relatório</strong>.</p></div>");
+      h.push("</div>");
+    }
+    h.push("</div></div>"); // fim preview
+    h.push("</div>"); // fim flex
+    h.push("</div>"); // fim max-width
+    main.innerHTML = h.join("");
+
+    // Função gerar relatório
+    window._gerarContextoSemanal = function(iniD,fimD){
+      var ocs=(state.db.ocorrencias||[]).filter(function(o){
+        var d=new Date(o.data||o.createdAt||"");
+        return d>=iniD&&d<=fimD;
+      });
+      // Bairros
+      var bMap={}; ocs.forEach(function(o){if(o.bairro&&!/^\d/.test(o.bairro))bMap[o.bairro]=(bMap[o.bairro]||0)+1;});
+      var bTop=Object.entries(bMap).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+      // Tipos
+      var tMap={}; ocs.forEach(function(o){if(o.tipo)tMap[o.tipo]=(tMap[o.tipo]||0)+1;});
+      var tTop=Object.entries(tMap).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+      // Horários
+      var hMap={};
+      ocs.forEach(function(o){if(o.hora){var hh=parseInt(o.hora.split(":")[0],10);if(!isNaN(hh)){var fx=Math.floor(hh/2)*2;var k=String(fx).padStart(2,"0")+"h-"+String(fx+2).padStart(2,"0")+"h";hMap[k]=(hMap[k]||0)+1;}}});
+      var hTop=Object.entries(hMap).sort(function(a,b){return b[1]-a[1];}).slice(0,4);
+      // VCM urgentes
+      var vcmUrg=(state.db.frida||[]).filter(function(f){return f.nivel==="E";}).length;
+      return {total:ocs.length,bTop:bTop,tTop:tTop,hTop:hTop,vcmUrg:vcmUrg,ocs:ocs};
+    };
+
+    window._gerarRelatorio = function(){
+      var cfg=state._relConfig||{};
+      var _iniD,_fimD;
+      if(cfg.periodo==="semana_passada"){
+        var hj=new Date(); var dow=hj.getDay();
+        var seg=new Date(hj); seg.setDate(hj.getDate()-((dow+6)%7)-7);
+        var dom=new Date(seg); dom.setDate(seg.getDate()+6);
+        _iniD=seg;_fimD=dom;
+      } else if(cfg.periodo==="personalizado"&&cfg.dataIni&&cfg.dataFim){
+        _iniD=new Date(cfg.dataIni); _fimD=new Date(cfg.dataFim);
+      } else {
+        var hj2=new Date(); var dow2=hj2.getDay();
+        var seg2=new Date(hj2); seg2.setDate(hj2.getDate()-((dow2+6)%7));
+        var dom2=new Date(seg2); dom2.setDate(seg2.getDate()+6);
+        _iniD=seg2;_fimD=dom2;
+      }
+      var ctx=_gerarContextoSemanal(_iniD,_fimD);
+      var prev=document.getElementById("rel-preview");
+      if(prev) prev.innerHTML="<div style='display:flex;align-items:center;justify-content:center;height:200px'><p style='color:#d4a87a;font-size:14px'>⏳ Gerando com IA...</p></div>";
+      var _key=localStorage.getItem("bcs_anthropic_key")||"";
+      if(!_key){
+        if(prev) prev.innerHTML="<div style='padding:20px;color:#f87171;font-size:13px'>⚠ Configure sua chave da API Claude nas Configurações para usar esta função.</div>";
+        return;
+      }
+      var _periodoTxt=_iniD.toLocaleDateString("pt-BR")+" a "+_fimD.toLocaleDateString("pt-BR");
+      var prompt="Você é um analista de segurança pública da 77ª CIPM BCS (Polícia Militar da Bahia). Gere um relatório semanal de inteligência policial.\n\nPeríodo: "+_periodoTxt+"\nTotal de ocorrências: "+ctx.total+"\nBairros com mais ocorrências: "+ctx.bTop.map(function(b){return b[0]+"("+b[1]+")";}).join(", ")+"\nTipos mais frequentes: "+ctx.tTop.map(function(t){return t[0]+"("+t[1]+")";}).join(", ")+"\nHorários de pico: "+ctx.hTop.map(function(h){return h[0]+"("+h[1]+")";}).join(", ")+"\nCasos VCM nível E urgentes: "+ctx.vcmUrg+"\n\nSeções solicitadas: "+((cfg.secoes||[]).join(", "))+"\n\nFormato de saída: "+(cfg.formato==="whatsapp"?"Texto WhatsApp com *negrito* para ênfase, sem markdown complexo, pronto para colar no grupo da guarnição":cfg.formato==="ambos"?"Gere primeiro o texto completo para PDF e depois uma versão WhatsApp separada com *negrito*":"Relatório completo estruturado para PDF")+"\n\nSeja direto, objetivo e use linguagem operacional policial. Para alertas nominais (suspeitos citados nos relatos), adicione aviso: 'citação em relato — não identificação formal'.";
+      fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":_key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:2048,messages:[{role:"user",content:prompt}]})})
+        .then(function(r){return r.json();})
+        .then(function(data){
+          var txt=(data.content&&data.content[0])?data.content[0].text:"[Erro ao gerar]";
+          state._relPreview=txt;
+          if(prev) prev.innerHTML="<div style='white-space:pre-wrap;font-size:13px;line-height:1.8;color:#e8d5b7'>"+esc(txt)+"</div>";
+          // Habilitar botões
+          var bPDF=document.getElementById("btn-rel-pdf");
+          var bWA=document.getElementById("btn-rel-wa");
+          if(bPDF){bPDF.disabled=false;bPDF.style.opacity="1";bPDF.style.cursor="pointer";}
+          if(bWA){bWA.disabled=false;bWA.style.opacity="1";bWA.style.cursor="pointer";}
+        })
+        .catch(function(){if(prev) prev.innerHTML="<div style='padding:20px;color:#f87171;font-size:13px'>⚠ Erro na API. Verifique a chave e a conexão.</div>";});
+    };
+    window._relBaixarPDF = function(){
+      if(!state._relPreview){return;}
+      var win=window.open("","_blank");
+      win.document.write("<html><head><title>Relatório Semanal — 77ª CIPM</title><style>body{font-family:'Georgia',serif;max-width:700px;margin:40px auto;color:#1a1a1a;line-height:1.8;font-size:14px}h1{color:#5a2a0a}@media print{button{display:none}}</style></head><body><h1>77ª CIPM — Relatório Semanal de Inteligência</h1><pre style='font-family:inherit;white-space:pre-wrap'>"+state._relPreview.replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</pre><button onclick='window.print()' style='margin-top:20px;padding:10px 24px;font-size:14px;cursor:pointer'>⬇ Imprimir / Salvar PDF</button></body></html>");
+      win.document.close();
+    };
+    window._relCopiarWhatsApp = function(){
+      if(!state._relPreview){return;}
+      navigator.clipboard.writeText(state._relPreview).then(function(){
+        var btn=document.getElementById("btn-rel-wa");
+        if(btn){btn.textContent="✓ Copiado!";setTimeout(function(){btn.textContent="💬 Copiar WhatsApp";},2500);}
+      }).catch(function(){alert("Não foi possível copiar. Selecione o texto manualmente.");});
+    };
     return;
   }
 
@@ -11300,6 +11580,12 @@ function renderAssistenteIA(main){
     if(c) btn.textContent=c.icon+" "+["Resumo do mês","Bairros críticos","Perfil vítimas","Tendências","Reincidências","Análise VCM","Pontos de atenção","Relatório mensal"][i];
   });
   _renderChatIA();
+  // Prefill da Chuva de Ideias — preenche o campo e foca
+  if(state._chatPrefill){
+    var _inp=document.getElementById("ia-input");
+    if(_inp){_inp.value=state._chatPrefill;_inp.focus();}
+    state._chatPrefill=null;
+  }
 }
 
 // ── TRIAGEM ────────────────────────────────────────────────────────
