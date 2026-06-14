@@ -3945,6 +3945,38 @@ function _vcmMarcarEnviado(encId){
   if(main) renderDashboardVCM(main);
 }
 
+function _renderCentralBar(main, abaAtiva){
+  var _nTriar=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length;
+  var _fridas=state.db.frida||[];
+  var _hoje=hoje();
+  var _nVcmUrg=(state.db.ocorrencias||[]).filter(function(o){
+    if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;
+    var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;}).sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;});
+    var _uf=_fs[0];
+    return _uf&&_uf.nivel==="E";
+  }).length;
+  var _nDev=(state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length;
+  var abas=[
+    {k:"fila_auxiliar",icon:"📋",label:"Fila do Dia",badge:0,fn:function(){setTela("fila_auxiliar");}},
+    {k:"triagem",icon:"🔍",label:"Triagem",badge:_nTriar,cor:"#ef4444",fn:function(){setTela("triagem");}},
+    {k:"dashvcm",icon:"🌸",label:"VCM",badge:_nVcmUrg,cor:"#ff1493",fn:function(){setTela("dashvcm");}},
+    {k:"cadastrosvcm",icon:"💜",label:"Atendimentos",badge:0,fn:function(){setTela("cadastrosvcm");}},
+    {k:"devolutivas",icon:"↩",label:"Devolutivas",badge:_nDev,cor:"#22c55e",fn:function(){setTela("devolutivas");}}
+  ];
+  var bar=document.createElement("div");
+  bar.style.cssText="display:flex;gap:0;border-bottom:2px solid #2a1a0a;margin-bottom:16px;background:#120a04;padding:0 16px;flex-shrink:0";
+  abas.forEach(function(a){
+    var ativo=abaAtiva===a.k;
+    var btn=document.createElement("button");
+    btn.style.cssText="padding:10px 14px;border:none;border-bottom:3px solid "+(ativo?"#d4a87a":"transparent")+";background:transparent;color:"+(ativo?"#d4a87a":"#6a4a2a")+";font-size:12px;font-weight:"+(ativo?"700":"400")+";cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:-2px;white-space:nowrap";
+    var badgeTxt=a.badge>0?"<span style='background:"+(a.cor||"#d4a87a")+";color:#fff;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700'>"+a.badge+"</span>":"";
+    btn.innerHTML=a.icon+" "+a.label+badgeTxt;
+    btn.onclick=a.fn;
+    bar.appendChild(btn);
+  });
+  main.insertAdjacentElement("afterbegin",bar);
+}
+
 function renderDashboardVCM(main){
   if(!state.vcmFiltro) state.vcmFiltro="todas";
   if(!state.vcmTab) state.vcmTab="dashboard";
@@ -4176,6 +4208,7 @@ function renderDashboardVCM(main){
   h+="</tbody></table></div></div></div>";
 
   main.innerHTML=h;
+  _renderCentralBar(main,"dashvcm");
 
   // Base: todas as VCM dos bairros BCS
   var ocsBase=(state.db.ocorrencias||[]).filter(function(o){
@@ -4465,6 +4498,7 @@ function renderCadastrosVCM(main){
 
   h+="</div>";
   main.innerHTML=h;
+  _renderCentralBar(main,"cadastrosvcm");
 
   // Busca com debounce
   var inp=document.getElementById("vcm-busca");
@@ -12397,6 +12431,7 @@ function renderFilaAuxiliar(main) {
 
   h += "</div>";
   main.innerHTML = h;
+  _renderCentralBar(main,"fila_auxiliar");
 }
 
 window._avisoAbrirFila = function(indicador) {
@@ -12462,6 +12497,7 @@ function renderFilaEncaminhamentos(main) {
 
   h += "</div>";
   main.innerHTML = h;
+  _renderCentralBar(main,"triagem");
 }
 
 window._concluirEncFila = function(encId) {
@@ -21029,6 +21065,7 @@ function renderDevolutivas(main){
 
   h.push("</div>");
   main.innerHTML=h.join("");
+  _renderCentralBar(main,"devolutivas");
 
   // Funções
   window._reenviarDevolutiva = function(encId){
