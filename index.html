@@ -4866,7 +4866,7 @@ function renderDashComandante(main){
   var bairrosUniq = ocs.map(function(o){return o.bairro||"";}).filter(function(b,i,a){return b&&a.indexOf(b)===i;}).sort();
 
   // ── Tab ativa ────────────────────────────────────
-  var tabAtiva = state._cmdTab || 'crime';
+  var tabAtiva = state._cmdTab || 'inicio';
 
   // ══════════════════════════════════════════════════
   // HTML
@@ -4884,6 +4884,56 @@ function renderDashComandante(main){
   h.push("<button onclick='exportarDadosBCS()' style='background:#0a1a2a;border:1px solid #1a3a4a;color:#3a8ab0;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>⬇ Backup</button>");
   h.push("<label style='background:#0a1a0a;border:1px solid #1a4a1a;color:#3a8a5a;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;display:inline-block'>⬆ Importar<input type='file' accept='.json' onchange='importarDadosBCS(this)' style='display:none'/></label>");
   h.push("</div></div>");
+
+  // ── Saudação + 4 Badges de Estado Geral ─────────
+  (function(){
+    var hr=new Date().getHours();
+    var saud=hr<12?"Bom dia":hr<18?"Boa tarde":"Boa noite";
+    // Calcular indicadores dos badges
+    var _novas=ocs.filter(function(o){return o.situacao==="nova";}).length;
+    var _vd48=ocs.filter(function(o){
+      if(!o.violencia_domestica||o.situacao!=="nova") return false;
+      var dt=_pdLocal(o.data); if(!dt) return false;
+      return (Date.now()-dt.getTime())>48*3600*1000;
+    }).length;
+    var _fridaE=(state.db.frida||[]).filter(function(f){return f.nivel==="E";}).length;
+    var _projCrit=(state.projetos||[]).filter(function(p){return p.status==="Crítico";}).length;
+    var _calVenc=(state.agendamentos||[]).filter(function(a){
+      if(a.tipo==="visita_solidaria"||a.tipo==="visita") return false;
+      var dt=_pdLocal(a.data||a.dataHora);
+      return dt&&dt<hojeDate&&!a.resultado;
+    }).length;
+    // Helper semáforo — num = valor numérico para cor, txt = display, limA = limiar âmbar
+    function _badge(titulo,num,txt,label,limA,link){
+      var cor=num===0?"#22c55e":(num<=limA?"#f59e0b":"#ef4444");
+      var bg=num===0?"#0a1a0a":(num<=limA?"#1a0e00":"#1a0000");
+      var bord=num===0?"#22c55e44":(num<=limA?"#f59e0b44":"#ef444444");
+      var clk=link?"onclick=\"state.tela='"+link+"';render()\"":"";
+      return "<div "+clk+" style='background:"+bg+";border:1px solid "+bord+";border-radius:10px;padding:10px 14px;flex:1;min-width:140px;cursor:"+(link?"pointer":"default")+";transition:border-color .15s'>"
+        +"<div style='display:flex;align-items:center;gap:6px;margin-bottom:4px'>"
+        +"<span style='width:8px;height:8px;border-radius:50%;background:"+cor+";flex-shrink:0;box-shadow:0 0 6px "+cor+"'></span>"
+        +"<span style='color:#8a6a4a;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px'>"+titulo+"</span>"
+        +"</div>"
+        +"<p style='color:"+cor+";font-size:22px;font-weight:800;margin:0;line-height:1'>"+txt+"</p>"
+        +"<p style='color:#5e4636;font-size:10px;margin:3px 0 0'>"+label+"</p>"
+        +"</div>";
+    }
+    // Para triar: vermelho se VD>48h OU _novas>5; âmbar se 1-5
+    var _triNum = _vd48>0 ? 99 : _novas;
+    var _triTxt = _novas+(_vd48>0?"<span style='font-size:11px;color:#ef4444'> VD!</span>":"");
+    h.push("<div style='margin-bottom:14px'>");
+    h.push("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px'>");
+    h.push("<p style='color:#8a6a4a;font-size:12px;margin:0'>"+saud+", Comandante — <span style='color:#d4a87a'>leia em 30 segundos</span></p>");
+    if(state.ultimaSinc) h.push("<p style='color:#3a5a3a;font-size:10px;margin:0'>✓ Atualizado às "+state.ultimaSinc.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</p>");
+    h.push("</div>");
+    h.push("<div style='display:flex;gap:8px;flex-wrap:wrap'>");
+    h.push(_badge("Para Triar",_triNum,_triTxt,_novas===0?"todas triadas":"novas — aguardam triagem",5,"triagem"));
+    h.push(_badge("FRIDA Nível E",_fridaE,_fridaE,_fridaE===0?"sem casos urgentes":"casos urgentes",3,"dashvcm"));
+    h.push(_badge("Proj. Críticos",_projCrit,_projCrit,_projCrit===0?"todos em dia":"requerem atenção",1,"projetos"));
+    h.push(_badge("Calendário",_calVenc,_calVenc,_calVenc===0?"tudo em dia":"eventos vencidos",3,"calendario"));
+    h.push("</div>");
+    h.push("</div>");
+  })();
 
   // ── Painel de Filtros Master ──────────────────────
   h.push("<div style='background:#2a1c10;border:1px solid #5e4636;border-radius:12px;padding:14px 16px;margin-bottom:16px'>");
@@ -4958,11 +5008,132 @@ function renderDashComandante(main){
 
   // ── Tabs principais ───────────────────────────────
   h.push("<div style='display:flex;gap:4px;margin-bottom:18px;flex-wrap:wrap'>");
-  [['crime','📊 Criminalidade'],['visitas','🤝 Visitas Solidárias'],['escolar','🏫 Ronda Escolar'],['vcm','🌸 Monitor VCM'],['projetos','🟢 Projetos'],['instrutores','👨‍🏫 Instrutores'],['auditoria','🔍 Auditoria']].forEach(function(tb){
+  [['inicio','🏠 Início'],['crime','📊 Criminalidade'],['visitas','🤝 Visitas Solidárias'],['escolar','🏫 Ronda Escolar'],['vcm','🌸 Monitor VCM'],['projetos','🟢 Projetos'],['instrutores','👨‍🏫 Instrutores'],['auditoria','🔍 Auditoria']].forEach(function(tb){
     var ativ=tabAtiva===tb[0];
     h.push("<button onclick=\"state._cmdTab='"+tb[0]+"';renderDashComandante(document.getElementById('main'))\" style='padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid "+(ativ?"#d4a87a":"#5e4636")+";background:"+(ativ?"#d4a87a22":"#2a1c10")+";color:"+(ativ?"#d4a87a":"#8a6a4a")+"'>"+tb[1]+"</button>");
   });
   h.push("</div>");
+
+  // ══════════════════════════════════════════════════
+  // ABA: INÍCIO — Faixas 1 e 2 do Painel do Comandante
+  // ══════════════════════════════════════════════════
+  if(tabAtiva==="inicio"){
+    // Faixa 1 — O que está acontecendo agora
+    var _novas2=ocs.filter(function(o){return o.situacao==="nova";}).length;
+    var _vdAtivos=ocs.filter(function(o){return o.violencia_domestica&&(o.situacao==="nova"||o.situacao==="em_andamento");}).length;
+    var _vdTotal=ocs.filter(function(o){return o.violencia_domestica;}).length;
+    var _fridaFeitos=(state.db.frida||[]).length;
+    var _cobertura=_vdTotal?Math.round(_fridaFeitos/_vdTotal*100):0;
+    var _totMes=cntMesFn(function(){return true;},mesA,anoA);
+    var _totMesAnt=cntMesFn(function(){return true;},mesAnt,anoAnt);
+    var _delta=_totMes-_totMesAnt;
+    function _metrica(label,valor,subtxt,cor,seta2){
+      return "<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:12px;padding:14px 16px;flex:1;min-width:130px'>"
+        +"<p style='color:#5e4636;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 5px'>"+label+"</p>"
+        +"<p style='color:"+cor+";font-size:28px;font-weight:800;margin:0;line-height:1'>"+valor+""+(seta2?"<span style='font-size:14px;margin-left:4px'>"+seta2+"</span>":"")+"</p>"
+        +"<p style='color:#5e4636;font-size:10px;margin:4px 0 0'>"+subtxt+"</p>"
+        +"</div>";
+    }
+    h.push("<div style='margin-bottom:20px'>");
+    h.push("<p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 10px'>● Faixa 1 — O que está acontecendo agora</p>");
+    h.push("<div style='display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px'>");
+    h.push(_metrica("Sem Triagem",_novas2,"ocorrências novas",_novas2===0?"#22c55e":_novas2>5?"#ef4444":"#f59e0b",""));
+    h.push(_metrica("Casos VD Ativos",_vdAtivos,"violência doméstica",_vdAtivos===0?"#22c55e":"#f59e0b",""));
+    h.push(_metrica("Cobertura FRIDA",_cobertura+"%","FRIDAs / casos VD",_cobertura>=80?"#22c55e":_cobertura>=50?"#f59e0b":"#ef4444",""));
+    h.push(_metrica("Total do Mês",_totMes,"ocorrências","#d4a87a",_delta>0?"<span style='color:#ef4444'>▲"+_delta+"</span>":_delta<0?"<span style='color:#22c55e'>▼"+Math.abs(_delta)+"</span>":""));
+    h.push("</div>");
+    // Cards VCM nível E
+    var _fridaECasos=(state.db.frida||[]).filter(function(f){return f.nivel==="E";});
+    if(_fridaECasos.length){
+      h.push("<p style='color:#ef4444;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>🔴 FRIDA Nível E — Atenção Imediata ("+_fridaECasos.length+")</p>");
+      h.push("<div style='display:flex;flex-direction:column;gap:6px;margin-bottom:8px'>");
+      _fridaECasos.slice(0,5).forEach(function(f){
+        var oc=ocs.find(function(o){return o.id===f.ocorrenciaId||o.id===f.oc_id;});
+        var diasAtras=f.data?Math.floor((Date.now()-new Date(f.data).getTime())/864e5):null;
+        h.push("<div onclick=\"state.tela='dashvcm';render()\" style='background:#1a0000;border:1px solid #ef444444;border-left:3px solid #ef4444;border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:12px'>");
+        h.push("<span style='font-size:16px'>🔴</span>");
+        h.push("<div style='flex:1'>");
+        h.push("<p style='color:#f5ede0;font-size:12px;font-weight:700;margin:0'>"+esc(f.vitimaNome||(oc&&oc.vitima_nome)||"—")+"</p>");
+        h.push("<p style='color:#5e2a2a;font-size:10px;margin:2px 0 0'>"+(oc&&oc.bairro?esc(oc.bairro)+" · ":"")+(diasAtras!==null?diasAtras+" dia(s) atrás":"")+"</p>");
+        h.push("</div>");
+        h.push("<span style='background:#ef444422;color:#ef4444;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;white-space:nowrap'>Nível E</span>");
+        h.push("</div>");
+      });
+      if(_fridaECasos.length>5) h.push("<p style='color:#5e4636;font-size:11px;text-align:center;margin:4px 0 0'>+"+(_fridaECasos.length-5)+" mais — <button onclick=\"state.tela='dashvcm';render()\" style='background:none;border:none;color:#d4a87a;cursor:pointer;font-size:11px;font-weight:700;padding:0'>ver todos ↗</button></p>");
+      h.push("</div>");
+    }
+    h.push("</div>");
+
+    // Faixa 2 — Projetos e metas
+    h.push("<div style='margin-bottom:20px'>");
+    h.push("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px'>");
+    h.push("<p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin:0'>● Faixa 2 — Projetos e Metas</p>");
+    h.push("<button onclick=\"state.tela='projetos';render()\" style='background:none;border:1px solid #4a3224;color:#d4a87a;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer'>Ver todos ↗</button>");
+    h.push("</div>");
+    var _projs=(state.projetos||[]).filter(function(p){return p.status!=="Concluído"&&p.status!=="Cancelado";}).sort(function(a,b){
+      var ord={Crítico:0,Alta:1,Media:2,Baixa:3,Planejamento:4};
+      return (ord[a.prioridade]||2)-(ord[b.prioridade]||2);
+    }).slice(0,6);
+    if(!_projs.length){
+      h.push("<p style='color:#5e4636;font-size:12px;text-align:center;padding:20px 0'>Nenhum projeto em andamento.</p>");
+    } else {
+      h.push("<div style='display:flex;flex-direction:column;gap:6px'>");
+      _projs.forEach(function(p){
+        var pct=(function(){ var ts=p.tarefas||[]; if(!ts.length) return 0; return Math.round(ts.filter(function(t){return t.status==="Concluída";}).length/ts.length*100); })();
+        var scor=PROJ_SCORS[p.status]||"#6b7280";
+        var pcor=PROJ_PRIOR[p.prioridade||"Media"]||"#3b82f6";
+        var vencido=p.dataFim&&_pdLocal(p.dataFim)&&_pdLocal(p.dataFim)<hojeDate;
+        h.push("<div onclick=\"state.tela='projetos';render()\" style='background:#2a1c10;border:1px solid #4a3224;border-left:3px solid "+scor+";border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px'>");
+        h.push("<div style='flex:1;min-width:0'>");
+        h.push("<div style='display:flex;align-items:center;gap:6px;margin-bottom:4px'>");
+        h.push("<span style='color:#f5ede0;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>"+esc(p.nome)+"</span>");
+        if(p.prioridade) h.push("<span style='background:"+pcor+"22;color:"+pcor+";padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap'>"+p.prioridade+"</span>");
+        if(p.status==="Crítico") h.push("<span style='background:#ef444422;color:#ef4444;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap'>CRÍTICO</span>");
+        h.push("</div>");
+        h.push("<div style='display:flex;align-items:center;gap:8px'>");
+        h.push("<div style='flex:1;background:#3c2818;border-radius:4px;height:5px'><div style='height:100%;width:"+pct+"%;background:"+(pct===100?"#22c55e":scor)+";border-radius:4px'></div></div>");
+        h.push("<span style='color:#8a6a4a;font-size:10px;font-weight:700;white-space:nowrap'>"+pct+"%</span>");
+        if(p.dataFim) h.push("<span style='color:"+(vencido?"#ef4444":"#5e4636")+";font-size:10px;white-space:nowrap'>📅 "+fmtData(p.dataFim)+"</span>");
+        h.push("</div>");
+        h.push("</div></div>");
+      });
+      h.push("</div>");
+    }
+    h.push("</div>");
+
+    // Faixa 3 — gráfico rápido (últimas 8 semanas)
+    h.push("<div style='margin-bottom:10px'>");
+    h.push("<p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 10px'>● Faixa 3 — Ocorrências por semana (últimas 8 semanas)</p>");
+    var _semanas=[]; var _semanaCnt=[];
+    for(var _sw=7;_sw>=0;_sw--){
+      var _ini=new Date(); _ini.setDate(_ini.getDate()-_sw*7-((_ini.getDay()+6)%7));
+      _ini.setHours(0,0,0,0);
+      var _fim=new Date(_ini); _fim.setDate(_ini.getDate()+7);
+      var _cnt=ocs.filter(function(o){ var d=_pdLocal(o.data); return d&&d>=_ini&&d<_fim; }).length;
+      _semanas.push((_ini.getDate())+"/"+(_ini.getMonth()+1));
+      _semanaCnt.push(_cnt);
+    }
+    var _maxCnt=Math.max.apply(null,_semanaCnt)||1;
+    var _chartId="cmd-semana-chart-"+Date.now();
+    h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:12px;padding:16px'>");
+    h.push("<canvas id='"+_chartId+"' height='120'></canvas>");
+    h.push("</div>");
+    h.push("</div>");
+
+    h.push("</div>"); // fim max-width
+    main.innerHTML = h.join("");
+    // Renderizar gráfico
+    (function(){
+      var canvas=document.getElementById(_chartId);
+      if(!canvas||typeof Chart==="undefined") return;
+      new Chart(canvas.getContext("2d"),{
+        type:"line",
+        data:{labels:_semanas,datasets:[{label:"Ocorrências",data:_semanaCnt,borderColor:"#d4a87a",backgroundColor:"rgba(212,168,122,.15)",borderWidth:2,pointRadius:4,pointBackgroundColor:"#d4a87a",tension:.35,fill:true}]},
+        options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y+" ocorrências";}}}},scales:{x:{ticks:{color:"#5e4636",font:{size:10}},grid:{color:"#3c2818"}},y:{ticks:{color:"#5e4636",font:{size:10},stepSize:1},grid:{color:"#3c2818"},beginAtZero:true}}}
+      });
+    })();
+    return;
+  }
 
   // ══════════════════════════════════════════════════
   // ABA: CRIMINALIDADE
