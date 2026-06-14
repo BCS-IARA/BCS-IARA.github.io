@@ -11255,65 +11255,354 @@ window._concluirEncFila = function(encId) {
 
 function renderTriagem(main) {
   var ocs = (state.db.ocorrencias||[]);
-  // VDs com situacao nova primeiro, depois restantes novas, ambos por data decrescente
   var novas = ocs.filter(function(o){ return (o.situacao||"nova")==="nova"; });
   var vds   = novas.filter(function(o){ return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||""); });
   var resto = novas.filter(function(o){ return !vds.includes(o); });
   function porDataDesc(a,b){ return (b.data||"").localeCompare(a.data||""); }
-  vds.sort(porDataDesc);
-  resto.sort(porDataDesc);
+  vds.sort(porDataDesc); resto.sort(porDataDesc);
   var fila = vds.concat(resto);
+  var ocSel = state._triagemOcId ? ocs.find(function(o){ return o.id===state._triagemOcId; }) : null;
+  // Se OC selecionada já foi triada, limpa seleção
+  if(ocSel && (ocSel.situacao||"nova")!=="nova") { state._triagemOcId=null; ocSel=null; }
 
-  var h = "<div style='max-width:860px;margin:0 auto'>";
-  h += "<div style='display:flex;align-items:center;gap:14px;margin-bottom:22px'>";
-  h += "<h2 style='font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--tinta);margin:0'>📥 Fila de Triagem</h2>";
-  h += "<span style='background:var(--verm);color:#fff;border-radius:12px;padding:2px 10px;font-size:13px;font-weight:900'>"+fila.length+"</span>";
-  h += "<span style='color:var(--tinta-2);font-size:12px;margin-left:auto'>"+vds.length+" VD · "+resto.length+" outras</span>";
+  var h = "<div style='display:flex;height:calc(100vh - 80px);overflow:hidden'>";
+
+  // ── COLUNA ESQUERDA — fila ──
+  h += "<div style='width:310px;min-width:220px;border-right:1px solid var(--papel-3);overflow-y:auto;background:var(--papel-2);flex-shrink:0'>";
+  h += "<div style='padding:12px 14px;border-bottom:1px solid var(--papel-3);background:var(--papel-2);position:sticky;top:0;z-index:2'>";
+  h += "<div style='display:flex;align-items:center;gap:8px'>";
+  h += "<span style='font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--tinta)'>📥 Triagem</span>";
+  if(fila.length) h += "<span style='background:var(--verm);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:900'>"+fila.length+"</span>";
+  h += "</div>";
+  h += "<p style='font-size:10px;color:var(--tinta-2);margin:3px 0 0'>"+vds.length+" VD · "+resto.length+" outras</p>";
   h += "</div>";
 
   if(!fila.length){
-    h += "<div class='card' style='text-align:center;padding:56px'>";
-    h += "<p style='font-size:32px;margin-bottom:10px'>✅</p>";
-    h += "<p style='font-size:16px;font-weight:700;color:var(--tinta);font-family:Georgia,serif'>Fila vazia</p>";
-    h += "<p style='color:var(--tinta-2);font-size:13px;margin-top:6px'>Todas as ocorrências foram triadas.</p>";
+    h += "<div style='padding:32px 16px;text-align:center'>";
+    h += "<p style='font-size:24px;margin-bottom:8px'>✅</p>";
+    h += "<p style='font-size:13px;font-weight:700;color:var(--tinta);font-family:Georgia,serif'>Fila vazia</p>";
+    h += "<p style='color:var(--tinta-2);font-size:11px;margin-top:4px'>Todas as ocorrências foram triadas.</p>";
     h += "</div>";
   } else {
     fila.forEach(function(o){
       var isVD = o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
-      var bordaCor = isVD ? "var(--verm)" : "var(--papel-3)";
-      h += "<div class='oc-row' style='border-left:4px solid "+bordaCor+";cursor:default;margin-bottom:10px'>";
-      h += "<div style='display:flex;align-items:flex-start;gap:12px'>";
-      // Info principal
-      h += "<div style='flex:1'>";
-      h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px'>";
-      if(isVD) h += "<span style='background:var(--verm);color:#fff;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:900'>VD</span>";
-      h += "<span style='background:var(--papel-3);color:var(--tinta);border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700'>"+esc(o.tipo||"—")+"</span>";
-      h += "<span style='color:var(--tinta-2);font-size:11px'>"+esc(o.data||"—")+(o.hora?" · "+esc(o.hora):"")+"</span>";
-      if(o.bairro) h += "<span style='color:var(--tinta-2);font-size:11px'>· "+esc(o.bairro)+"</span>";
+      var ativo = ocSel && ocSel.id===o.id;
+      h += "<div onclick='_selecionarTriagem(\""+esc(o.id)+"\")' style='padding:10px 14px;border-bottom:1px solid var(--papel-3);cursor:pointer;background:"+(ativo?"var(--ambar-claro)":"transparent")+";border-left:3px solid "+(isVD?"var(--verm)":(ativo?"var(--ambar)":"transparent"))+"'>";
+      h += "<div style='display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap'>";
+      if(isVD) h += "<span style='background:var(--verm);color:#fff;border-radius:3px;padding:0px 5px;font-size:9px;font-weight:900'>VD</span>";
+      h += "<span style='font-size:11px;font-weight:700;color:var(--tinta)'>"+esc((o.tipo||"—").substring(0,28))+"</span>";
       h += "</div>";
-      if(o.vitima_nome) h += "<p style='font-size:13px;color:var(--tinta);font-weight:600;margin-bottom:2px'>👤 "+esc(o.vitima_nome)+"</p>";
-      if(o.descricao) h += "<p style='font-size:12px;color:var(--tinta-2);margin:0;line-height:1.5'>"+esc((o.descricao||"").substring(0,140))+(o.descricao&&o.descricao.length>140?"…":"")+"</p>";
-      h += "</div>";
-      // Ações de situação
-      h += "<div style='display:flex;flex-direction:column;gap:6px;flex-shrink:0'>";
-      if(o.vitima_id) h += "<button onclick='state._vitimaAtual=\""+esc(o.vitima_id)+"\";setTela(\"vitima\")' style='background:var(--papel-2);border:1.5px solid var(--ambar);color:var(--ambar);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>👤 Ficha</button>";
-      var situacoes = [
-        {v:"em_triagem",    l:"Em triagem",    c:"var(--ambar)"},
-        {v:"em_acompanhamento", l:"Acompanhamento", c:"var(--verde)"},
-        {v:"encerrada",    l:"Encerrar",      c:"var(--tinta-2)"},
-        {v:"historico",    l:"Histórico",     c:"var(--papel-3)"}
-      ];
-      situacoes.forEach(function(s){
-        h += "<button onclick='_triarOc(\""+esc(o.id)+"\",\""+s.v+"\")' style='background:var(--papel-2);border:1.5px solid "+s.c+";color:var(--tinta);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>"+s.l+"</button>";
-      });
-      h += "</div>";
-      h += "</div>";
+      if(o.vitima_nome) h += "<p style='font-size:11px;color:var(--tinta-2);margin:0 0 2px;font-weight:600'>👤 "+esc(o.vitima_nome)+"</p>";
+      h += "<p style='font-size:10px;color:var(--tinta-2);margin:0'>"+esc(o.data||"—")+(o.bairro?" · "+esc(o.bairro):"")+"</p>";
       h += "</div>";
     });
   }
-  h += "</div>";
+  h += "</div>"; // fim fila
+
+  // ── COLUNA DIREITA — formulário de triagem ──
+  h += "<div style='flex:1;overflow-y:auto;padding:20px 24px'>";
+  if(!ocSel){
+    h += "<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;color:var(--tinta-2)'>";
+    h += "<p style='font-size:40px;margin-bottom:12px'>📋</p>";
+    h += "<p style='font-family:Georgia,serif;font-size:16px;font-weight:700;color:var(--tinta);margin-bottom:6px'>Selecione uma ocorrência</p>";
+    h += "<p style='font-size:13px'>Clique em um item da fila para iniciar a triagem.</p>";
+    h += "</div>";
+  } else {
+    var o = ocSel;
+    var isVD = o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
+    var isMenor = o.menor_envolvido || (o.vitima_idade && parseInt(o.vitima_idade)<18);
+    var vit = o.vitima_id ? (state.vitimas||[]).find(function(v){ return v.id===o.vitima_id; }) : null;
+    var fridaOc = (state.db.frida||[]).filter(function(f){ return f.ocorrenciaId===o.id; }).sort(function(a,b){ return (b.data||"").localeCompare(a.data||""); })[0];
+    var fridaNivel = fridaOc && fridaOc.nivel && fridaOc.nivel!=="?" ? fridaOc.nivel : null;
+    var ncores = {B:{bg:"var(--verde)",tx:"#fff",l:"BAIXO"},M:{bg:"var(--ambar)",tx:"var(--madeira-3)",l:"MÉDIO"},E:{bg:"var(--verm)",tx:"#fff",l:"ELEVADO"}};
+
+    // Cabeçalho OC
+    h += "<div style='display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap'>";
+    h += "<h2 style='font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--tinta);margin:0'>Triagem — "+esc(o.tipo||"Ocorrência")+"</h2>";
+    if(isVD) h += "<span style='background:var(--verm);color:#fff;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:900'>VD</span>";
+    h += "<span style='color:var(--tinta-2);font-size:12px;margin-left:auto'>"+esc(o.data||"—")+(o.hora?" · "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+"</span>";
+    h += "</div>";
+
+    // BLOCO 1 — Vítima + Relato
+    h += "<div class='card' style='margin-bottom:14px;padding:14px 16px'>";
+    h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0 0 10px'>① Vítima e Contexto</p>";
+    if(vit||o.vitima_nome){
+      h += "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px;background:var(--papel-3);border-radius:6px;padding:10px 12px'>";
+      var campos=[["Nome",(vit&&vit.nome)||o.vitima_nome||"—"],["Sexo",(vit&&vit.sexo)||o.vitima_sexo||"—"],["Idade",((vit&&vit.idade)||o.vitima_idade||"—")],["Telefone",(vit&&vit.telefone)||o.vitima_telefone||"—"],["Bairro",(vit&&vit.bairro)||o.bairro||"—"]];
+      campos.forEach(function(c){ h+="<div><p style='font-size:9px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;margin:0 0 2px'>"+c[0]+"</p><p style='font-size:12px;color:var(--tinta);font-weight:600;margin:0'>"+esc(String(c[1]))+"</p></div>"; });
+      if(o.vitima_id) h += "<div style='grid-column:1/-1'><button onclick='state._vitimaAtual=\""+esc(o.vitima_id)+"\";setTela(\"vitima\")' style='background:transparent;border:1px solid var(--ambar);color:var(--ambar);border-radius:5px;padding:4px 12px;font-size:10px;font-weight:700;cursor:pointer'>👤 Ver ficha completa</button></div>";
+      h += "</div>";
+    } else {
+      h += "<div style='background:var(--papel-3);border-radius:6px;padding:10px 12px;margin-bottom:12px;color:var(--tinta-2);font-size:12px'>⚠️ Vítima não identificada — preencher durante a triagem.</div>";
+    }
+    var relato = o.descricao_dinamica||o.texto_original||o.descricao||"";
+    h += "<label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>Relato / Dinâmica dos fatos</label>";
+    h += "<textarea id='tri-relato' rows='5' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(relato)+"</textarea>";
+    h += "</div>";
+
+    // BLOCO 2 — Quatro trilhos
+    h += "<div class='card' style='margin-bottom:14px;padding:14px 16px'>";
+    h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px'>② Trilhos de Ação</p>";
+
+    // Trilho VD
+    var ISbg = "style='border:none;border-radius:10px;width:36px;height:20px;cursor:pointer;font-size:9px;font-weight:900;transition:.2s'";
+    h += "<div id='tri-vd-bloco' style='border:1.5px solid "+(isVD?"var(--verm)":"var(--papel-3)")+";border-radius:8px;padding:12px 14px;margin-bottom:10px;background:"+(isVD?"#F5E8E4":"var(--papel-2)")+";transition:.2s'>";
+    h += "<div style='display:flex;align-items:center;gap:10px'>";
+    h += "<label style='display:flex;align-items:center;gap:8px;cursor:pointer;flex:1'>";
+    h += "<input type='checkbox' id='tri-vd' onchange='_triToggleVD()' "+(isVD?"checked":"")+"> ";
+    h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>🚨 Violência Doméstica / VCM</span></label>";
+    if(fridaNivel){ var nc=ncores[fridaNivel]||{}; h+="<span style='background:"+nc.bg+";color:"+nc.tx+";border-radius:5px;padding:3px 10px;font-size:11px;font-weight:900'>FRIDA "+nc.l+"</span>"; }
+    h += "</div>";
+    h += "<div id='tri-vd-extra' style='display:"+(isVD?"block":"none")+";margin-top:10px'>";
+    if(!fridaNivel){
+      h += "<div style='background:#EDD6C8;border:1.5px dashed var(--verm);border-radius:6px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px'>";
+      h += "<p style='font-size:12px;color:var(--verm-2);font-weight:700;margin:0'>FRIDA obrigatório para concluir a triagem</p>";
+      h += "<button onclick='abrirMonitorVCM(\""+esc(o.id)+"\")' style='background:var(--verm);color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap'>Aplicar FRIDA ▶</button>";
+      h += "</div>";
+    } else {
+      h += "<div style='background:#E8F0E8;border:1px solid var(--verde);border-radius:6px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between'>";
+      h += "<p style='font-size:12px;color:var(--verde-2);font-weight:700;margin:0'>✓ FRIDA aplicado — Nível "+(ncores[fridaNivel]&&ncores[fridaNivel].l||fridaNivel)+"</p>";
+      h += "<button onclick='abrirMonitorVCM(\""+esc(o.id)+"\")' style='background:transparent;border:1px solid var(--verde);color:var(--verde-2);border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer'>Rever FRIDA</button>";
+      h += "</div>";
+    }
+    h += "</div></div>";
+
+    // Trilho Menor
+    h += "<div id='tri-menor-bloco' style='border:1.5px solid "+(isMenor?"var(--ambar)":"var(--papel-3)")+";border-radius:8px;padding:12px 14px;margin-bottom:10px;background:"+(isMenor?"var(--ambar-claro)":"var(--papel-2)")+";transition:.2s'>";
+    h += "<label style='display:flex;align-items:center;gap:8px;cursor:pointer'>";
+    h += "<input type='checkbox' id='tri-menor' onchange='_triToggle(\"menor\")' "+(isMenor?"checked":"")+"> ";
+    h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>👶 Menor Envolvido</span></label>";
+    h += "<div id='tri-menor-extra' style='display:"+(isMenor?"block":"none")+";margin-top:8px'>";
+    h += "<div style='background:var(--papel-3);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--tinta-2)'>Encaminhamento automático ao <b style='color:var(--tinta)'>Conselho Tutelar</b> será criado ao salvar.</div>";
+    h += "</div></div>";
+
+    // Trilho Encaminhamento
+    var orgaos = ["CRAV","CREAS","Delegacia / DEAM","Ministério Público","Defensoria Pública","UBS / Saúde","Conselho Tutelar","Outro"];
+    h += "<div id='tri-enc-bloco' style='border:1.5px solid var(--papel-3);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:var(--papel-2);transition:.2s'>";
+    h += "<label style='display:flex;align-items:center;gap:8px;cursor:pointer'>";
+    h += "<input type='checkbox' id='tri-enc' onchange='_triToggle(\"enc\")'> ";
+    h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>📤 Encaminhar a Órgão Externo</span></label>";
+    h += "<div id='tri-enc-extra' style='display:none;margin-top:10px'>";
+    h += "<p style='font-size:11px;color:var(--tinta-2);margin:0 0 8px'>Selecione os órgãos (múltipla seleção):</p>";
+    h += "<div style='display:flex;flex-wrap:wrap;gap:6px'>";
+    orgaos.forEach(function(org,i){
+      h += "<label style='display:flex;align-items:center;gap:5px;background:var(--papel-3);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:12px;color:var(--tinta)'>";
+      h += "<input type='checkbox' class='tri-orgao' value='"+esc(org)+"'> "+esc(org)+"</label>";
+    });
+    h += "</div></div></div>";
+
+    // Trilho Visita
+    h += "<div id='tri-vis-bloco' style='border:1.5px solid var(--papel-3);border-radius:8px;padding:12px 14px;background:var(--papel-2);transition:.2s'>";
+    h += "<label style='display:flex;align-items:center;gap:8px;cursor:pointer'>";
+    h += "<input type='checkbox' id='tri-vis' onchange='_triToggle(\"vis\")'> ";
+    h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>🏠 Agendar Visita</span></label>";
+    h += "<div id='tri-vis-extra' style='display:none;margin-top:10px;display:none'>";
+    h += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px'>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Tipo</label>";
+    h += "<select id='tri-vis-tipo' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px'>";
+    h += "<option value='solidaria'>Solidária (vítima)</option><option value='comunitaria'>Comunitária (território)</option></select></div>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Responsável</label>";
+    h += "<input id='tri-vis-resp' type='text' placeholder='Policial/equipe' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px;box-sizing:border-box'></div>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Data</label>";
+    h += "<input id='tri-vis-data' type='date' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px;box-sizing:border-box'></div>";
+    h += "</div></div></div>";
+    h += "</div>"; // fim card bloco 2
+
+    // BLOCO 3 — Decisão
+    h += "<div class='card' style='margin-bottom:16px;padding:14px 16px'>";
+    h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px'>③ Decisão</p>";
+    h += "<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:10px'>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Situação</label>";
+    h += "<select id='tri-situacao' style='width:100%;padding:8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px'>";
+    h += "<option value='em_acompanhamento'>Em acompanhamento</option>";
+    h += "<option value='encerrada'>Encerrada</option>";
+    h += "<option value='historico'>Histórico</option>";
+    h += "</select></div>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Próxima Ação</label>";
+    h += "<input id='tri-proxacao' type='text' placeholder='Ex: Ligar para verificar situação' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px;box-sizing:border-box'></div>";
+    h += "</div>";
+    h += "<div style='display:grid;grid-template-columns:160px 1fr;gap:10px'>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Data da Próxima Ação</label>";
+    h += "<input id='tri-proxdata' type='date' style='width:100%;padding:8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px;box-sizing:border-box'></div>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Observações finais</label>";
+    h += "<input id='tri-obs' type='text' placeholder='Opcional' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px;box-sizing:border-box'></div>";
+    h += "</div></div>";
+
+    // Botões
+    h += "<div style='display:flex;gap:10px'>";
+    h += "<button onclick='_salvarTriagem(\""+esc(o.id)+"\")' style='flex:1;background:var(--ambar);color:var(--madeira-3);border:none;border-radius:7px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Georgia,serif'>✓ Concluir Triagem</button>";
+    h += "<button onclick='_triarOc(\""+esc(o.id)+"\",\"historico\")' style='background:var(--papel-2);border:1.5px solid var(--papel-3);color:var(--tinta-2);border-radius:7px;padding:12px 18px;font-size:13px;font-weight:700;cursor:pointer'>Mover para Histórico</button>";
+    h += "</div>";
+  }
+  h += "</div>"; // fim coluna direita
+  h += "</div>"; // fim flex
   main.innerHTML = h;
+
+  // Ativa bloco vis (display:none duplo workaround)
+  var ve = document.getElementById("tri-vis-extra");
+  if(ve) ve.style.display="none";
 }
+
+window._selecionarTriagem = function(ocId) {
+  state._triagemOcId = ocId;
+  var main = document.getElementById("main");
+  if(main) renderTriagem(main);
+};
+
+window._triToggleVD = function() {
+  var cb = document.getElementById("tri-vd");
+  var bloco = document.getElementById("tri-vd-bloco");
+  var extra = document.getElementById("tri-vd-extra");
+  if(!cb) return;
+  if(cb.checked){
+    bloco.style.borderColor="var(--verm)"; bloco.style.background="#F5E8E4";
+    extra.style.display="block";
+  } else {
+    bloco.style.borderColor="var(--papel-3)"; bloco.style.background="var(--papel-2)";
+    extra.style.display="none";
+  }
+};
+
+window._triToggle = function(trilho) {
+  var cb = document.getElementById("tri-"+trilho);
+  var bloco = document.getElementById("tri-"+trilho+"-bloco");
+  var extra = document.getElementById("tri-"+trilho+"-extra");
+  if(!cb||!bloco||!extra) return;
+  if(cb.checked){
+    var cor = trilho==="menor"?"var(--ambar)":trilho==="enc"?"var(--verde)":"var(--verde)";
+    var bg  = trilho==="menor"?"var(--ambar-claro)":"var(--papel)";
+    bloco.style.borderColor=cor; bloco.style.background=bg;
+    extra.style.display="block";
+  } else {
+    bloco.style.borderColor="var(--papel-3)"; bloco.style.background="var(--papel-2)";
+    extra.style.display="none";
+  }
+};
+
+window._salvarTriagem = function(ocId) {
+  var idx = (state.db.ocorrencias||[]).findIndex(function(o){ return o.id===ocId; });
+  if(idx<0){ showToast("Ocorrência não encontrada","error"); return; }
+  var oc = state.db.ocorrencias[idx];
+
+  // Trilho VD — bloqueia se FRIDA não aplicado
+  var vdAtivo = !!(document.getElementById("tri-vd")||{}).checked;
+  if(vdAtivo){
+    var fridaOc = (state.db.frida||[]).filter(function(f){ return f.ocorrenciaId===ocId; }).sort(function(a,b){ return (b.data||"").localeCompare(a.data||""); })[0];
+    if(!fridaOc||!fridaOc.nivel||fridaOc.nivel==="?"){
+      showToast("Aplique o FRIDA antes de concluir a triagem VD","error");
+      return;
+    }
+    oc.violencia_domestica = true;
+  }
+
+  // Atualiza relato
+  var relatoEl = document.getElementById("tri-relato");
+  if(relatoEl && relatoEl.value.trim()){
+    oc.descricao_dinamica = relatoEl.value.trim();
+    oc.texto_original     = relatoEl.value.trim();
+    oc.descricao          = relatoEl.value.trim().substring(0,150);
+  }
+
+  // Trilho Menor — encaminhamento automático Conselho Tutelar
+  var menorAtivo = !!(document.getElementById("tri-menor")||{}).checked;
+  if(menorAtivo){
+    oc.menor_envolvido = true;
+    if(!state.encaminhamentos) state.encaminhamentos=[];
+    var encMenor = {
+      id:"enc_"+Date.now()+"_ct",
+      vitima_id: oc.vitima_id||"",
+      ocorrencia_id: ocId,
+      tipo:"Conselho Tutelar",
+      descricao:"Encaminhamento automático — menor envolvido",
+      data: hoje(),
+      status:"pendente"
+    };
+    state.encaminhamentos.push(encMenor);
+    _sheetsGet({acao:"salvarEncaminhamento",dados:JSON.stringify(encMenor)}).catch(function(){});
+  }
+
+  // Trilho Encaminhamento — órgãos selecionados
+  var encAtivo = !!(document.getElementById("tri-enc")||{}).checked;
+  if(encAtivo){
+    if(!state.encaminhamentos) state.encaminhamentos=[];
+    document.querySelectorAll(".tri-orgao:checked").forEach(function(cb){
+      var enc = {
+        id:"enc_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
+        vitima_id: oc.vitima_id||"",
+        ocorrencia_id: ocId,
+        tipo: cb.value,
+        descricao:"",
+        data: hoje(),
+        status:"pendente"
+      };
+      state.encaminhamentos.push(enc);
+      _sheetsGet({acao:"salvarEncaminhamento",dados:JSON.stringify(enc)}).catch(function(){});
+    });
+  }
+
+  // Trilho Visita — agendamento
+  var visAtivo = !!(document.getElementById("tri-vis")||{}).checked;
+  if(visAtivo){
+    var visTipo  = (document.getElementById("tri-vis-tipo")||{value:"solidaria"}).value;
+    var visResp  = (document.getElementById("tri-vis-resp")||{value:""}).value.trim();
+    var visData  = (document.getElementById("tri-vis-data")||{value:""}).value;
+    if(visData){
+      if(!state.db.agendamentos) state.db.agendamentos=[];
+      var ag = {
+        id:"ag_tri_"+Date.now(),
+        ocorrenciaId: ocId,
+        vitima_id: oc.vitima_id||"",
+        tipo: visTipo==="comunitaria"?"Visita Comunitária":"Visita Solidária",
+        subtipo: visTipo,
+        data: visData,
+        responsavel: visResp||"",
+        status:"Agendado",
+        criadoEm: new Date().toISOString()
+      };
+      state.db.agendamentos.push(ag);
+      enviarSheets("agendamentos", ag);
+    }
+  }
+
+  // Próxima ação → agendamento
+  var proxAcao  = (document.getElementById("tri-proxacao")||{value:""}).value.trim();
+  var proxData  = (document.getElementById("tri-proxdata")||{value:""}).value;
+  if(proxAcao && proxData){
+    if(!state.db.agendamentos) state.db.agendamentos=[];
+    var agProx = {
+      id:"ag_prox_"+Date.now(),
+      ocorrenciaId: ocId,
+      vitima_id: oc.vitima_id||"",
+      tipo:"Próxima ação",
+      subtipo:"proxima_acao",
+      descricao: proxAcao,
+      data: proxData,
+      responsavel:"",
+      status:"Agendado",
+      criadoEm: new Date().toISOString()
+    };
+    state.db.agendamentos.push(agProx);
+    enviarSheets("agendamentos", agProx);
+  }
+
+  // Observações finais
+  var obs = (document.getElementById("tri-obs")||{value:""}).value.trim();
+  if(obs) oc.observacoes_triagem = obs;
+
+  // Situação final
+  var situacao = (document.getElementById("tri-situacao")||{value:"em_acompanhamento"}).value||"em_acompanhamento";
+  oc.situacao = situacao;
+  oc._triadoEm = new Date().toISOString();
+
+  salvarLocal();
+  _sheetsGet({acao:"atualizarSituacaoOc", id:ocId, situacao:situacao}).catch(function(){});
+  enviarSheets("ocorrencias", oc);
+
+  state._triagemOcId = null;
+  showToast("✓ Triagem concluída — situação: "+situacao.replace(/_/g," "));
+  var main = document.getElementById("main");
+  if(main) renderTriagem(main);
+};
 
 function _triarOc(id, situacao) {
   var idx = (state.db.ocorrencias||[]).findIndex(function(o){ return o.id===id; });
