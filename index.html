@@ -8601,7 +8601,11 @@ function renderCursosComunitarios(main){
       var scor=SOC_SCORS[c.status]||"#6b7280";
       var inscs=_getAlunosProjeto(c.id);
       var chamsCt=(state.chamadas||[]).filter(function(ch){return ch.projetoId===c.id;}).length;
-      h.push("<div style='background:linear-gradient(145deg,#F2E4C8,#160e2a);border:1px solid #A87B22;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px'>");
+      var _mesAtual=(new Date().getFullYear()+"-"+(("0"+(new Date().getMonth()+1)).slice(-2)));
+      var chamsCtMes=(state.chamadas||[]).filter(function(ch){return ch.projetoId===c.id&&(ch.data||"").slice(0,7)===_mesAtual;}).length;
+      var _semAtividade=c.status==="Ativo"&&chamsCtMes===0;
+      h.push("<div style='background:linear-gradient(145deg,#F2E4C8,#160e2a);border:1px solid "+(_semAtividade?"#ef4444":"#A87B22")+";border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px'>");
+      if(_semAtividade) h.push("<div style='background:#ef444422;border:1px solid #ef444444;border-radius:6px;padding:5px 10px;font-size:10px;color:#ef4444;font-weight:700'>⚠ Projeto ativo sem chamada este mês</div>");
       // Header do card
       h.push("<div style='display:flex;align-items:flex-start;justify-content:space-between'>");
       h.push("<div style='flex:1'>");
@@ -8628,7 +8632,7 @@ function renderCursosComunitarios(main){
       h.push("<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:6px'>");
       h.push("<div style='background:#F2E4C8;border:1px solid #2a1a4a;border-radius:7px;padding:7px;text-align:center'><p style='color:#5a4a7a;font-size:9px;margin:0 0 2px;text-transform:uppercase;font-weight:700'>Alunos</p><p style='color:#3D2B1A;font-size:16px;font-weight:900;margin:0'>"+inscs.length+"</p></div>");
       h.push("<div style='background:#F2E4C8;border:1px solid #2a1a4a;border-radius:7px;padding:7px;text-align:center'><p style='color:#5a4a7a;font-size:9px;margin:0 0 2px;text-transform:uppercase;font-weight:700'>Vagas</p><p style='color:#3D2B1A;font-size:16px;font-weight:900;margin:0'>"+(c.vagas||"∞")+"</p></div>");
-      h.push("<div style='background:#F2E4C8;border:1px solid #2a1a4a;border-radius:7px;padding:7px;text-align:center'><p style='color:#5a4a7a;font-size:9px;margin:0 0 2px;text-transform:uppercase;font-weight:700'>Chamadas</p><p style='color:#3D2B1A;font-size:16px;font-weight:900;margin:0'>"+chamsCt+"</p></div>");
+      h.push("<div style='background:"+(_semAtividade?"#ef444422":"#F2E4C8")+";border:1px solid "+(_semAtividade?"#ef4444":"#2a1a4a")+";border-radius:7px;padding:7px;text-align:center'><p style='color:"+(_semAtividade?"#ef4444":"#5a4a7a")+";font-size:9px;margin:0 0 2px;text-transform:uppercase;font-weight:700'>Chamadas/mês</p><p style='color:"+(_semAtividade?"#ef4444":"#3D2B1A")+";font-size:16px;font-weight:900;margin:0'>"+chamsCtMes+"</p></div>");
       h.push("</div>");
       // Botões de ação
       h.push("<div style='display:flex;gap:6px'>");
