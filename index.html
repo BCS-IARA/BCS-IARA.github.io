@@ -21732,9 +21732,9 @@ function renderInventario(main){
       confs.forEach(function(conf){
         var dt=conf.criadoEm?new Date(conf.criadoEm).toLocaleString("pt-BR"):"—";
         var vals=Object.values(conf.itens||{});
-        var nOk=vals.filter(function(v){return v==="ok";}).length;
-        var nDiv=vals.filter(function(v){return v==="divergencia";}).length;
-        var nAus=vals.filter(function(v){return v==="ausente";}).length;
+        var nOk=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok";}).length;
+        var nDiv=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="divergencia";}).length;
+        var nAus=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ausente";}).length;
         var nPend=itens.length-vals.length;
         h+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:10px;padding:14px'>";
         h+="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px'>";
