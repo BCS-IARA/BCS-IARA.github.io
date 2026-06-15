@@ -3409,9 +3409,9 @@ function renderCalendar() {
       var _agsD = _agByDate[_ds2]||[], _visD = _visByDate[_ds2]||[], _evD = _evAvByDate[_ds2]||[];
       var _semN = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"][_dt.getDay()];
       var _total2 = _agsD.length+_visD.length+_evD.length;
-      html += `<div style="background:${_isHj2?"#42301e":"#2a1c10"};border:1px solid ${_isHj2?"#C8A84B":"#5e4636"};border-radius:10px;padding:10px 14px">`;
+      html += `<div style="background:${_isHj2?"var(--ambar-claro)":"var(--papel-2)"};border:1.5px solid ${_isHj2?"var(--ambar-2)":"var(--papel-3)"};border-radius:10px;padding:10px 14px">`;
       html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${_total2>0?8:0}px">`;
-      html += `<span style="color:${_isHj2?"#D9A53C":"#a07c58"};font-size:12px;font-weight:700">${_semN} ${String(_dt.getDate()).padStart(2,"0")}/${String(_dt.getMonth()+1).padStart(2,"0")}</span>`;
+      html += `<span style="color:${_isHj2?"var(--ambar-2)":"var(--tinta-2)"};font-size:12px;font-weight:700">${_semN} ${String(_dt.getDate()).padStart(2,"0")}/${String(_dt.getMonth()+1).padStart(2,"0")}</span>`;
       if(_total2>0) html += `<span style="color:#6B5236;font-size:10px">${_total2} evento(s)</span>`;
       else html += `<span style="color:#5e4636;font-size:10px">—</span>`;
       html += `</div>`;
@@ -3420,9 +3420,9 @@ function renderCalendar() {
         var _stBadge = a.status==="Realizado"?"<span style='background:#22c55e22;color:#22c55e;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700'>✅</span>":a.status==="NaoRealizado"?"<span style='background:#ef444422;color:#ef4444;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700'>❌</span>":"";
         var _btns2 = state.perfil==="guarnicao"&&a.status!=="Realizado"&&a.status!=="NaoRealizado"?`<div style="display:flex;gap:6px;margin-top:6px"><button onclick="confirmarVisita('${a.id}','Realizado')" style="flex:1;background:#22c55e22;border:1px solid #22c55e;color:#22c55e;padding:7px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Realizei</button><button onclick="confirmarVisita('${a.id}','NaoRealizado')" style="flex:1;background:#ef444411;border:1px solid #ef4444;color:#ef4444;padding:7px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✗ Não fui</button></div>`:"";
         var _agIco2=a.tipo==="Ronda Escolar"?"🏫 ":"";
-        html += `<div style="border-left:3px solid ${_c};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:#36221a"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="color:${_c};font-size:10px;font-weight:700">${_agIco2}${a.tipo||"Visita"}</span><span style="color:#a07c58;font-size:10px">${normHora(a.hora)}</span>${_stBadge}</div><p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${a.vitima_nome||a.nome||"—"}</p>${_btns2}</div>`;
+        html += `<div style="border-left:3px solid ${_c};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:var(--papel)"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="color:${_c};font-size:10px;font-weight:700">${_agIco2}${a.tipo||"Visita"}</span><span style="color:#a07c58;font-size:10px">${normHora(a.hora)}</span>${_stBadge}</div><p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${a.vitima_nome||a.nome||"—"}</p>${_btns2}</div>`;
       });
-      _evD.forEach(function(e){ html += `<div style="border-left:3px solid ${e.cor||"#8b5cf6"};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:#36221a"><span style="color:${e.cor||"#8b5cf6"};font-size:10px;font-weight:700">${e.tipo||"Evento"}</span>${e.hora?` <span style='color:#a07c58;font-size:10px'>${e.hora}</span>`:""}<p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${e.titulo}</p></div>`; });
+      _evD.forEach(function(e){ html += `<div style="border-left:3px solid ${e.cor||"var(--roxo)"};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:var(--papel)"><span style="color:${e.cor||"#8b5cf6"};font-size:10px;font-weight:700">${e.tipo||"Evento"}</span>${e.hora?` <span style='color:#a07c58;font-size:10px'>${e.hora}</span>`:""}<p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${e.titulo}</p></div>`; });
       html += `</div>`;
     }
     html += `</div>`;
@@ -3438,10 +3438,10 @@ function renderCalendar() {
   }
 
   // ── MÊS VIEW (default) ──────────────────────────────────────────────────────
-  html += `<div style="background:#42301e;border:1px solid #5e4636;border-radius:12px;overflow:hidden${_vista==='dia'?';display:none':''}">
-    <div class="cal-grid" style="background:#080400">`;
+  html += `<div style="background:var(--madeira);border:1.5px solid var(--ambar-2);border-radius:12px;overflow:hidden${_vista==='dia'?';display:none':''}">
+    <div class="cal-grid">`;
   sem.forEach(s=>{ html+=`<div class="cal-header-day">${s}</div>`; });
-  html+=`</div><div class="cal-grid" style="gap:1px;background:#5e4636">`;
+  html+=`</div><div class="cal-grid" style="gap:1px;background:var(--papel-3)">`;
   for(let i=0;i<primeiro;i++) html+=`<div class="cal-day"></div>`;
   for(let d=1;d<=total;d++){
     const ds=dStr(d), ev=getEvs(d), isHoje=ds===hojeStr, isSel=state.calDia===d;
@@ -3449,7 +3449,7 @@ function renderCalendar() {
     const _projDia=_projByDate[ds]||[];
     const totalEvDia=ev.ags.length+ev.vis.length+_evAvDia.length+ev.esc.length+ev.cham.length+_projDia.length;
     const alertaCls=totalEvDia>=3?" alerta-3":totalEvDia===2?" alerta-2":"";
-    const bg=isSel?"background:#3e2c22":isHoje?"background:#42301e":(totalEvDia>=3?"background:#1f0808":"background:#36221a");
+    const bg=isHoje&&!isSel?"background:var(--ambar-claro)":"";
     // Dia da semana: 0=Dom...5=Sex
     var _dow=new Date(ano,mn,d).getDay();
     var _isSex=_dow===5;
@@ -3457,13 +3457,13 @@ function renderCalendar() {
     // Estilo extra: sexta-feira fundo âmbar claro; FRIDA E borda vermelha topo
     var _extraStyle=_isSex?"border-top:2px solid #D9A53C;":(_fridaE?"border-top:3px solid #A8492E;":"");
     html+=`<div class="cal-day${isHoje?" today":""}${isSel?" selected":""}${alertaCls}" style="${bg};${_extraStyle}" onclick="calClick(${d})">
-      <div class="cal-num" style="color:${_isSex?"#D9A53C":totalEvDia?"#f5ede0":"#9a7050"}">${d}</div>`;
+      <div class="cal-num" style="color:${_isSex?"var(--ambar-2)":totalEvDia?"var(--tinta)":"var(--tinta-2)"}">${d}</div>`;
     (ev.ags||[]).slice(0,2).forEach(a=>{ var _agIco=a.tipo==="Ronda Escolar"?"🏫 ":""; html+=`<div class="cal-event" style="background:${COR_VISITA[a.tipo]||"#d4a87a"};color:${a.tipo==="Ronda Escolar"?"#fff":"#000"}">${_agIco}${normHora(a.hora)} ${(a.vitima_nome||a.nome||"--").split(" ")[0]}</div>`; });
-    (ev.vis||[]).slice(0,1).forEach(v=>{ html+=`<div class="cal-event" style="background:#334155;color:#94a3b8">✓ ${(v.vitima_nome||"--").split(" ")[0]}</div>`; });
-    (ev.esc||[]).slice(0,1).forEach(a=>{ html+=`<div class="cal-event" style="background:#1e3a5f;color:#38bdf8;font-size:9px">🏫 ${(a.escolaNome||"Escola").split(" ")[0]}</div>`; });
+    (ev.vis||[]).slice(0,1).forEach(v=>{ html+=`<div class="cal-event" style="background:var(--verde)22;color:var(--verde-2)">✓ ${(v.vitima_nome||"--").split(" ")[0]}</div>`; });
+    (ev.esc||[]).slice(0,1).forEach(a=>{ html+=`<div class="cal-event" style="background:var(--azul)22;color:var(--azul);font-size:9px">🏫 ${(a.escolaNome||"Escola").split(" ")[0]}</div>`; });
     (ev.cham||[]).slice(0,1).forEach(c=>{ html+=`<div class="cal-event" style="background:#3E2A1A;color:#6B5236;font-size:9px">📚 ${(c.projetoNome||"Aula").substring(0,10)}</div>`; });
     _evAvDia.slice(0,1).forEach(e=>{ html+=`<div class="cal-event" style="background:${e.cor||"#6A4A8A"};color:#fff;font-size:9px">${e.hora||""} ${e.titulo.substring(0,10)}</div>`; });
-    _projDia.slice(0,1).forEach(p=>{ html+=`<div class="cal-event" style="background:#2a1a3a;color:#c084fc;font-size:9px">📁 ${(p.nome||"").substring(0,10)}</div>`; });
+    _projDia.slice(0,1).forEach(p=>{ html+=`<div class="cal-event" style="background:var(--roxo)22;color:var(--roxo);font-size:9px">📁 ${(p.nome||"").substring(0,10)}</div>`; });
     // Badge de sexta com encaminhamentos pendentes
     if(_isSex && _encPendCount>0) html+=`<div style="font-size:8px;color:#D9A53C;font-weight:700;text-align:right;padding-right:2px">📤${_encPendCount}</div>`;
     html+=`</div>`;
@@ -3480,7 +3480,7 @@ function renderCalendar() {
     const totalEvs=ev.ags.length+ev.vis.length+evAvulsos.length+escDia.length+chamDia.length+projDia.length;
     html+=`<div class="card" style="margin-top:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h4 style="color:#f5ede0;font-size:15px;font-weight:700;margin:0">${String(state.calDia).padStart(2,"0")}/${String(mn+1).padStart(2,"0")}/${ano}</h4>
+        <h4 style="color:var(--tinta);font-family:Georgia,serif;font-size:15px;font-weight:700;margin:0">${String(state.calDia).padStart(2,"0")}/${String(mn+1).padStart(2,"0")}/${ano}</h4>
         <button onclick="abrirModalEventoAvulso('${diaSel}')" style="background:#2a1c10;border:1px solid #C8A84B;color:#C8A84B;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">+ Evento neste dia</button>
       </div>`;
     if(!totalEvs) html+=`<div style="text-align:center;padding:24px 0"><p style="font-size:20px;margin-bottom:6px">✓</p><p style="color:#5e4636;font-size:13px;font-weight:600">Nenhum evento neste dia — tudo em dia</p></div>`;
@@ -3489,19 +3489,19 @@ function renderCalendar() {
       var _stCor=a.status==="Realizado"?"#22c55e":a.status==="NaoRealizado"?"#ef4444":c;
       var _stBadge=a.status==="Realizado"?"<span style='background:#22c55e22;color:#22c55e;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>✅ Realizado</span>":a.status==="NaoRealizado"?"<span style='background:#ef444422;color:#ef4444;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>❌ Não realizado</span>":"";
       var _btnsGuarnicao=state.perfil==="guarnicao"&&a.status!=="Realizado"&&a.status!=="NaoRealizado"?`<div style="display:flex;gap:6px;margin-top:8px"><button onclick="event.stopPropagation();confirmarVisita('${a.id}','Realizado')" style="flex:1;background:#10b98133;border:1px solid #22c55e;color:#22c55e;padding:8px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Realizei</button><button onclick="event.stopPropagation();confirmarVisita('${a.id}','NaoRealizado')" style="flex:1;background:#ef444411;border:1px solid #ef4444;color:#ef4444;padding:8px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✗ Não fui</button></div>`:"";
-      html+=`<div class="cal-ag-item" data-ag-id="${a.id}" style="background:#36221a;border-left:3px solid ${_stCor};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;opacity:${a.status==="Realizado"||a.status==="NaoRealizado"?0.75:1}" onmouseover="this.style.background='#3c2818'" onmouseout="this.style.background='#36221a'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">${tag(a.tipo,_stCor)}<span style="color:#a07c58;font-size:12px">${normHora(a.hora)}</span></div><p style="color:#f5ede0;font-size:14px;font-weight:500">${a.vitima_nome}</p>${a.endereco?`<p style="color:#a07c58;font-size:12px">📍 ${a.endereco}</p>`:""} ${_stBadge}${_btnsGuarnicao}</div>`;
+      html+=`<div class="cal-ag-item" data-ag-id="${a.id}" style="background:var(--papel-2);border-left:3px solid ${_stCor};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;opacity:${a.status==="Realizado"||a.status==="NaoRealizado"?0.75:1}" onmouseover="this.style.background='var(--papel-3)'" onmouseout="this.style.background='var(--papel-2)'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">${tag(a.tipo,_stCor)}<span style="color:#a07c58;font-size:12px">${normHora(a.hora)}</span></div><p style="color:#f5ede0;font-size:14px;font-weight:500">${a.vitima_nome}</p>${a.endereco?`<p style="color:#a07c58;font-size:12px">📍 ${a.endereco}</p>`:""} ${_stBadge}${_btnsGuarnicao}</div>`;
     });
-    ev.vis.forEach(v=>{html+=`<div style="background:#36221a;border-left:3px solid #10b981;border-radius:8px;padding:12px;margin-bottom:8px">${tag("✓ Realizada","#10b981")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${v.vitima_nome}</p>${v.resultado?`<p style="color:#a07c58;font-size:12px;margin-top:4px">${v.resultado}</p>`:""}</div>`;});
-    escDia.forEach(a=>{html+=`<div style="background:#0f2035;border-left:3px solid #38bdf8;border-radius:8px;padding:12px;margin-bottom:8px">${tag("🏫 "+esc(a.subtipo||a.tipo||"Visita Escolar"),"#38bdf8")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${esc(a.escolaNome||"Escola")}</p>${a.responsavel?`<p style="color:#a07c58;font-size:12px;margin-top:4px">👮 ${esc(a.responsavel)}</p>`:""}${a.tema?`<p style="color:#a07c58;font-size:11px;margin-top:2px">${esc(a.tema)}</p>`:""}</div>`;});
+    ev.vis.forEach(v=>{html+=`<div style="background:var(--papel-2);border-left:3px solid var(--verde);border-radius:8px;padding:12px;margin-bottom:8px">${tag("✓ Realizada","#10b981")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${v.vitima_nome}</p>${v.resultado?`<p style="color:#a07c58;font-size:12px;margin-top:4px">${v.resultado}</p>`:""}</div>`;});
+    escDia.forEach(a=>{html+=`<div style="background:var(--papel-2);border-left:3px solid var(--azul);border-radius:8px;padding:12px;margin-bottom:8px">${tag("🏫 "+esc(a.subtipo||a.tipo||"Visita Escolar"),"#38bdf8")}<p style="color:#f5ede0;font-size:14px;font-weight:500;margin-top:6px">${esc(a.escolaNome||"Escola")}</p>${a.responsavel?`<p style="color:#a07c58;font-size:12px;margin-top:4px">👮 ${esc(a.responsavel)}</p>`:""}${a.tema?`<p style="color:#a07c58;font-size:11px;margin-top:2px">${esc(a.tema)}</p>`:""}</div>`;});
     chamDia.forEach(c=>{html+=`<div style="background:#EAD9B8;border-left:3px solid #6B5236;border-radius:8px;padding:12px;margin-bottom:8px">${tag("📚 "+esc(c.projetoNome||"Aula"),"#6B5236")}<p style="color:#6B5236;font-size:12px;margin-top:6px">👨‍🏫 ${esc(c.instrutor||"Instrutor")}</p>${c.presencas?`<p style="color:#a07c58;font-size:11px;margin-top:2px">Presenças: ${Array.isArray(c.presencas)?c.presencas.filter(Boolean).length:c.presencas}</p>`:""}</div>`;});
-    evAvulsos.forEach(e=>{html+=`<div class="cal-ev-avulso" data-ev-id="${e.id}" style="background:#36221a;border-left:3px solid ${e.cor||"#6A4A8A"};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onmouseover="this.style.background='#3c2818'" onmouseout="this.style.background='#36221a'">
+    evAvulsos.forEach(e=>{html+=`<div class="cal-ev-avulso" data-ev-id="${e.id}" style="background:var(--papel-2);border-left:3px solid ${e.cor||"var(--roxo)"};border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onmouseover="this.style.background='var(--papel-3)'" onmouseout="this.style.background='var(--papel-2)'">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         ${tag(e.tipo||"Evento","#8b5cf6")}<span style="color:#a07c58;font-size:12px">${e.hora||""}</span>
       </div>
       <p style="color:#f5ede0;font-size:13px;font-weight:600;margin:0">${e.titulo}</p>
       ${e.descricao?`<p style="color:#a07c58;font-size:11px;margin:4px 0 0">${e.descricao}</p>`:""}
     </div>`;});
-    projDia.forEach(function(p){ var _cor=p.prioridade==="Critica"||p.prioridade==="Alta"?"#c084fc":"#9f7aea"; html+=`<div onclick="state.tela='projetos';render()" style="background:#1a0f2a;border-left:3px solid ${_cor};border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">${tag("📁 Gestão e Planejamento",_cor)}<span style="color:#7c5fa8;font-size:9px;font-weight:700;text-transform:uppercase">${p.prioridade||"Média"}</span></div><p style="color:#e2d0f8;font-size:13px;font-weight:600;margin:2px 0 0">${esc(p.nome)} — ${esc(p.entrega)}</p></div>`; });
+    projDia.forEach(function(p){ var _cor=p.prioridade==="Critica"||p.prioridade==="Alta"?"#c084fc":"#9f7aea"; html+=`<div onclick="state.tela='projetos';render()" style="background:var(--papel-2);border-left:3px solid ${_cor};border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">${tag("📁 Gestão e Planejamento",_cor)}<span style="color:#7c5fa8;font-size:9px;font-weight:700;text-transform:uppercase">${p.prioridade||"Média"}</span></div><p style="color:#e2d0f8;font-size:13px;font-weight:600;margin:2px 0 0">${esc(p.nome)} — ${esc(p.entrega)}</p></div>`; });
     // Bloco sexta: encaminhamentos a enviar
     var _dowSel=new Date(ano,mn,state.calDia).getDay();
     if(_dowSel===5 && _encPendCount>0){ html+=`<div onclick="state.tela='encaminhamentos';render()" style="background:#2a1f08;border:1.5px dashed #D9A53C;border-radius:8px;padding:10px 14px;margin-bottom:8px;cursor:pointer"><p style="color:#D9A53C;font-size:11px;font-weight:700;margin:0 0 2px">📤 Encaminhamentos desta sexta</p><p style="color:#8a6a40;font-size:11px;margin:0">${_encPendCount} pendente(s) para enviar em lote</p></div>`; }
