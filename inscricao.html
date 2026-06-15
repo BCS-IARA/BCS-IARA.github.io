@@ -75,11 +75,44 @@
       <div class="erro-msg" id="erro-cursos">Selecione pelo menos um curso</div>
     </div>
 
+    <!-- Idade (para lógica de menor) -->
+    <label class="campo">
+      <span>Data de nascimento <em>*</em></span>
+      <input type="date" id="f-nasc" required oninput="_verificarIdade()" max="" style="width:100%;background:#2a1c10;border:1px solid #3a2818;color:#f5ede0;padding:10px 12px;border-radius:8px;font-size:13px;outline:none"/>
+    </label>
+
     <!-- Sugestão -->
     <label class="campo">
       <span>Sugira um novo curso ou atividade</span>
       <textarea id="f-sugestao" rows="2" placeholder="Se quiser ver outro curso ou atividade, escreva aqui..."></textarea>
     </label>
+
+    <!-- Termo de Uso de Imagem -->
+    <div style="background:#1a1400;border:2px solid #d4a87a44;border-radius:12px;padding:16px;margin-bottom:14px">
+      <p style="color:#d4a87a;font-size:12px;font-weight:700;margin-bottom:10px">📸 Termo de Uso de Imagem</p>
+      <p style="color:#8a6a4a;font-size:11px;line-height:1.6;margin-bottom:12px">A participação nas atividades da 77ª CIPM pode ser documentada com fotos e vídeos para uso institucional e nas redes sociais da Base Comunitária de Segurança Nova Cidade.</p>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:10px">
+        <input type="checkbox" id="f-termo-imagem" required style="margin-top:3px;flex-shrink:0;accent-color:#d4a87a;width:18px;height:18px"/>
+        <span style="color:#f5ede0;font-size:12px;line-height:1.5">Autorizo o uso de imagem (fotos e vídeos) do(a) participante para fins institucionais da 77ª CIPM / BCS. <em style="color:#ef4444">*</em></span>
+      </label>
+
+      <!-- Bloco adicional para menor de idade -->
+      <div id="bloco-menor" style="display:none;background:#2a1c00;border:1px solid #f59e0b44;border-radius:8px;padding:12px;margin-top:10px">
+        <p style="color:#f59e0b;font-size:11px;font-weight:700;margin-bottom:8px">👪 Participante menor de 18 anos — assinatura do responsável</p>
+        <label class="campo" style="margin-bottom:10px">
+          <span>Nome do responsável <em>*</em></span>
+          <input type="text" id="f-resp-nome" placeholder="Nome completo do responsável" autocomplete="off"/>
+        </label>
+        <label class="campo" style="margin-bottom:10px">
+          <span>Parentesco</span>
+          <input type="text" id="f-resp-parentesco" placeholder="Ex.: mãe, pai, avó..." autocomplete="off"/>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="checkbox" id="f-termo-resp" style="margin-top:3px;flex-shrink:0;accent-color:#f59e0b;width:18px;height:18px"/>
+          <span style="color:#f5ede0;font-size:12px;line-height:1.5">Como responsável legal, autorizo a participação e o uso de imagem do menor nas atividades da 77ª CIPM / BCS. <em style="color:#ef4444">*</em></span>
+        </label>
+      </div>
+    </div>
 
     <button type="submit" class="btn-enviar" id="btn-enviar">✅ Confirmar Inscrição</button>
   </form>
@@ -92,6 +125,30 @@
 </div>
 
 <script>
+// Define max date para campo nascimento (hoje)
+document.addEventListener("DOMContentLoaded", function(){
+  var f = document.getElementById("f-nasc");
+  if(f) f.max = new Date().toISOString().slice(0,10);
+});
+
+function _verificarIdade(){
+  var nasc = document.getElementById("f-nasc").value;
+  if(!nasc) return;
+  var idade = Math.floor((new Date() - new Date(nasc)) / (365.25 * 86400000));
+  var bloco = document.getElementById("bloco-menor");
+  var termoResp = document.getElementById("f-termo-resp");
+  var respNome = document.getElementById("f-resp-nome");
+  if(idade < 18){
+    bloco.style.display = "block";
+    if(termoResp) termoResp.required = true;
+    if(respNome) respNome.required = true;
+  } else {
+    bloco.style.display = "none";
+    if(termoResp){ termoResp.required = false; termoResp.checked = false; }
+    if(respNome){ respNome.required = false; respNome.value = ""; }
+  }
+}
+
 // ── Lê parâmetros da URL ────────────────────────────
 var params = new URLSearchParams(location.search);
 var PROJ_ID     = params.get("projeto") || "";
@@ -159,15 +216,34 @@ function enviarInscricao(e){
   btn.disabled = true;
   btn.textContent = "Enviando...";
 
+  var nasc = (document.getElementById("f-nasc")||{}).value || "";
+  var termoImagem = (document.getElementById("f-termo-imagem")||{}).checked || false;
+  var termoResp = (document.getElementById("f-termo-resp")||{}).checked || false;
+  var respNome = (document.getElementById("f-resp-nome")||{}).value || "";
+  var respParentesco = (document.getElementById("f-resp-parentesco")||{}).value || "";
+  var idade = nasc ? Math.floor((new Date() - new Date(nasc)) / (365.25 * 86400000)) : null;
+
+  // Validar termo do responsável se menor
+  if(idade !== null && idade < 18 && !termoResp){
+    alert("O responsável precisa autorizar a participação do menor."); return;
+  }
+
   var dados = {
     projeto_id:   PROJ_ID,
     projeto_nome: PROJ_NOME,
     nome:         nome,
     telefone:     tel,
+    data_nascimento: nasc,
     cursos:       selecionados.join(", "),
     sugestao:     sug,
     data_inscricao: new Date().toISOString(),
-    origem:       "qr_card"
+    origem:       "qr_card",
+    termo_imagem: termoImagem,
+    termo_imagem_data: new Date().toISOString(),
+    menor_de_idade: idade !== null && idade < 18,
+    resp_nome: respNome,
+    resp_parentesco: respParentesco,
+    resp_autorizou: termoResp
   };
 
   // Envio via JSONP (mesmo padrão do CRAV)
