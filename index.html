@@ -1307,7 +1307,7 @@ try{ var _plEx=localStorage.getItem("bcs_pol_excluidos"); state._deletedPolIds=_
 
 // ── Arquivar automaticamente OCs anteriores a maio/2025 ──
 function _arquivarOcsAntigas() {
-  var CORTE = "2025-04-30"; // inclusive
+  var CORTE = "2025-06-15"; // zerar fila — só contar registros novos daqui pra frente
   var PENDENTES = ["nova", "em_triagem", "em_acompanhamento"];
   // Parser inline — _pdLocal pode não estar definido ainda na inicialização
   function _toISO(s) {
