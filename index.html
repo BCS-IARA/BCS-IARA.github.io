@@ -19050,19 +19050,6 @@ function renderOcorrenciasGestor(el, perfil_atual){
   h.push("<input id='oc-busca' type='text' placeholder='🔍 Filtrar por nome, Nº, bairro, tipo, suspeito...' value='"+(state.filtroOcBusca||"")+"' style='flex:1;background:#2a1c10;border:1px solid #2a3818;color:#f2eada;padding:10px 13px;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none'/>");
   var _nEncPend=(state.vcmEncaminhamentos||[]).filter(function(e){return e.status==="pendente";}).length;
   h.push("<button onclick=\"state.vcmTab='encaminhamentos';setTela('dashvcm')\" style='flex-shrink:0;background:linear-gradient(135deg,#3a0a18,#5a1020);border:2px solid #ff1493;color:#ffb3c8;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px'>📤 Encaminhamentos"+(_nEncPend>0?" <span style='background:#ff1493;color:#fff;border-radius:10px;padding:0px 6px;font-size:11px'>"+_nEncPend+"</span>":"")+"</button>");
-  h.push("<button onclick='_gestorLancarOcManual()' style='flex-shrink:0;background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:2px solid #22c55e;color:#4ade80;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px'><span>📝</span> Lançar Ocorrência</button>");
-  h.push("</div>");
-
-  // Botão IA — Analisar tipos da semana
-  var _temIaKey = !!(localStorage.getItem("bcs_anthropic_key")||"");
-  h.push("<div style='margin-bottom:12px'>");
-  h.push("<button onclick='analisarTiposSemaniaIA()' title='A IA lê o relato de cada ocorrência dos últimos 7 dias e verifica se o tipo está correto, sugerindo correções.' style='background:linear-gradient(135deg,#0c1a3c,#1a2d6a);border:2px solid #4a7fd4;color:#a0c5f8;padding:9px 18px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 10px rgba(74,127,212,.25)"+((!_temIaKey)?" opacity:.6":"")+"'>");
-  h.push("<span style='font-size:16px'>🤖</span>");
-  h.push("<span>Analisar Tipos da Semana com IA</span>");
-  if(!_temIaKey) h.push("<span style='background:#3c2000;color:#f59e0b;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;margin-left:2px'>Configurar chave</span>");
-  else           h.push("<span style='background:#0a3c18;color:#6adf90;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;margin-left:2px'>IA ativa</span>");
-  h.push("</button>");
-  h.push("<span style='color:#4a3224;font-size:10px;margin-left:10px'>Verifica e sugere o tipo correto para cada ocorrência dos últimos 7 dias</span>");
   h.push("</div>");
 
   // Filtrar por período
