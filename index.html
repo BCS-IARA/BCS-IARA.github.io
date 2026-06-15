@@ -5809,6 +5809,20 @@ function renderDashComandante(main){
       {n:6,titulo:"Qualidade Lançamentos", ico:_s6_ico,cor:_s6_cor,txt:_s6_txt,dica:_s6_dica,cobrar:_s6_cobrar,ind:_s6_ind,qtd:_s6_inc.length,tela:"ocorrencias"}
     ];
 
+    // Fechamento automático: indicador voltou ao verde → marcar aviso como resolvido
+    if(state.db.avisos){
+      _auds.forEach(function(a){
+        if(a.qtd===0){
+          state.db.avisos.forEach(function(v){
+            if(v.origem==="auditoria_comandante" && v.indicador===a.ind && !v.resolvido){
+              v.resolvido=true; v.resolvidoEm=new Date().toLocaleString("pt-BR"); v.resolvidoAuto=true;
+            }
+          });
+        }
+      });
+      salvarLocal();
+    }
+
     // Resumo geral
     var _nVerm = _auds.filter(function(a){return a.cor==="#ef4444";}).length;
     var _nAmar = _auds.filter(function(a){return a.cor==="#f59e0b";}).length;
