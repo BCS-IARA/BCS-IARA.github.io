@@ -8906,8 +8906,8 @@ function gerarCardCurso(id){
     +"&token="+encodeURIComponent(BCS_TOKEN)
     +"&cor="+encodeURIComponent(tcor);
   var linkInsc=linkBase+params;
-  var qrA5="https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=ffffff&bgcolor=130d24&data="+encodeURIComponent(linkInsc);
-  var qrSq="https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=ffffff&bgcolor=130d24&data="+encodeURIComponent(linkInsc);
+  var qrA5="https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=3D2B1A&bgcolor=F2E4C8&data="+encodeURIComponent(linkInsc);
+  var qrSq="https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=3D2B1A&bgcolor=F2E4C8&data="+encodeURIComponent(linkInsc);
   var dtFmt=c.dataInicio?new Date(c.dataInicio+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"}):"";
 
   var h="<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Card — "+esc(c.nome)+"</title>"
@@ -9627,6 +9627,7 @@ function _renderAcoesPatrulha(main){
     if(!state.acoesPatrulha) state.acoesPatrulha=[];
     state.acoesPatrulha.push(acao);
     salvarLocal();
+    _sheetsGet({acao:"salvarAcaoPatrulha",dados:JSON.stringify(acao)}).catch(function(){});
     showToast("✓ Ação salva!");
     renderProjetosSociais(document.getElementById("main"));
   };
@@ -21862,7 +21863,7 @@ function renderInventario(main){
           } else if(item.tipo_carga==="secao"){
             var _secNome=esc(item.carga_secao_nome||item.localizacao||"—");
             var _secResp=esc(item.carga_responsavel_nome||"");
-            h+="<span style='background:#8b5cf622;color:#a78bfa;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>🏛️ Carga seção: "+_secNome+(_secResp?" · "+_secResp:"")+"</span>";
+            h+="<span style='background:#D9A53C22;color:#8a6a30;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>🏛️ Carga seção: "+_secNome+(_secResp?" · "+_secResp:"")+"</span>";
           } else {
             h+="<span style='background:#33333322;color:#888;padding:1px 8px;border-radius:5px;font-size:10px'>📦 Em estoque</span>";
           }
