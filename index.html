@@ -20950,7 +20950,7 @@ function _invAbrirMovimentacao(itemId){
   html+="<p style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>🗝️ Quem Autoriza a Movimentação</p>";
   html+="<div style='display:grid;grid-template-columns:90px 1fr 120px;gap:8px;margin-bottom:8px'>";
   html+="<div><label style='color:#6B5236;font-size:10px'>Graduação</label><input id='mov-aut-grad' placeholder='Sgt...' style='"+IS+"'></div>";
-  html+="<div><label style='color:#6B5236;font-size:10px'>Nome *</label><input id='mov-aut-nome' placeholder='Nome completo' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Nome *</label><input id='mov-aut-nome' list='dl-pols-mov' placeholder='Nome completo' oninput='_invMovAutoFill(\"aut\",this.value)' style='"+IS+"'></div>";
   html+="<div><label style='color:#6B5236;font-size:10px'>Matrícula</label><input id='mov-aut-mat' placeholder='Nº' style='"+IS+"'></div>";
   html+="</div>";
   html+="<label style='color:#6B5236;font-size:10px'>Assinatura de quem autoriza</label>";
@@ -20963,8 +20963,9 @@ function _invAbrirMovimentacao(itemId){
   html+="<div id='mov-rec-row' style='background:#EAD9B8;border:1px solid #5e4636;border-radius:8px;padding:12px'>";
   html+="<p id='mov-rec-label' style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>👮 Quem Recebe/ Responsável pelo Local</p>";
   html+="<div style='display:grid;grid-template-columns:90px 1fr 120px;gap:8px;margin-bottom:8px'>";
+  html+="<datalist id='dl-pols-mov'>"+(_polAtivos||[]).map(function(p){return "<option value='"+esc(p.nome)+"'>";}).join("")+"</datalist>";
   html+="<div><label style='color:#6B5236;font-size:10px'>Graduação</label><input id='mov-rec-grad' placeholder='Sd...' style='"+IS+"'></div>";
-  html+="<div><label style='color:#6B5236;font-size:10px'>Nome *</label><input id='mov-rec-nome' placeholder='Nome completo' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:10px'>Nome *</label><input id='mov-rec-nome' list='dl-pols-mov' placeholder='Nome completo' oninput='_invMovAutoFill(\"rec\",this.value)' style='"+IS+"'></div>";
   html+="<div><label style='color:#6B5236;font-size:10px'>Matrícula</label><input id='mov-rec-mat' placeholder='Nº' style='"+IS+"'></div>";
   html+="</div>";
   html+="<label style='color:#6B5236;font-size:10px'>Assinatura de quem recebe</label>";
@@ -21067,6 +21068,70 @@ function _invConfirmarMovimentacao(itemId, origem){
   showToast("✓ Movimentação registrada! "+esc(origem)+" → "+esc(dest));
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
+}
+
+function _invMovAutoFill(campo, nome){
+  var pol=(state.policiais||[]).find(function(p){return p.nome===nome&&(p.status||"ativo")==="ativo";});
+  if(!pol) return;
+  var gradEl=document.getElementById("mov-"+campo+"-grad");
+  var matEl=document.getElementById("mov-"+campo+"-mat");
+  if(gradEl&&!gradEl.value) gradEl.value=pol.posto||"";
+  if(matEl&&!matEl.value) matEl.value=pol.matricula||"";
+}
+
+function _invPDFMovimentacao(tipo, filtroId){
+  // tipo: "item" | "policial" | "todos"
+  var movs=(state.invMovimentacoes||[]).slice().sort(function(a,b){return(b.dataHora||"")>(a.dataHora||"")?1:-1;});
+  var titulo="Relatório de Movimentações";
+  if(tipo==="item"){
+    var item=(state.invItens||[]).find(function(x){return x.id===filtroId;});
+    movs=movs.filter(function(m){return m.itemId===filtroId;});
+    titulo="Movimentações — "+(item?item.descricao:filtroId);
+  } else if(tipo==="policial"){
+    movs=movs.filter(function(m){
+      return (m.autorizador_nome||m.responsavel||"").toLowerCase().includes(filtroId.toLowerCase())||
+             (m.receptor_nome||"").toLowerCase().includes(filtroId.toLowerCase());
+    });
+    titulo="Movimentações — Policial: "+filtroId;
+  }
+  var dt=new Date().toLocaleString("pt-BR");
+  var h="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>"+titulo+"</title><style>";
+  h+="body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:0;padding:20px}";
+  h+="h1{font-size:15px;margin-bottom:4px}h2{font-size:12px;margin:10px 0 4px}";
+  h+="table{width:100%;border-collapse:collapse;margin-top:8px}";
+  h+="th{background:#DBC79E;padding:5px 8px;text-align:left;font-size:10px;border:1px solid #A87B22;color:#3D2B1A}";
+  h+="td{padding:5px 8px;border:1px solid #ddd;font-size:10px;vertical-align:top}";
+  h+="@media print{body{padding:10px}}";
+  h+="</style></head><body>";
+  h+="<div style='background:#2a1c10;padding:12px 18px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:10px'>";
+  h+="<img src='"+BCS_LOGO_B64+"' style='width:48px;height:48px;border-radius:50%;object-fit:cover;flex-shrink:0'>";
+  h+="<div><div style='color:#D9A53C;font-size:15px;font-weight:700'>"+titulo+"</div>";
+  h+="<div style='color:#a07c58;font-size:10px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
+  h+="<div style='margin-left:auto;text-align:right;color:#a07c58;font-size:10px'>Emitido em "+dt+"</div></div>";
+  h+="<p style='font-size:11px;color:#555;margin-bottom:10px'>"+movs.length+" registro(s) encontrado(s)</p>";
+  if(!movs.length){
+    h+="<p style='color:#888;text-align:center;padding:30px'>Nenhuma movimentação no período.</p>";
+  } else {
+    h+="<table><tr><th>Data/Hora</th><th>Item</th><th>Tipo</th><th>Origem → Destino</th><th>Autorizador</th><th>Receptor</th><th>Motivo</th></tr>";
+    movs.forEach(function(m){
+      var itemNome=(state.invItens||[]).find(function(x){return x.id===m.itemId;});
+      var tipoLabel={individual:"Individual",secao:"Seção",estoque:"Devolução"}[m.tipo_mov]||"—";
+      var dtMov=m.dataHora?new Date(m.dataHora).toLocaleString("pt-BR"):"—";
+      h+="<tr>";
+      h+="<td>"+dtMov+"</td>";
+      h+="<td>"+(itemNome?esc(itemNome.descricao):esc(m.itemId||"—"))+"</td>";
+      h+="<td>"+tipoLabel+"</td>";
+      h+="<td>"+esc(m.origem||"—")+" → "+esc(m.destino||"—")+"</td>";
+      h+="<td>"+(m.autorizador_grad?m.autorizador_grad+" ":"")+esc(m.autorizador_nome||m.responsavel||"—")+"</td>";
+      h+="<td>"+(m.receptor_grad?m.receptor_grad+" ":"")+esc(m.receptor_nome||"—")+"</td>";
+      h+="<td>"+esc(m.motivo||"—")+"</td>";
+      h+="</tr>";
+    });
+    h+="</table>";
+  }
+  h+="</body></html>";
+  var w=window.open("","_blank");
+  if(w){w.document.write(h);w.document.close();setTimeout(function(){w.print();},400);}
 }
 
 function _invMovTipoChange(tipo){
@@ -22659,6 +22724,290 @@ function _invGerarPDFConferencia(confId){
   var w=window.open("","_blank");
   if(w){ w.document.write(h); w.document.close(); setTimeout(function(){w.print();},400); }
 }
+// ── Parecer Oficial da Comissão de Inventário ───────────────
+function _invAbrirParecerModal(confId){
+  var conf=(state.invConferencias||[]).find(function(x){return x.id===confId;});
+  if(!conf){ showToast("Conferência não encontrada","error"); return; }
+  var cm=conf.comissao||{};
+  var IS="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid #DBC79E;border-radius:6px;background:#EAD9B8;color:#3D2B1A;font-size:12px;margin-top:3px";
+  var polOpts=(state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";})
+    .map(function(p){return "<option value='"+esc(p.matricula)+"' data-nome='"+esc(p.nome)+"' data-posto='"+esc(p.posto||"")+"'>"+esc(p.posto?p.posto+" ":"")+""+esc(p.nome)+" ("+esc(p.matricula)+")</option>";}).join("");
+  var mbs=cm.membros||[{},{},{}];
+  var h="<div id='modal-parecer-comissao' onclick='if(event.target===this)this.remove()' style='position:fixed;inset:0;background:#0009;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px'>";
+  h+="<div style='background:#F2E4C8;border:2px solid #5e4636;border-radius:14px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;padding:20px'>";
+  h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px'>";
+  h+="<span style='color:#2a1c10;font-size:16px;font-weight:700'>📋 Parecer da Comissão de Inventário</span>";
+  h+="<button onclick='document.getElementById(\"modal-parecer-comissao\").remove()' style='background:none;border:none;font-size:18px;color:#6B5236;cursor:pointer'>✕</button>";
+  h+="</div>";
+  // Identificação do exercício
+  h+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;margin-bottom:12px'>";
+  h+="<div style='color:#C8A84B;font-size:11px;font-weight:700;margin-bottom:8px'>IDENTIFICAÇÃO DO INVENTÁRIO</div>";
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Exercício (Ano)</label><input id='pc-exercicio' value='"+esc(cm.exercicio||new Date().getFullYear())+"' style='"+IS+"'></div>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Nº do Relatório</label><input id='pc-numero' value='"+esc(cm.numero||"")+"' placeholder='Ex.: 001/2025' style='"+IS+"'></div>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Tipo</label><select id='pc-tipo' style='"+IS+"'>";
+  ["Rotativo","Anual","Extraordinário"].forEach(function(t){h+="<option"+(cm.tipo===t?" selected":"")+">"+t+"</option>";});
+  h+="</select></div>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Código de Gestora</label><input id='pc-gestora' value='"+esc(cm.codigo_gestora||"")+"' placeholder='Ex.: 0012345' style='"+IS+"'></div>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Área</label><input id='pc-area' value='"+esc(cm.area||"Bens Permanentes")+"' style='"+IS+"'></div>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Objeto</label><input id='pc-objeto' value='"+esc(cm.objeto||"Inventário Patrimonial")+"' style='"+IS+"'></div>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Gestor da OPM</label><input id='pc-gestor-opm' value='"+esc(cm.gestor_opm||"")+"' placeholder='Nome do Comandante' style='"+IS+"'></div>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Chefe da SSO</label><input id='pc-chefe-sso' value='"+esc(cm.chefe_sso||"")+"' placeholder='Nome' style='"+IS+"'></div>";
+  h+="<div style='grid-column:1/-1'><label style='color:#6B5236;font-size:10px'>Responsável pelo Almoxarifado</label><input id='pc-alm' value='"+esc(cm.resp_almoxarifado||"")+"' placeholder='Nome' style='"+IS+"'></div>";
+  h+="</div></div>";
+  // Portaria de nomeação
+  h+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;margin-bottom:12px'>";
+  h+="<div style='color:#C8A84B;font-size:11px;font-weight:700;margin-bottom:8px'>PORTARIA DE NOMEAÇÃO DA COMISSÃO</div>";
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Nº da Portaria</label><input id='pc-port-num' value='"+esc(cm.portaria_num||"")+"' placeholder='Ex.: 123/2025' style='"+IS+"'></div>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>BIO (edição)</label><input id='pc-port-bio' value='"+esc(cm.portaria_bio||"")+"' placeholder='Ex.: 003 de 15/01/2025' style='"+IS+"'></div>";
+  h+="</div></div>";
+  // Presidente
+  h+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;margin-bottom:12px'>";
+  h+="<div style='color:#C8A84B;font-size:11px;font-weight:700;margin-bottom:8px'>PRESIDENTE DA COMISSÃO</div>";
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px'>";
+  h+="<div><label style='color:#6B5236;font-size:10px'>Posto/Grad.</label><input id='pc-pres-posto' value='"+esc((cm.presidente||{}).posto||"")+"' list='dl-pols-pare' style='"+IS+"' oninput='_parecerAutoFill(\"pres\",this.value)'></div>";
+  h+="<div style='grid-column:span 2'><label style='color:#6B5236;font-size:10px'>Nome</label><input id='pc-pres-nome' value='"+esc((cm.presidente||{}).nome||"")+"' list='dl-pols-pare' style='"+IS+"' oninput='_parecerAutoFill(\"pres\",this.value)'></div>";
+  h+="<div style='grid-column:1/-1'><label style='color:#6B5236;font-size:10px'>Matrícula</label><input id='pc-pres-mat' value='"+esc((cm.presidente||{}).matricula||"")+"' style='"+IS+"'></div>";
+  h+="</div></div>";
+  // Membros
+  h+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;margin-bottom:12px'>";
+  h+="<div style='color:#C8A84B;font-size:11px;font-weight:700;margin-bottom:8px'>MEMBROS DA COMISSÃO</div>";
+  h+="<datalist id='dl-pols-pare'>"+((state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";}).map(function(p){return "<option value='"+esc(p.nome)+"'>";})).join("")+"</datalist>";
+  [0,1,2].forEach(function(idx){
+    var mb=mbs[idx]||{};
+    h+="<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #DBC79E'>";
+    h+="<div><label style='color:#6B5236;font-size:10px'>Posto/Grad.</label><input id='pc-mb"+idx+"-posto' value='"+esc(mb.posto||"")+"' style='"+IS+"' oninput='_parecerAutoFillMb("+idx+",this.value)'></div>";
+    h+="<div style='grid-column:span 2'><label style='color:#6B5236;font-size:10px'>Nome</label><input id='pc-mb"+idx+"-nome' value='"+esc(mb.nome||"")+"' list='dl-pols-pare' style='"+IS+"' oninput='_parecerAutoFillMb("+idx+",this.value)'></div>";
+    h+="<div style='grid-column:1/-1'><label style='color:#6B5236;font-size:10px'>Matrícula</label><input id='pc-mb"+idx+"-mat' value='"+esc(mb.matricula||"")+"' style='"+IS+"'></div>";
+    h+="</div>";
+  });
+  h+="</div>";
+  // Categorias normativas a-j
+  var catDefs=[
+    {k:"a",label:"Sem tombamento"},
+    {k:"b",label:"Plaqueta extraviada"},
+    {k:"c",label:"Não localizado / extraviado"},
+    {k:"d",label:"Obsoleto para desativação"},
+    {k:"e",label:"Descrição incorreta"},
+    {k:"f",label:"Recebido de outro órgão (carente de transferência)"},
+    {k:"g",label:"Cedido a outro órgão"},
+    {k:"h",label:"De terceiro (empréstimo/cessão)"},
+    {k:"i",label:"Oriundo de convênio"},
+    {k:"j",label:"Inservível vinculado a convênio"}
+  ];
+  h+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;margin-bottom:12px'>";
+  h+="<div style='color:#C8A84B;font-size:11px;font-weight:700;margin-bottom:8px'>CATEGORIAS NORMATIVAS (Bens Permanentes)</div>";
+  var cats=cm.categorias||{};
+  catDefs.forEach(function(cat){
+    h+="<div style='margin-bottom:8px'>";
+    h+="<label style='color:#6B5236;font-size:10px'>"+cat.k+") "+cat.label+" <span style='color:#888'>(qtd)</span></label>";
+    h+="<div style='display:grid;grid-template-columns:80px 1fr;gap:6px;margin-top:3px'>";
+    var cv=cats[cat.k]||{};
+    h+="<input id='pc-cat-"+cat.k+"-qtd' type='number' min='0' value='"+(cv.qtd||0)+"' style='"+IS+"'>";
+    h+="<input id='pc-cat-"+cat.k+"-obs' value='"+esc(cv.obs||"")+"' placeholder='Sem alterações' style='"+IS+"'>";
+    h+="</div></div>";
+  });
+  h+="<div style='margin-top:8px'><label style='color:#6B5236;font-size:10px'>Outras dignas de registro</label><textarea id='pc-cat-outras' rows='2' style='"+IS+"resize:vertical'>"+esc(cats.outras||"")+"</textarea></div>";
+  h+="</div>";
+  // Conclusão
+  h+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;margin-bottom:16px'>";
+  h+="<div style='color:#C8A84B;font-size:11px;font-weight:700;margin-bottom:8px'>TEXTO DE CONCLUSÃO</div>";
+  h+="<textarea id='pc-conclusao' rows='4' style='"+IS+"resize:vertical'>"+esc(cm.conclusao||"Não foram encontradas não-conformidades graves no inventário desta OPM. As divergências identificadas foram devidamente registradas e encaminhadas ao DAL via SEI para as devidas providências.")+"</textarea>";
+  h+="</div>";
+  // Botões
+  h+="<div style='display:flex;gap:8px;justify-content:flex-end'>";
+  h+="<button onclick='document.getElementById(\"modal-parecer-comissao\").remove()' style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 20px;border-radius:8px;font-size:13px;cursor:pointer'>Cancelar</button>";
+  h+="<button onclick='_invSalvarGerarParecer(\""+confId+"\")' style='background:#2a1c10;border:1px solid #C8A84B;color:#C8A84B;padding:8px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer'>📋 Gerar Parecer PDF</button>";
+  h+="</div>";
+  h+="</div></div>";
+  document.body.insertAdjacentHTML("beforeend",h);
+}
+
+function _parecerAutoFill(prefix,nome){
+  var pol=(state.policiais||[]).find(function(p){return p.nome===nome&&(p.status||"ativo")==="ativo";});
+  if(!pol) return;
+  var postoEl=document.getElementById("pc-"+prefix+"-posto");
+  var matEl=document.getElementById("pc-"+prefix+"-mat");
+  if(postoEl&&!postoEl.value) postoEl.value=pol.posto||"";
+  if(matEl&&!matEl.value) matEl.value=pol.matricula||"";
+}
+function _parecerAutoFillMb(idx,nome){
+  var pol=(state.policiais||[]).find(function(p){return p.nome===nome&&(p.status||"ativo")==="ativo";});
+  if(!pol) return;
+  var postoEl=document.getElementById("pc-mb"+idx+"-posto");
+  var matEl=document.getElementById("pc-mb"+idx+"-mat");
+  if(postoEl&&!postoEl.value) postoEl.value=pol.posto||"";
+  if(matEl&&!matEl.value) matEl.value=pol.matricula||"";
+}
+
+function _invSalvarGerarParecer(confId){
+  var g=function(id){var el=document.getElementById(id);return el?el.value.trim():"";};
+  var catDefs=["a","b","c","d","e","f","g","h","i","j"];
+  var cats={};
+  catDefs.forEach(function(k){
+    cats[k]={qtd:parseInt(g("pc-cat-"+k+"-qtd"))||0, obs:g("pc-cat-"+k+"-obs")};
+  });
+  cats.outras=g("pc-cat-outras");
+  var membros=[0,1,2].map(function(i){
+    return {posto:g("pc-mb"+i+"-posto"),nome:g("pc-mb"+i+"-nome"),matricula:g("pc-mb"+i+"-mat")};
+  }).filter(function(m){return m.nome||m.matricula;});
+  var cm={
+    exercicio:g("pc-exercicio"),numero:g("pc-numero"),tipo:g("pc-tipo"),
+    codigo_gestora:g("pc-gestora"),area:g("pc-area"),objeto:g("pc-objeto"),
+    gestor_opm:g("pc-gestor-opm"),chefe_sso:g("pc-chefe-sso"),resp_almoxarifado:g("pc-alm"),
+    portaria_num:g("pc-port-num"),portaria_bio:g("pc-port-bio"),
+    presidente:{posto:g("pc-pres-posto"),nome:g("pc-pres-nome"),matricula:g("pc-pres-mat")},
+    membros:membros,categorias:cats,conclusao:g("pc-conclusao")
+  };
+  var conf=(state.invConferencias||[]).find(function(x){return x.id===confId;});
+  if(conf){ conf.comissao=cm; salvarLocal(); }
+  document.getElementById("modal-parecer-comissao").remove();
+  _invGerarParecerComissao(confId);
+}
+
+function _invGerarParecerComissao(confId){
+  var conf=(state.invConferencias||[]).find(function(x){return x.id===confId;});
+  if(!conf){ showToast("Conferência não encontrada","error"); return; }
+  var cm=conf.comissao||{};
+  var itens=(state.invItens||[]).filter(function(x){return x.ativo!==false;});
+  var vals=Object.values(conf.itens||{});
+  var nOk=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok";}).length;
+  var nDiv=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="divergencia";}).length;
+  var nAus=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ausente";}).length;
+  var dtEmissao=new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+  var dtConc=conf.concluidaEm?new Date(conf.concluidaEm).toLocaleDateString("pt-BR"):"—";
+  var exercicio=cm.exercicio||new Date().getFullYear();
+  var num=cm.numero||"___/"+exercicio;
+  var catDefs=[
+    {k:"a",label:"Bens sem tombamento"},
+    {k:"b",label:"Bens com plaqueta extraviada"},
+    {k:"c",label:"Bens não localizados / extraviados"},
+    {k:"d",label:"Bens obsoletos para desativação"},
+    {k:"e",label:"Bens com descrição incorreta"},
+    {k:"f",label:"Bens recebidos de outro órgão (carente de transferência)"},
+    {k:"g",label:"Bens cedidos a outro órgão"},
+    {k:"h",label:"Bens de terceiro (empréstimo/cessão)"},
+    {k:"i",label:"Bens oriundos de convênio"},
+    {k:"j",label:"Bens inservíveis vinculados a convênio"}
+  ];
+  var cats=cm.categorias||{};
+  var pres=cm.presidente||{};
+  var membros=cm.membros||[];
+  var h="<!DOCTYPE html><html><head><meta charset='UTF-8'>";
+  h+="<title>Parecer da Comissão — Inventário "+num+"</title><style>";
+  h+="body{font-family:'Times New Roman',serif;font-size:12px;color:#111;margin:0;padding:30px 40px;line-height:1.6}";
+  h+=".cabecalho{text-align:center;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:18px}";
+  h+=".cabecalho .chain{font-size:10px;color:#444;margin-bottom:4px}";
+  h+=".cabecalho h1{font-size:14px;font-weight:700;margin:6px 0 2px}";
+  h+=".cabecalho h2{font-size:12px;font-weight:400;margin:0}";
+  h+=".bloco-id{border:1px solid #ccc;border-radius:4px;padding:10px 14px;margin-bottom:16px}";
+  h+=".bloco-id table{width:100%;border-collapse:collapse}";
+  h+=".bloco-id td{padding:3px 8px;font-size:11px;border-bottom:1px solid #eee}";
+  h+=".bloco-id td:first-child{font-weight:700;width:40%;color:#333}";
+  h+="h3{font-size:12px;font-weight:700;margin:16px 0 6px;border-bottom:1px solid #ddd;padding-bottom:4px}";
+  h+="h4{font-size:12px;font-weight:700;margin:12px 0 4px}";
+  h+="table.norm{width:100%;border-collapse:collapse;margin:10px 0}";
+  h+="table.norm th{background:#f0f0f0;padding:5px 8px;text-align:left;font-size:11px;border:1px solid #ccc;font-weight:700}";
+  h+="table.norm td{padding:4px 8px;border:1px solid #ddd;font-size:11px;vertical-align:top}";
+  h+=".sig-block{display:inline-block;text-align:center;min-width:200px;margin:10px 20px}";
+  h+=".sig-line{border-top:1px solid #333;padding-top:4px;font-size:11px}";
+  h+="@media print{body{padding:15px 20px}}";
+  h+="</style></head><body>";
+  // Cabeçalho
+  h+="<div class='cabecalho'>";
+  h+="<div class='chain'>POLÍCIA MILITAR DO ESTADO DA BAHIA — COMANDO DE OPERAÇÕES</div>";
+  h+="<div class='chain'>COPPM / CPRC-Central / 77ª CIPM — Base Comunitária de Segurança Nova Cidade</div>";
+  h+="<h1>RELATÓRIO ANALÍTICO DE INVENTÁRIO Nº "+esc(num)+"</h1>";
+  h+="<h2>PARECER DA COMISSÃO</h2>";
+  h+="</div>";
+  // Bloco identificação
+  h+="<div class='bloco-id'><table>";
+  var idRows=[
+    ["Data de Conclusão", dtConc],
+    ["Tipo de Inventário", esc(cm.tipo||"Rotativo")],
+    ["Sigla da OPM", "77ª CIPM"],
+    ["Código de Gestora", esc(cm.codigo_gestora||"—")],
+    ["Área", esc(cm.area||"Bens Permanentes")],
+    ["Objeto", esc(cm.objeto||"Inventário Patrimonial")],
+    ["Exercício", esc(exercicio)],
+    ["Gestor da OPM", esc(cm.gestor_opm||"—")],
+    ["Chefe da SSO", esc(cm.chefe_sso||"—")],
+    ["Responsável pelo Almoxarifado", esc(cm.resp_almoxarifado||"—")]
+  ];
+  idRows.forEach(function(r){h+="<tr><td>"+r[0]+"</td><td>"+r[1]+"</td></tr>";});
+  h+="</table></div>";
+  // 1. Considerações iniciais
+  h+="<h3>1. CONSIDERAÇÕES INICIAIS</h3>";
+  h+="<p>A Comissão de Inventário, nomeada pela Portaria nº "+esc(cm.portaria_num||"_____")+", publicada no BIO nº "+esc(cm.portaria_bio||"_____")+", composta pelo Presidente ";
+  if(pres.nome) h+=(pres.posto?pres.posto+" ":"")+esc(pres.nome)+(pres.matricula?" (Mat. "+esc(pres.matricula)+")":"")+", ";
+  if(membros.length) h+="e pelos Membros: "+membros.map(function(m){return (m.posto?m.posto+" ":"")+esc(m.nome||"—")+(m.matricula?" (Mat. "+esc(m.matricula)+")":"");}).join("; ")+",";
+  h+=" realizou os trabalhos de inventário patrimonial da 77ª CIPM, com o objetivo de apurar a existência, localização e estado de conservação dos bens permanentes desta OPM, em conformidade com as rotinas DAL-DAF de referência.</p>";
+  // 2. Desenvolvimento — 2.1 Bens Permanentes
+  h+="<h3>2. DESENVOLVIMENTO</h3>";
+  h+="<h4>2.1 Bens Permanentes</h4>";
+  catDefs.forEach(function(cat,idx){
+    var cv=cats[cat.k]||{qtd:0,obs:""};
+    var letra=String.fromCharCode(97+idx);
+    h+="<p><b>"+letra+") "+cat.label+":</b> "+(cv.obs&&cv.obs.trim()?esc(cv.obs.trim()):"Sem alterações.")+(cv.qtd?" Quantidade: <b>"+cv.qtd+"</b>.":"")+"</p>";
+  });
+  if(cats.outras&&cats.outras.trim()){
+    h+="<p><b>Outras dignas de registro:</b> "+esc(cats.outras)+"</p>";
+  }
+  // 2.2 Tabela de quantificação
+  h+="<h4>2.2 Tabela de Quantificação — Bens Permanentes</h4>";
+  h+="<table class='norm'><tr><th>Categoria</th><th>Descrição</th><th>Quantidade</th></tr>";
+  var totalCat=0;
+  catDefs.forEach(function(cat,idx){
+    var cv=cats[cat.k]||{qtd:0};
+    totalCat+=cv.qtd||0;
+    h+="<tr><td>"+String.fromCharCode(97+idx)+")</td><td>"+cat.label+"</td><td style='text-align:center'>"+(cv.qtd||0)+"</td></tr>";
+  });
+  h+="<tr><td>—</td><td>Outras</td><td style='text-align:center'>—</td></tr>";
+  h+="<tr style='font-weight:700;background:#f9f9f9'><td colspan='2'>TOTAL DE NÃO CONFORMIDADES</td><td style='text-align:center'>"+totalCat+"</td></tr>";
+  h+="</table>";
+  // 2.3 Resultado da conferência digital
+  h+="<h4>2.3 Resultado da Conferência Patrimonial</h4>";
+  h+="<table class='norm'><tr><th>Situação</th><th>Quantidade</th></tr>";
+  h+="<tr><td>Localizado e Conforme (OK)</td><td style='text-align:center'>"+nOk+"</td></tr>";
+  h+="<tr><td>Com Divergência</td><td style='text-align:center'>"+nDiv+"</td></tr>";
+  h+="<tr><td>Não Localizado / Ausente</td><td style='text-align:center'>"+nAus+"</td></tr>";
+  h+="<tr style='font-weight:700;background:#f9f9f9'><td>TOTAL CONFERIDO</td><td style='text-align:center'>"+(nOk+nDiv+nAus)+" / "+itens.length+"</td></tr>";
+  h+="</table>";
+  // 3. Conclusão
+  h+="<h3>3. CONCLUSÃO</h3>";
+  h+="<p>"+esc(cm.conclusao||"Não foram encontradas não-conformidades graves no inventário desta OPM. As divergências identificadas foram devidamente registradas e encaminhadas ao DAL via SEI para as devidas providências.")+"</p>";
+  h+="<p>Salvador — BA, "+dtEmissao+".</p>";
+  // Assinaturas
+  h+="<div style='margin-top:36px;page-break-inside:avoid'>";
+  h+="<p style='font-size:11px;font-weight:700;margin-bottom:16px'>Comissão de Inventário — 77ª CIPM:</p>";
+  h+="<div style='display:flex;flex-wrap:wrap;gap:20px;justify-content:flex-start'>";
+  // Presidente
+  if(pres.nome){
+    h+="<div class='sig-block'>";
+    h+="<div style='height:50px'></div>";
+    h+="<div class='sig-line'>";
+    h+=(pres.posto?pres.posto+" ":"")+esc(pres.nome);
+    if(pres.matricula) h+="<br>Mat. "+esc(pres.matricula);
+    h+="<br><i>Presidente da Comissão</i>";
+    h+="</div></div>";
+  }
+  membros.forEach(function(m){
+    if(!m.nome) return;
+    h+="<div class='sig-block'>";
+    h+="<div style='height:50px'></div>";
+    h+="<div class='sig-line'>";
+    h+=(m.posto?m.posto+" ":"")+esc(m.nome);
+    if(m.matricula) h+="<br>Mat. "+esc(m.matricula);
+    h+="<br><i>Membro</i>";
+    h+="</div></div>";
+  });
+  h+="</div></div>";
+  h+="</body></html>";
+  var w=window.open("","_blank");
+  if(w){ w.document.write(h); w.document.close(); setTimeout(function(){w.print();},500); }
+}
+
 // ============================================================
 // FIM MÓDULO INVENTÁRIO
 // ============================================================
