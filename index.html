@@ -13099,7 +13099,7 @@ function renderTriagem(main) {
     h += "<div style='display:flex;gap:10px;flex-wrap:wrap'>";
     h += "<button onclick='_salvarTriagem(\""+esc(o.id)+"\")' style='flex:1;min-width:160px;background:var(--ambar);color:var(--madeira-3);border:none;border-radius:7px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Georgia,serif'>✓ Concluir Triagem</button>";
     h += "<button onclick='_triarOc(\""+esc(o.id)+"\",\"em_acompanhamento\")' style='background:var(--verde);color:#fff;border:none;border-radius:7px;padding:12px 18px;font-size:13px;font-weight:700;cursor:pointer' title='Marca como em acompanhamento sem preencher o formulário'>Realizar agora</button>";
-    h += "<button onclick='state.popEditarOc=\""+esc(o.id)+"\";setTela(\"ocorrencias\")' style='background:var(--papel-2);border:1.5px solid var(--ambar-2);color:var(--ambar-2);border-radius:7px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer' title='Abre o formulário completo de edição da ocorrência'>Editar ocorrência</button>";
+    h += "<button onclick='state._triagemRetornoId=\""+esc(o.id)+"\";state.popEditarOc=\""+esc(o.id)+"\";setTela(\"ocorrencias\")' style='background:var(--papel-2);border:1.5px solid var(--ambar-2);color:var(--ambar-2);border-radius:7px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer' title='Abre o formulário completo de edição da ocorrência'>Editar ocorrência</button>";
     h += "<button onclick='_triarOc(\""+esc(o.id)+"\",\"historico\")' style='background:var(--papel-2);border:1.5px solid var(--papel-3);color:var(--tinta-2);border-radius:7px;padding:12px 16px;font-size:13px;font-weight:700;cursor:pointer'>Histórico</button>";
     h += "</div>";
   }
@@ -13124,7 +13124,7 @@ window._triToggleVD = function() {
   var extra = document.getElementById("tri-vd-extra");
   if(!cb) return;
   if(cb.checked){
-    bloco.style.borderColor="var(--verm)"; bloco.style.background="#F5E8E4";
+    bloco.style.borderColor="var(--verm)"; bloco.style.background="rgba(168,74,46,0.07)";
     extra.style.display="block";
   } else {
     bloco.style.borderColor="var(--papel-3)"; bloco.style.background="var(--papel-2)";
@@ -13138,8 +13138,8 @@ window._triToggle = function(trilho) {
   var extra = document.getElementById("tri-"+trilho+"-extra");
   if(!cb||!bloco||!extra) return;
   if(cb.checked){
-    var cor = trilho==="menor"?"var(--ambar)":trilho==="enc"?"var(--verde)":"var(--verde)";
-    var bg  = trilho==="menor"?"var(--ambar-claro)":"var(--papel)";
+    var cor = trilho==="menor"?"var(--ambar)":trilho==="enc"?"var(--ambar-2)":"var(--verde)";
+    var bg  = trilho==="menor"?"var(--ambar-claro)":trilho==="enc"?"rgba(217,165,60,0.06)":"rgba(110,143,82,0.06)";
     bloco.style.borderColor=cor; bloco.style.background=bg;
     extra.style.display="block";
   } else {
@@ -13230,6 +13230,9 @@ window._salvarTriagem = function(ocId) {
       };
       state.db.agendamentos.push(ag);
       enviarSheets("agendamentos", ag);
+      oc.requer_visita = true;
+    } else {
+      showToast("Informe a data da visita","error"); return;
     }
   }
 
@@ -18858,6 +18861,17 @@ function gerarJanelaPDF(oc){
   setTimeout(function(){w.print();},800);
 }
 
+function _fecharEditorOc(el){
+  state.popEditarOc = null;
+  if(state._triagemRetornoId){
+    var _rid = state._triagemRetornoId;
+    state._triagemRetornoId = null;
+    state._triagemOcId = _rid;
+    setTela('triagem');
+  } else {
+    renderOcorrenciasGestor(el);
+  }
+}
 function renderOcorrenciasGestor(el, perfil_atual){
   var isOperador = (perfil_atual || state.perfil) === "operador";
   state._ocPerfil = perfil_atual || state.perfil; // guardar pra chamadas recursivas
@@ -18974,7 +18988,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
       mh.push("<button id='btn-salvar-editar' style='background:linear-gradient(135deg,#0c2d5c,#1a4d9a);border:1px solid #4a9fd4;color:#c5daf5;padding:11px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>💾 Salvar Alterações</button>");
       mh.push("</div></div>");
       modal.innerHTML = mh.join("");
-      modal.onclick = function(e){ if(e.target===this){ state.popEditarOc=null; renderOcorrenciasGestor(el); } };
+      modal.onclick = function(e){ if(e.target===this){ _fecharEditorOc(el); } };
       document.body.appendChild(modal);
 
       // ── Funções dinâmicas do modal edição ──
@@ -19030,8 +19044,8 @@ function renderOcorrenciasGestor(el, perfil_atual){
       window._edRemAutor=function(i){ if(_edAutores.length>1){ _edAutores.splice(i,1); _edRenderAutores(); } };
       _edRenderAutores();
 
-      document.getElementById("btn-fechar-editar").onclick = function(){ state.popEditarOc=null; renderOcorrenciasGestor(el); };
-      document.getElementById("btn-cancelar-editar").onclick = function(){ state.popEditarOc=null; renderOcorrenciasGestor(el); };
+      document.getElementById("btn-fechar-editar").onclick = function(){ _fecharEditorOc(el); };
+      document.getElementById("btn-cancelar-editar").onclick = function(){ _fecharEditorOc(el); };
       document.getElementById("btn-salvar-editar").onclick = function(){
         // Re-busca no array ATUAL (pode ter sido substituído pelo sync do Sheets)
         var ocRef=(state.db.ocorrencias||[]).find(function(o){return o.id===ocId;})||
@@ -19115,9 +19129,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
               if(ocAtual) ocAtual._editadoLocal = false;
               salvarLocal();
               showToast("✓ Ocorrência atualizada!");
-              state.popEditarOc = null;
-              var elMain=document.getElementById("main-content")||el;
-              renderOcorrenciasGestor(elMain);
+              _fecharEditorOc(document.getElementById("main-content")||el);
             })
             .catch(function(){
               showToast("⚠ Falha na sincronização", "error");
@@ -19126,9 +19138,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
             });
         } else {
           showToast("✓ Ocorrência atualizada!");
-          state.popEditarOc = null;
-          var elMain=document.getElementById("main-content")||el;
-          renderOcorrenciasGestor(elMain);
+          _fecharEditorOc(document.getElementById("main-content")||el);
         }
       };
     }
