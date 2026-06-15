@@ -1331,6 +1331,9 @@ function _arquivarOcsAntigas() {
   }
   var mod = 0;
   (state.db.ocorrencias || []).forEach(function(oc) {
+    // OCs criadas hoje ou depois nunca são arquivadas automaticamente
+    var criadoISO = oc.criadoEm ? oc.criadoEm.substring(0,10) : null;
+    if(criadoISO && criadoISO >= CORTE) return;
     var iso = _toISO(oc.data);
     // sem data ou data até o corte → arquivar; após o corte → manter na fila
     if(iso && iso > CORTE) return;
