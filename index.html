@@ -14087,7 +14087,7 @@ function renderTela() {
           var municipio=(document.getElementById("oc-municipio")||{value:"Vitória da Conquista"}).value.trim()||"Vitória da Conquista";
           var dataVal=(document.getElementById("oc-data")||{value:hoje()}).value||hoje();
           var horaVal=(document.getElementById("oc-hora")||{value:""}).value||new Date().toTimeString().slice(0,5);
-          var _vdRe=/maria da penha|violência doméstica|violencia domestica|vd/i; var vd=_vdRe.test(dinamica)||_vdRe.test(tipo););
+          var _vdRe=/maria da penha|violência doméstica|violencia domestica|vd/i; var vd=_vdRe.test(dinamica)||_vdRe.test(tipo);
           var _det=_detectarEscolaNaOc(dinamica);
           // Lê diretamente do DOM — sem depender de oninput/arrays
           var _vArr=_lerVitimas();
@@ -19211,7 +19211,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
         ocM.medidas  = "";
         ocM.policiais = document.getElementById("ed-policiais").value.trim();
         ocM.situacao  = (document.getElementById("ed-situacao")||{value:"nova"}).value || "nova";
-        var _vdRe2=/maria da penha|violência doméstica|violencia domestica|vd/i; var vd=_vdRe2.test(narrativa)||_vdRe2.test((document.getElementById("ed-tipo")||{value:""}).value););
+        var _vdRe2=/maria da penha|violência doméstica|violencia domestica|vd/i; var vd=_vdRe2.test(narrativa)||_vdRe2.test((document.getElementById("ed-tipo")||{value:""}).value);
         if(vd){ ocM.violencia_domestica=true; ocM.requer_visita=true; ocM.medida_protetiva=ocM.medida_protetiva||"Sim"; }
         ocM._editadoLocal = true;
         ocM._editadoEm = Date.now();
