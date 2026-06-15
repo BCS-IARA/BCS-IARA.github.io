@@ -20927,6 +20927,14 @@ function _invAbrirMovimentacao(itemId){
   html+="<br><span style='color:#6B5236;font-size:11px'>📍 Origem: <b>"+esc(item.localizacao||"Almoxarifado")+"</b></span>";
   html+="</div>";
 
+  // Tipo de carga
+  html+="<div><label style='color:#D9A53C;font-size:11px;font-weight:700;display:block;margin-bottom:4px'>Tipo de movimentação *</label>";
+  html+="<select id='mov-tipo' style='"+IS+"' onchange='_invMovTipoChange(this.value)'>";
+  html+="<option value='individual'>👤 Carga individual — responsabilidade pessoal</option>";
+  html+="<option value='secao'>🏛️ Carga de seção — chefe da seção responde</option>";
+  html+="<option value='estoque'>📦 Devolução ao almoxarifado</option>";
+  html+="</select></div>";
+
   // Destino + motivo
   html+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
   html+="<div><label style='color:#D9A53C;font-size:11px;font-weight:700;display:block;margin-bottom:4px'>Destino *</label>";
@@ -20952,8 +20960,8 @@ function _invAbrirMovimentacao(itemId){
   html+="</div></div>";
 
   // Quem recebe / responsável pelo local
-  html+="<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:8px;padding:12px'>";
-  html+="<p style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>👮 Quem Recebe / Responsável pelo Local</p>";
+  html+="<div id='mov-rec-row' style='background:#EAD9B8;border:1px solid #5e4636;border-radius:8px;padding:12px'>";
+  html+="<p id='mov-rec-label' style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>👮 Quem Recebe/ Responsável pelo Local</p>";
   html+="<div style='display:grid;grid-template-columns:90px 1fr 120px;gap:8px;margin-bottom:8px'>";
   html+="<div><label style='color:#6B5236;font-size:10px'>Graduação</label><input id='mov-rec-grad' placeholder='Sd...' style='"+IS+"'></div>";
   html+="<div><label style='color:#6B5236;font-size:10px'>Nome *</label><input id='mov-rec-nome' placeholder='Nome completo' style='"+IS+"'></div>";
@@ -21011,10 +21019,12 @@ function _invConfirmarMovimentacao(itemId, origem){
   if(!autNome.trim()){ showToast("Informe quem autoriza","error"); return; }
   if(!recNome.trim()){ showToast("Informe quem recebe / responsável","error"); return; }
 
+  var tipoMov=(document.getElementById("mov-tipo")||{}).value||"individual";
   var mov={
     id:_invId("mov"), itemId:itemId,
     dataHora:new Date().toISOString(),
     origem:origem, destino:dest,
+    tipo_mov:tipoMov,
     motivo:(document.getElementById("mov-motivo")||{}).value||"",
     // Autorizador
     autorizador_grad:(document.getElementById("mov-aut-grad")||{}).value||"",
@@ -21032,13 +21042,41 @@ function _invConfirmarMovimentacao(itemId, origem){
   if(!state.invMovimentacoes) state.invMovimentacoes=[];
   state.invMovimentacoes.push(mov);
   var idx=(state.invItens||[]).findIndex(function(x){return x.id===itemId;});
-  if(idx>=0){ _invEnviarSheets("inv_item", state.invItens[idx]); state.invItens[idx].localizacao=dest; }
+  if(idx>=0){
+    var it=state.invItens[idx];
+    it.localizacao=dest;
+    // Atualiza situação de carga
+    if(tipoMov==="individual"){
+      it.tipo_carga="fixa";
+      it.carga_responsavel_grad=(document.getElementById("mov-rec-grad")||{}).value||"";
+      it.carga_responsavel_nome=recNome.trim();
+      it.carga_responsavel_mat=(document.getElementById("mov-rec-mat")||{}).value||"";
+    } else if(tipoMov==="secao"){
+      it.tipo_carga="secao";
+      it.carga_secao_nome=dest;
+      it.carga_responsavel_nome=recNome.trim();
+    } else {
+      it.tipo_carga="estoque";
+      it.carga_responsavel_nome="";
+    }
+    _invEnviarSheets("inv_item", it);
+  }
   _invSalvarLocal();
   _invEnviarSheets("inv_movimentacao", mov);
   document.getElementById("modal-inv-mov").remove();
   showToast("✓ Movimentação registrada! "+esc(origem)+" → "+esc(dest));
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
+}
+
+function _invMovTipoChange(tipo){
+  // Ajusta label do receptor conforme o tipo de movimentação
+  var lbl=document.getElementById("mov-rec-label");
+  if(lbl){
+    lbl.textContent=tipo==="secao"?"Chefe da Seção *":tipo==="estoque"?"(devolução — não necessário)":"Quem recebe *";
+  }
+  var recRow=document.getElementById("mov-rec-row");
+  if(recRow) recRow.style.display=tipo==="estoque"?"none":"block";
 }
 
 function _invVerHistorico(itemId){
@@ -21065,8 +21103,9 @@ function _invVerHistorico(itemId){
       var recNome=(m.receptor_grad?m.receptor_grad+" ":"")+esc(m.receptor_nome||"—");
       html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:8px;padding:12px'>";
       // Cabeçalho
+      var _tipoMovLabel={individual:"👤 Individual",secao:"🏛️ Seção",estoque:"📦 Devolução"}[m.tipo_mov]||"";
       html+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px'>";
-      html+="<span style='color:#d4a87a;font-size:11px;font-weight:700'>"+dt+"</span>";
+      html+="<div style='display:flex;align-items:center;gap:6px'><span style='color:#d4a87a;font-size:11px;font-weight:700'>"+dt+"</span>"+(_tipoMovLabel?"<span style='background:#EAD9B8;color:#6B5236;font-size:9px;padding:1px 6px;border-radius:4px;font-weight:700'>"+_tipoMovLabel+"</span>":"")+"</div>";
       html+="<span style='color:#6B5236;font-size:11px;font-weight:700'>"+esc(m.origem||"—")+" → <span style='color:#D9A53C'>"+esc(m.destino||"—")+"</span></span>";
       html+="</div>";
       if(m.motivo) html+="<div style='color:#6B5236;font-size:11px;margin-bottom:8px'>Motivo: "+esc(m.motivo)+"</div>";
@@ -21674,6 +21713,10 @@ function renderInventario(main){
           if(item.tipo_carga==="fixa"||item.tipo_carga==="pessoal"){
             var _scNome=(item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+esc(item.carga_responsavel_nome||"—");
             h+="<span style='background:#4a9fd422;color:#4a9fd4;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>📋 Carga individual: "+_scNome+"</span>";
+          } else if(item.tipo_carga==="secao"){
+            var _secNome=esc(item.carga_secao_nome||item.localizacao||"—");
+            var _secResp=esc(item.carga_responsavel_nome||"");
+            h+="<span style='background:#8b5cf622;color:#a78bfa;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>🏛️ Carga seção: "+_secNome+(_secResp?" · "+_secResp:"")+"</span>";
           } else {
             h+="<span style='background:#33333322;color:#888;padding:1px 8px;border-radius:5px;font-size:10px'>📦 Em estoque</span>";
           }
@@ -21691,8 +21734,8 @@ function renderInventario(main){
           h+="<button onclick='_invAbrirItem(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #A87B22;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>✏️ Editar</button>";
           h+="<button onclick='_invAbrirMovimentacao(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #5e4636;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🚛 Mover</button>";
           h+="<button onclick='_invVerHistorico(\""+item.id+"\")' style='background:#1a2a3a;border:1px solid #4a9fd433;color:#4a9fd4;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>📜 Histórico</button>";
-          if(item.tipo_carga==="fixa"&&item.carga_responsavel_nome) h+="<button onclick='_invPDFRecibo(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #d4a87a55;color:#d4a87a;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🧾 Recibo</button>";
-          if(item.tipo_carga==="fixa"&&item.carga_responsavel_nome) h+="<button onclick='_invDevolverItem(\""+item.id+"\")' style='background:#1a0808;border:1px solid #ef444455;color:#ef4444;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>↩ Devolver</button>";
+          if((item.tipo_carga==="fixa"||item.tipo_carga==="secao")&&item.carga_responsavel_nome) h+="<button onclick='_invPDFRecibo(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #d4a87a55;color:#d4a87a;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🧾 Recibo</button>";
+          if((item.tipo_carga==="fixa"||item.tipo_carga==="secao")&&item.carga_responsavel_nome) h+="<button onclick='_invDevolverItem(\""+item.id+"\")' style='background:#1a0808;border:1px solid #ef444455;color:#ef4444;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>↩ Devolver</button>";
           h+="<button onclick='_invQRCode(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #5e4636;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>📱 QR</button>";
           h+="</div></div>";
           h+="</div>";
