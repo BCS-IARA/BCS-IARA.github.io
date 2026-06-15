@@ -294,9 +294,9 @@ function esc(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-const TIPOS_VISITA = ["Visita Solidária","Visita Comunitária","Visita Institucional Comunitária","Visita a Vítima de Violência","Visita de Acompanhamento"];
-const COR_VISITA = {"Visita Solidária":"#d4a87a","Visita Comunitária":"#b87333","Visita Institucional Comunitária":"#c4833a","Visita a Vítima de Violência":"#ef4444","Visita de Acompanhamento":"#10b981"};
-const CONCEITO_VISITA = {"Visita Solidária":"🤝 Apoio emocional e orientação a vítimas. Foco na escuta ativa e encaminhamentos.","Visita Comunitária":"🏘 Presença institucional para fortalecer laços comunitários.","Visita Institucional Comunitária":"🏛 Articulação com CRAS, CREAS, UBS e escolas (teoria do crescimento comunitário).","Visita a Vítima de Violência":"🛡 Acompanhamento de vítimas e verificação de medidas protetivas.","Visita de Acompanhamento":"🔄 Seguimento de casos anteriores."};
+const TIPOS_VISITA = ["Visita Solidária","Visita Comunitária","Visita Institucional Comunitária","Visita a Vítima de Violência","Visita de Acompanhamento","Ronda Escolar"];
+const COR_VISITA = {"Visita Solidária":"#d4a87a","Visita Comunitária":"#b87333","Visita Institucional Comunitária":"#c4833a","Visita a Vítima de Violência":"#ef4444","Visita de Acompanhamento":"#10b981","Ronda Escolar":"#38bdf8"};
+const CONCEITO_VISITA = {"Visita Solidária":"🤝 Apoio emocional e orientação a vítimas. Foco na escuta ativa e encaminhamentos.","Visita Comunitária":"🏘 Presença institucional para fortalecer laços comunitários.","Visita Institucional Comunitária":"🏛 Articulação com CRAS, CREAS, UBS e escolas (teoria do crescimento comunitário).","Visita a Vítima de Violência":"🛡 Acompanhamento de vítimas e verificação de medidas protetivas.","Visita de Acompanhamento":"🔄 Seguimento de casos anteriores.","Ronda Escolar":"🏫 Visita a escola para presença institucional, prevenção e articulação com educadores."};
 
 // ══════════════════════════════════════════════════
 // PERSISTÊNCIA LOCAL
@@ -3416,7 +3416,8 @@ function renderCalendar() {
         var _c = COR_VISITA[a.tipo]||"#d4a87a";
         var _stBadge = a.status==="Realizado"?"<span style='background:#22c55e22;color:#22c55e;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700'>✅</span>":a.status==="NaoRealizado"?"<span style='background:#ef444422;color:#ef4444;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700'>❌</span>":"";
         var _btns2 = state.perfil==="guarnicao"&&a.status!=="Realizado"&&a.status!=="NaoRealizado"?`<div style="display:flex;gap:6px;margin-top:6px"><button onclick="confirmarVisita('${a.id}','Realizado')" style="flex:1;background:#22c55e22;border:1px solid #22c55e;color:#22c55e;padding:7px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✓ Realizei</button><button onclick="confirmarVisita('${a.id}','NaoRealizado')" style="flex:1;background:#ef444411;border:1px solid #ef4444;color:#ef4444;padding:7px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✗ Não fui</button></div>`:"";
-        html += `<div style="border-left:3px solid ${_c};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:#36221a"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="color:${_c};font-size:10px;font-weight:700">${a.tipo||"Visita"}</span><span style="color:#a07c58;font-size:10px">${normHora(a.hora)}</span>${_stBadge}</div><p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${a.vitima_nome||"—"}</p>${_btns2}</div>`;
+        var _agIco2=a.tipo==="Ronda Escolar"?"🏫 ":"";
+        html += `<div style="border-left:3px solid ${_c};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:#36221a"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="color:${_c};font-size:10px;font-weight:700">${_agIco2}${a.tipo||"Visita"}</span><span style="color:#a07c58;font-size:10px">${normHora(a.hora)}</span>${_stBadge}</div><p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${a.vitima_nome||a.nome||"—"}</p>${_btns2}</div>`;
       });
       _evD.forEach(function(e){ html += `<div style="border-left:3px solid ${e.cor||"#8b5cf6"};padding:6px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;background:#36221a"><span style="color:${e.cor||"#8b5cf6"};font-size:10px;font-weight:700">${e.tipo||"Evento"}</span>${e.hora?` <span style='color:#a07c58;font-size:10px'>${e.hora}</span>`:""}<p style="color:#f5ede0;font-size:12px;font-weight:500;margin:2px 0 0">${e.titulo}</p></div>`; });
       html += `</div>`;
@@ -3454,7 +3455,7 @@ function renderCalendar() {
     var _extraStyle=_isSex?"border-top:2px solid #D9A53C;":(_fridaE?"border-top:3px solid #A8492E;":"");
     html+=`<div class="cal-day${isHoje?" today":""}${isSel?" selected":""}${alertaCls}" style="${bg};${_extraStyle}" onclick="calClick(${d})">
       <div class="cal-num" style="color:${_isSex?"#D9A53C":totalEvDia?"#f5ede0":"#9a7050"}">${d}</div>`;
-    (ev.ags||[]).slice(0,2).forEach(a=>{ html+=`<div class="cal-event" style="background:${COR_VISITA[a.tipo]||"#d4a87a"};color:#000">${normHora(a.hora)} ${(a.vitima_nome||"--").split(" ")[0]}</div>`; });
+    (ev.ags||[]).slice(0,2).forEach(a=>{ var _agIco=a.tipo==="Ronda Escolar"?"🏫 ":""; html+=`<div class="cal-event" style="background:${COR_VISITA[a.tipo]||"#d4a87a"};color:${a.tipo==="Ronda Escolar"?"#fff":"#000"}">${_agIco}${normHora(a.hora)} ${(a.vitima_nome||a.nome||"--").split(" ")[0]}</div>`; });
     (ev.vis||[]).slice(0,1).forEach(v=>{ html+=`<div class="cal-event" style="background:#334155;color:#94a3b8">✓ ${(v.vitima_nome||"--").split(" ")[0]}</div>`; });
     (ev.esc||[]).slice(0,1).forEach(a=>{ html+=`<div class="cal-event" style="background:#1e3a5f;color:#38bdf8;font-size:9px">🏫 ${(a.escolaNome||"Escola").split(" ")[0]}</div>`; });
     (ev.cham||[]).slice(0,1).forEach(c=>{ html+=`<div class="cal-event" style="background:#3E2A1A;color:#6B5236;font-size:9px">📚 ${(c.projetoNome||"Aula").substring(0,10)}</div>`; });
@@ -8695,8 +8696,11 @@ function renderCursosComunitarios(main){
   h.push("<h2 style='color:#3D2B1A;font-size:16px;font-weight:800;margin:0 0 3px'>📚 Cursos Comunitários</h2>");
   h.push("<p style='color:#6B5236;font-size:11px;margin:0'>"+cursos.length+" curso(s) cadastrado(s)</p>");
   h.push("</div>");
-  h.push("<div style='display:flex;gap:8px'>");
-  h.push("<button onclick='_sincronizarProjetosSociais()' title='Envia todos os projetos para a planilha e atualiza o portfólio público' style='background:#0a1a2a;border:1px solid #4a9fd455;color:#4a9fd4;padding:10px 14px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer'>🔄 Sync Portfólio</button>");
+  h.push("<div style='display:flex;gap:8px;align-items:center'>");
+  var _psSincTxt=state.sincErro?"⚠ Sem conexão":state._psSyncTime?"✓ "+new Date(state._psSyncTime).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"—";
+  var _psSincCor=state.sincErro?"#A8492E":state._psSyncTime?"#6E8F52":"#6B5236";
+  h.push("<span style='font-size:10px;color:"+_psSincCor+";border:1px solid "+_psSincCor+"44;border-radius:6px;padding:3px 8px'>"+_psSincTxt+"</span>");
+  h.push("<button onclick='_sincronizarProjetosSociais();renderProjetosSociais(document.getElementById(\"main\"))' title='Envia todos os projetos para a planilha e atualiza o portfólio público' style='background:#0a1a2a;border:1px solid #4a9fd455;color:#4a9fd4;padding:10px 14px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer'>🔄 Sync Portfólio</button>");
   h.push("<button onclick='abrirModalNovoCurso()' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Curso</button>");
   h.push("</div>");
   h.push("</div>");
@@ -8853,6 +8857,7 @@ function _sincronizarProjetosSociais(){
     setTimeout(function(){ _invEnviarSheets("projeto_social", p); }, i*200);
   });
   showToast("🔄 Sincronizando "+prjs.length+" projeto(s) com o portfólio...");
+  state._psSyncTime = Date.now();
 }
 
 function gerarCardCurso(id){
@@ -14236,7 +14241,9 @@ function renderTela() {
       ha.push("</div>");
 
       // ── LISTA DE AVISOS ──────────────────────────
-      var pendentes=avisos.filter(function(a){return !(a.leituras&&a.leituras.length>0);});
+      var pendentes=avisos.filter(function(a){return !a.resolvido&&!(a.leituras&&a.leituras.length>0);});
+      // auditoria_comandante avisos appear first
+      pendentes.sort(function(a,b){var pa=a.origem==="auditoria_comandante"?0:1;var pb=b.origem==="auditoria_comandante"?0:1;return pa-pb;});
       var lidos=avisos.filter(function(a){return a.leituras&&a.leituras.length>0;});
 
       if(!avisos.length){
@@ -15145,7 +15152,7 @@ function render(){
         var n=tipos.filter(function(tp){return cnt(ocs24,tp)>cnt(ocs30,tp)/30&&cnt(ocs24,tp)>0;}).length;
         return n>0?` <span style="background:#ff4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${n}</span>`:"";
       })()}</button>
-      <button class="nav-btn${state.tela==="avisos"?" active":""}" onclick="setTela('avisos')" style="${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0&&state.tela!=='avisos'?'animation:piscar 1s infinite;color:#d4a87a;':''}"">📣 Avisos${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length>0?` <span style="background:#d4a87a;color:#2a1c10;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">${(state.db.avisos||[]).filter(a=>!(a.leituras&&a.leituras.length>0)).length}</span>`:""}</button>
+      ${(function(){ var _avNLidos=(state.db.avisos||[]).filter(function(a){return !a.resolvido&&!(a.leituras&&a.leituras.length>0);}); var _nAv=_avNLidos.length; return "<button class='nav-btn"+(state.tela==="avisos"?" active":"")+"' onclick='setTela(\"avisos\")' style='"+((_nAv>0&&state.tela!=="avisos")?"animation:piscar 1s infinite;color:#d4a87a;":"")+"'>📣 Avisos"+(_nAv>0?" <span style='background:#d4a87a;color:#2a1c10;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+_nAv+"</span>":"")+"</button>"; })()}
       <button class="nav-btn${state.tela==='inventario'?' active':''}" data-tela="inventario" onclick="setTela('inventario')" style="color:${state.tela==='inventario'?'#D9A53C':'#D9A53C66'};border-color:${state.tela==='inventario'?'#D9A53C':'transparent'}">📦 Inventário</button>
     `:`
       <p style="color:#6B523666;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 10px;margin:4px 0 2px">Operacional</p>
@@ -21660,7 +21667,10 @@ function renderInventario(main){
   // Header
   h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px'>";
   h+="<div><h2 style='color:#D9A53C;font-size:20px;font-weight:800;margin:0;font-family:Georgia,serif'>📦 Inventário</h2><p style='color:#a07c58;font-size:12px;margin:2px 0 0'>Gestão de patrimônio — 77ª CIPM BCS</p></div>";
-  h+="<div style='display:flex;gap:8px;flex-wrap:wrap'>";
+  h+="<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center'>";
+  var _invSincTxt=state.sincErro?"⚠ Sem conexão":state.sincronizando?"⟳ Sincronizando...":state._invLastSync?"✓ "+new Date(state._invLastSync).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"—";
+  var _invSincCor=state.sincErro?"#A8492E":state.sincronizando?"#C8A84B":state._invLastSync?"#6E8F52":"#6B5236";
+  h+="<span style='font-size:10px;color:"+_invSincCor+";border:1px solid "+_invSincCor+"44;border-radius:6px;padding:3px 8px'>"+_invSincTxt+"</span>";
   h+="<button onclick='_invAbrirImport()' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📤 Importar Lista</button>";
   h+="<button onclick='_invGerarPDF()' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📄 Exportar PDF</button>";
   h+="<button onclick='_invAbrirItem(null)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Item</button>";
