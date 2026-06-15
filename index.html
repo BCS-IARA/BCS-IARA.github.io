@@ -1321,7 +1321,8 @@ function _arquivarOcsAntigas() {
   var mod = 0;
   (state.db.ocorrencias || []).forEach(function(oc) {
     var iso = _toISO(oc.data);
-    if(!iso || iso > CORTE) return;
+    // sem data ou data até o corte → arquivar; após o corte → manter na fila
+    if(iso && iso > CORTE) return;
     if(PENDENTES.indexOf(oc.situacao || "nova") < 0) return;
     oc.situacao = "historico";
     oc._autoArquivada = true;
