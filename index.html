@@ -5770,15 +5770,20 @@ function renderDashComandante(main){
     var _s3_cobrar = "Há "+_s3_vis.length+" visita(s) agendada(s) e vencida(s) sem registro de resultado. Registrar as visitas realizadas ou reagendar.";
     var _s3_ind = "visitas";
 
-    // Semáforo 4 — Encaminhamentos: pendentes há >7 dias
+    // Semáforo 4 — Encaminhamentos: pendentes há >7 dias + devolutivas vencidas >15 dias
     var _s4_enc = _aud_enc.filter(function(e){
       return (e.status==="pendente"||e.status==="a_encaminhar") && e.data && ((_aud_hd - new Date(e.data+"T12:00")) > 7*864e5);
     });
-    var _s4_cor = _s4_enc.length===0?"#22c55e":_s4_enc.length<=2?"#f59e0b":"#ef4444";
-    var _s4_ico = _s4_enc.length===0?"🟢":_s4_enc.length<=2?"🟡":"🔴";
-    var _s4_txt = _s4_enc.length===0?"Encaminhamentos em dia":_s4_enc.length+" encaminhamento(s) pendente(s) há >7 dias";
-    var _s4_dica = "Encaminhamentos para órgãos externos (CRAM, DEAM, CT…) sem conclusão há mais de 7 dias.";
-    var _s4_cobrar = ""+_s4_enc.length+" encaminhamento(s) pendente(s) há mais de 7 dias. Verificar situação junto aos órgãos e atualizar o status no sistema.";
+    var _s4_devVenc = (state.encaminhamentos||[]).filter(function(e){
+      var dtEnv=e.data_envio?new Date(e.data_envio):null;
+      return (e.status==="aguardando_devolutiva"||e.status==="enviado")&&!e.relato_devolutiva&&dtEnv&&(_aud_hd-dtEnv)>15*864e5;
+    });
+    var _s4_total = _s4_enc.length + _s4_devVenc.length;
+    var _s4_cor = _s4_total===0?"#22c55e":_s4_total<=2?"#f59e0b":"#ef4444";
+    var _s4_ico = _s4_total===0?"🟢":_s4_total<=2?"🟡":"🔴";
+    var _s4_txt = _s4_total===0?"Encaminhamentos em dia":_s4_total+" encaminhamento(s) pendente(s) ou vencido(s)";
+    var _s4_dica = "Encaminhamentos para órgãos externos (CRAM, DEAM, CT…) sem conclusão há >7 dias, mais devolutivas aguardadas há >15 dias.";
+    var _s4_cobrar = (_s4_enc.length?""+_s4_enc.length+" encaminhamento(s) pendente(s) há >7 dias. ":"")+(_s4_devVenc.length?""+_s4_devVenc.length+" devolutiva(s) vencida(s) há >15 dias. Cobrar os órgãos por retorno.":"");
     var _s4_ind = "encaminhamentos";
 
     // Semáforo 5 — Calendário: agendamentos vencidos (exceto visitas) sem resultado
@@ -5804,7 +5809,7 @@ function renderDashComandante(main){
       {n:1,titulo:"Esteira de Triagem",    ico:_s1_ico,cor:_s1_cor,txt:_s1_txt,dica:_s1_dica,cobrar:_s1_cobrar,ind:_s1_ind,qtd:_s1_atras.length,tela:"triagem"},
       {n:2,titulo:"Cobertura FRIDA (VD)",  ico:_s2_ico,cor:_s2_cor,txt:_s2_txt,dica:_s2_dica,cobrar:_s2_cobrar,ind:_s2_ind,qtd:_s2_vds.length-_s2_comFrida.length,tela:"vcm"},
       {n:3,titulo:"Visitas Solidárias",    ico:_s3_ico,cor:_s3_cor,txt:_s3_txt,dica:_s3_dica,cobrar:_s3_cobrar,ind:_s3_ind,qtd:_s3_vis.length,tela:"calendario"},
-      {n:4,titulo:"Encaminhamentos",       ico:_s4_ico,cor:_s4_cor,txt:_s4_txt,dica:_s4_dica,cobrar:_s4_cobrar,ind:_s4_ind,qtd:_s4_enc.length,tela:"encaminhamentos"},
+      {n:4,titulo:"Encaminhamentos",       ico:_s4_ico,cor:_s4_cor,txt:_s4_txt,dica:_s4_dica,cobrar:_s4_cobrar,ind:_s4_ind,qtd:_s4_total,tela:"devolutivas"},
       {n:5,titulo:"Calendário de Ações",   ico:_s5_ico,cor:_s5_cor,txt:_s5_txt,dica:_s5_dica,cobrar:_s5_cobrar,ind:_s5_ind,qtd:_s5_cal.length,tela:"calendario"},
       {n:6,titulo:"Qualidade Lançamentos", ico:_s6_ico,cor:_s6_cor,txt:_s6_txt,dica:_s6_dica,cobrar:_s6_cobrar,ind:_s6_ind,qtd:_s6_inc.length,tela:"ocorrencias"}
     ];
