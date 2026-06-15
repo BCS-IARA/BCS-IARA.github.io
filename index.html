@@ -5265,35 +5265,62 @@ function renderDashComandante(main){
     }
     h.push("</div>");
 
-    // Faixa 3 — gráfico rápido (últimas 8 semanas)
+    // Faixa 3 — três gráficos com dados reais
     h.push("<div style='margin-bottom:10px'>");
-    h.push("<p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 10px'>● Faixa 3 — Ocorrências por semana (últimas 8 semanas)</p>");
-    var _semanas=[]; var _semanaCnt=[];
+    h.push("<p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 10px'>● Faixa 3 — Indicadores Gráficos</p>");
+    var _semanas=[]; var _semanaCnt=[]; var _semanaVD=[];
     for(var _sw=7;_sw>=0;_sw--){
       var _ini=new Date(); _ini.setDate(_ini.getDate()-_sw*7-((_ini.getDay()+6)%7));
       _ini.setHours(0,0,0,0);
       var _fim=new Date(_ini); _fim.setDate(_ini.getDate()+7);
       var _cnt=ocs.filter(function(o){ var d=_pdLocal(o.data); return d&&d>=_ini&&d<_fim; }).length;
+      var _cvd=ocs.filter(function(o){ var d=_pdLocal(o.data); return d&&d>=_ini&&d<_fim&&(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")); }).length;
       _semanas.push((_ini.getDate())+"/"+(_ini.getMonth()+1));
       _semanaCnt.push(_cnt);
+      _semanaVD.push(_cvd);
     }
-    var _maxCnt=Math.max.apply(null,_semanaCnt)||1;
-    var _chartId="cmd-semana-chart-"+Date.now();
-    h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:12px;padding:16px'>");
-    h.push("<canvas id='"+_chartId+"' height='120'></canvas>");
+    // Gráfico 2 — FRIDA por nível
+    var _fridaTodos=state.db.frida||[];
+    var _fridaB=_fridaTodos.filter(function(f){return f.nivel==="B";}).length;
+    var _fridaM=_fridaTodos.filter(function(f){return f.nivel==="M";}).length;
+    var _fridaE=_fridaTodos.filter(function(f){return f.nivel==="E";}).length;
+    var _fridaSN=_fridaTodos.filter(function(f){return !f.nivel||f.nivel==="?";}).length;
+    // Gráfico 3 — Top 5 bairros
+    var _bairrosCnt={};
+    ocs.forEach(function(o){ if(o.bairro) _bairrosCnt[o.bairro]=(_bairrosCnt[o.bairro]||0)+1; });
+    var _bairrosTop=Object.keys(_bairrosCnt).sort(function(a,b){return _bairrosCnt[b]-_bairrosCnt[a];}).slice(0,5);
+    var _chartId1="cmd-chart1-"+Date.now();
+    var _chartId2="cmd-chart2-"+Date.now();
+    var _chartId3="cmd-chart3-"+Date.now();
+    h.push("<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px'>");
+    h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:12px;padding:14px'><p style='color:#8a6a4a;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>Ocorrências/semana</p><canvas id='"+_chartId1+"' height='120'></canvas></div>");
+    h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:12px;padding:14px'><p style='color:#8a6a4a;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>FRIDA — Distribuição de Risco</p><canvas id='"+_chartId2+"' height='120'></canvas></div>");
+    h.push("<div style='background:#2a1c10;border:1px solid #4a3224;border-radius:12px;padding:14px'><p style='color:#8a6a4a;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px'>Top 5 Bairros</p><canvas id='"+_chartId3+"' height='120'></canvas></div>");
     h.push("</div>");
     h.push("</div>");
 
     h.push("</div>"); // fim max-width
     main.innerHTML = h.join("");
-    // Renderizar gráfico
+    // Renderizar gráficos
     (function(){
-      var canvas=document.getElementById(_chartId);
-      if(!canvas||typeof Chart==="undefined") return;
-      new Chart(canvas.getContext("2d"),{
+      if(typeof Chart==="undefined") return;
+      var c1=document.getElementById(_chartId1);
+      if(c1) new Chart(c1.getContext("2d"),{
         type:"line",
-        data:{labels:_semanas,datasets:[{label:"Ocorrências",data:_semanaCnt,borderColor:"#d4a87a",backgroundColor:"rgba(212,168,122,.15)",borderWidth:2,pointRadius:4,pointBackgroundColor:"#d4a87a",tension:.35,fill:true}]},
-        options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.y+" ocorrências";}}}},scales:{x:{ticks:{color:"#5e4636",font:{size:10}},grid:{color:"#3c2818"}},y:{ticks:{color:"#5e4636",font:{size:10},stepSize:1},grid:{color:"#3c2818"},beginAtZero:true}}}
+        data:{labels:_semanas,datasets:[{label:"Total",data:_semanaCnt,borderColor:"#d4a87a",backgroundColor:"rgba(212,168,122,.1)",borderWidth:2,pointRadius:3,tension:.3,fill:true},{label:"VD",data:_semanaVD,borderColor:"#A8492E",backgroundColor:"rgba(168,73,46,.1)",borderWidth:2,pointRadius:3,tension:.3,fill:true}]},
+        options:{responsive:true,plugins:{legend:{labels:{color:"#8a6a4a",font:{size:9}}}},scales:{x:{ticks:{color:"#5e4636",font:{size:9}},grid:{color:"#3c2818"}},y:{ticks:{color:"#5e4636",font:{size:9},stepSize:1},grid:{color:"#3c2818"},beginAtZero:true}}}
+      });
+      var c2=document.getElementById(_chartId2);
+      if(c2) new Chart(c2.getContext("2d"),{
+        type:"doughnut",
+        data:{labels:["Baixo","Médio","Elevado","Sem FRIDA"],datasets:[{data:[_fridaB,_fridaM,_fridaE,_fridaSN],backgroundColor:["#22c55e","#f59e0b","#ef4444","#5e4636"],borderWidth:0}]},
+        options:{responsive:true,plugins:{legend:{labels:{color:"#8a6a4a",font:{size:9}}}}}
+      });
+      var c3=document.getElementById(_chartId3);
+      if(c3&&_bairrosTop.length) new Chart(c3.getContext("2d"),{
+        type:"bar",
+        data:{labels:_bairrosTop,datasets:[{data:_bairrosTop.map(function(b){return _bairrosCnt[b];}),backgroundColor:"#6E8F52",borderRadius:4}]},
+        options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#5e4636",font:{size:9}},grid:{color:"#3c2818"},beginAtZero:true},y:{ticks:{color:"#8a6a4a",font:{size:9}},grid:{color:"transparent"}}}}
       });
     })();
     return;
