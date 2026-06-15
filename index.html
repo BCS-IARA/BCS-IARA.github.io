@@ -892,6 +892,17 @@ async function carregarDadosAppDoSheets(){
     state.ocorrenciasEncerradas = _mergeById(state.ocorrenciasEncerradas||[], ocEncSheets);
     state.alertasGraves       = _mergeById(state.alertasGraves||[],       alertasGravesSheets);
     state.devolutivasCrav     = _mergeById(state.devolutivasCrav||[],     devolutivasSheets);
+    // Cruzar devolutivasCrav com encaminhamentos — atualiza relato_devolutiva localmente
+    (state.devolutivasCrav||[]).forEach(function(dev){
+      var ocId = dev.ocorrenciaId||dev.ocorrencia_id||"";
+      if(!ocId) return;
+      var enc = (state.encaminhamentos||[]).find(function(e){ return e.ocorrenciaId===ocId||e.ocorrencia_id===ocId; });
+      if(enc && !enc.relato_devolutiva){
+        enc.relato_devolutiva = [dev.tiposTexto,dev.situacao,dev.observacoes].filter(Boolean).join(" | ");
+        enc.data_devolutiva   = dev.data||"";
+        enc.status            = enc.status==="concluido"?enc.status:"concluido";
+      }
+    });
     state.conselho_atas       = _mergeById(state.conselho_atas||[],       conselhoAtasSheets);
     state.conselho_associados = _mergeById(state.conselho_associados||[], conselhoAssocSheets);
     state.conselho_diretoria  = _mergeById(state.conselho_diretoria||[],  conselhoDirSheets);
