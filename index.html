@@ -4082,7 +4082,7 @@ function _vcmMarcarEnviado(encId){
 }
 
 function _renderCentralBar(main, abaAtiva){
-  var _nTriar=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length;
+  var _nTriar=(state.db.ocorrencias||[]).filter(_ocNaFila).length;
   var _fridas=state.db.frida||[];
   var _hoje=hoje();
   var _nVcmUrg=(state.db.ocorrencias||[]).filter(function(o){
@@ -12954,9 +12954,18 @@ window._concluirEncFila = function(encId) {
   if(main) renderFilaEncaminhamentos(main);
 };
 
+var _CORTE_FILA = "2025-06-15"; // OCs com data até este dia nunca entram na fila
+function _ocNaFila(o){
+  // Só entra na fila se situacao nova E (data ausente/inválida É após o corte)
+  if((o.situacao||"nova")!=="nova") return false;
+  var s=String(o.data||"").trim();
+  var m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  var iso=m?m[3]+"-"+m[2]+"-"+m[1]:(/^\d{4}-\d{2}-\d{2}/.test(s)?s.substring(0,10):null);
+  return iso ? iso > _CORTE_FILA : false; // sem data → não entra
+}
 function renderTriagem(main) {
   var ocs = (state.db.ocorrencias||[]);
-  var novas = ocs.filter(function(o){ return (o.situacao||"nova")==="nova"; });
+  var novas = ocs.filter(_ocNaFila);
   var vds   = novas.filter(function(o){ return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||""); });
   var resto = novas.filter(function(o){ return !vds.includes(o); });
   function porDataDesc(a,b){ return (b.data||"").localeCompare(a.data||""); }
@@ -15236,7 +15245,7 @@ function render(){
       <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" onclick="setTela('ocorrencias')">Ocorrências</button>
       <button class="nav-btn${state.tela==="calendario"?" active":""}" onclick="setTela('calendario')">Calendário</button>
       <p class="nav-label">Central de Atend.</p>
-      ${(function(){ var _nTriar=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length; var _ativo=state.tela==="triagem"; var _badge=_nTriar>0?"<span style='background:"+(_ativo?"#fff":"var(--verm)")+";color:"+(_ativo?"var(--verm)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nTriar+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"triagem\")' style='"+(_nTriar>0&&!_ativo?"color:var(--verm);animation:piscar-suave 2s infinite;":"")+"'>Triagem"+_badge+"</button>"; })()}
+      ${(function(){ var _nTriar=(state.db.ocorrencias||[]).filter(_ocNaFila).length; var _ativo=state.tela==="triagem"; var _badge=_nTriar>0?"<span style='background:"+(_ativo?"#fff":"var(--verm)")+";color:"+(_ativo?"var(--verm)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nTriar+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"triagem\")' style='"+(_nTriar>0&&!_ativo?"color:var(--verm);animation:piscar-suave 2s infinite;":"")+"'>Triagem"+_badge+"</button>"; })()}
       ${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return "<button class='nav-btn"+(state.tela==="dashvcm"?" active":"")+"' onclick='setTela(\"dashvcm\")' style='"+(_n>0&&state.tela!=="dashvcm"?"color:#ff69b4;animation:piscar-rosa 1.4s infinite;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";")+"'>VCM"+(_n>0?"<span style='background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+_n+"</span>":"")+"</button>";})()}
       <p class="nav-label">Gestão Comunitária</p>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" onclick="setTela('projetossociais')">Projetos Sociais</button>
@@ -15249,8 +15258,8 @@ function render(){
       <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" onclick="setTela('ocorrencias')">Ocorrências</button>
       <button class="nav-btn${state.tela==="calendario"?" active":""}" onclick="setTela('calendario')">Calendário</button>
       <p class="nav-label">Central de Atendimento</p>
-      ${(function(){ var _ativo=state.tela==="fila_auxiliar"; var _nPend=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length + (state.db.agendamentos||[]).filter(function(a){return a.data===hoje()&&(a.status||"Agendado")==="Agendado";}).length; var _badge=_nPend>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nPend+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"fila_auxiliar\")'>Fila do Dia"+_badge+"</button>"; })()}
-      ${(function(){ var _nTriar=(state.db.ocorrencias||[]).filter(function(o){return (o.situacao||"nova")==="nova";}).length; var _ativo=state.tela==="triagem"; var _badge=_nTriar>0?"<span style='background:"+(_ativo?"#fff":"var(--verm)")+";color:"+(_ativo?"var(--verm)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nTriar+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"triagem\")' style='"+(_nTriar>0&&!_ativo?"color:var(--verm);animation:piscar-suave 2s infinite;":"")+"'>Triagem"+_badge+"</button>"; })()}
+      ${(function(){ var _ativo=state.tela==="fila_auxiliar"; var _nPend=(state.db.ocorrencias||[]).filter(_ocNaFila).length + (state.db.agendamentos||[]).filter(function(a){return a.data===hoje()&&(a.status||"Agendado")==="Agendado";}).length; var _badge=_nPend>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nPend+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"fila_auxiliar\")'>Fila do Dia"+_badge+"</button>"; })()}
+      ${(function(){ var _nTriar=(state.db.ocorrencias||[]).filter(_ocNaFila).length; var _ativo=state.tela==="triagem"; var _badge=_nTriar>0?"<span style='background:"+(_ativo?"#fff":"var(--verm)")+";color:"+(_ativo?"var(--verm)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nTriar+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"triagem\")' style='"+(_nTriar>0&&!_ativo?"color:var(--verm);animation:piscar-suave 2s infinite;":"")+"'>Triagem"+_badge+"</button>"; })()}
       ${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return "<button class='nav-btn"+(state.tela==="dashvcm"?" active":"")+"' onclick='setTela(\"dashvcm\")' style='"+(_n>0&&state.tela!=="dashvcm"?"color:#ff69b4;animation:piscar-rosa 1.4s infinite;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";")+"'>VCM"+(_n>0?"<span style='background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+_n+"</span>":"")+"</button>";})()}
       ${(function(){ var _nEnc=(state.encaminhamentos||[]).filter(function(e){return e.status!=="concluido";}).length; var _ativo=state.tela==="encaminhamentos"; var _badge=_nEnc>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nEnc+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"encaminhamentos\")'>Encaminhamentos"+_badge+"</button>"; })()}
       ${(function(){ var _nDev=(state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length; var _ativo=state.tela==="devolutivas"; var _badge=_nDev>0?"<span style='background:"+(_ativo?"#fff":"var(--verde)")+";color:"+(_ativo?"var(--verde)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nDev+" novo</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"devolutivas\")' style='color:var(--verde);border-color:"+(_ativo?"var(--verde)":"transparent")+(_nDev>0&&!_ativo?";animation:piscar-suave 2s infinite":"")+"'>Devolutivas"+_badge+"</button>"; })()}
