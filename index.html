@@ -17575,11 +17575,16 @@ let _turnoInt=null;
 function startTurnoWatch(){
   if(_turnoInt)return;
   const{dentroJanela,jaConfirmado}=verificarAlertaTurno();
-  if(dentroJanela&&!jaConfirmado&&state.perfil==="operador")setTimeout(function(){mostrarModalTurno(dentroJanela.turno);},800);
+  function _dispararModalTurno(turno){
+    if(state.perfil==="gestor"||state.perfil==="operador_gestor") mostrarModalTurnoGestor(turno);
+    else if(state.perfil==="projetossociais") mostrarModalTurnoProj(turno);
+    else if(state.perfil==="operador") mostrarModalTurno(turno);
+  }
+  if(dentroJanela&&!jaConfirmado)setTimeout(function(){_dispararModalTurno(dentroJanela.turno);},800);
   _turnoInt=setInterval(function(){
     const{dentroJanela,jaConfirmado}=verificarAlertaTurno();
     const ex=!!document.getElementById("modal-turno");
-    if(dentroJanela&&!jaConfirmado&&!ex&&state.perfil==="operador")mostrarModalTurno(dentroJanela.turno);
+    if(dentroJanela&&!jaConfirmado&&!ex)_dispararModalTurno(dentroJanela.turno);
     if((!dentroJanela||jaConfirmado)&&ex){const m=document.getElementById("modal-turno");if(m)m.remove();}
   },15000);
 }
@@ -17605,6 +17610,90 @@ function mostrarModalTurno(turnoLabel){
     h+="<div><p style='color:#e8c090;font-size:13px;font-weight:700;margin-bottom:3px'>"+item[1]+"</p><p style='color:#6a4020;font-size:11px;line-height:1.6'>"+item[2]+"</p></div></div>";
   });
   h+="<button onclick='confirmarPassagemTurno()' style='width:100%;margin-top:8px;background:linear-gradient(135deg,#c8601a,#a84010);border:none;color:#fff;padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer'>✅ Procedimento Realizado — Confirmar</button>";
+  h+="</div></div>";
+  modal.innerHTML=h;
+  document.body.appendChild(modal);
+}
+
+function mostrarModalTurnoGestor(turnoLabel){
+  if(document.getElementById("modal-turno"))return;
+  var modal=document.createElement("div");
+  modal.id="modal-turno";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)";
+  var ocs=state.db.ocorrencias||[];
+  var ags=state.db.agendamentos||[];
+  var enc=state.encaminhamentos||[];
+  var nPend=ocs.filter(function(o){return (o.situacao||"nova")==="nova";}).length;
+  var nVcm=ocs.filter(function(o){return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");}).length;
+  var nAgHoje=ags.filter(function(a){return a.data===hoje()&&(a.status||"Agendado")==="Agendado";}).length;
+  var nEncPend=enc.filter(function(e){return e.status!=="concluido";}).length;
+  var turnoInicio=turnoLabel==="07h–19h"?"07h00":"19h00";
+  var h="<div style='background:var(--papel-2);border:2px solid var(--ambar-2);border-radius:18px;max-width:480px;width:100%;box-shadow:0 0 60px rgba(61,43,26,.5)'>";
+  h+="<div style='background:var(--madeira-2);padding:18px 22px;border-bottom:1px solid var(--ambar-2);border-radius:16px 16px 0 0;display:flex;align-items:center;gap:12px'>";
+  h+="<span style='font-size:26px'>⚔️</span><div>";
+  h+="<p style='color:var(--ambar);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0'>Turno "+turnoLabel+" · Início às "+turnoInicio+"</p>";
+  h+="<p style='color:var(--papel);font-size:17px;font-weight:700;margin:4px 0 0'>Briefing de Início de Turno</p>";
+  h+="</div></div>";
+  h+="<div style='padding:20px 22px'>";
+  // KPIs
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px'>";
+  [{n:nPend,l:"Ocorrências pendentes",c:"var(--verm)"},{n:nVcm,l:"Casos VCM ativos",c:"#ff69b4"},{n:nAgHoje,l:"Agendamentos hoje",c:"var(--ambar)"},{n:nEncPend,l:"Encaminhamentos em aberto",c:"var(--verde)"}].forEach(function(item){
+    h+="<div style='background:var(--madeira-3);border:1px solid var(--madeira-2);border-radius:10px;padding:12px 14px'>";
+    h+="<p style='color:"+item.c+";font-size:22px;font-weight:900;margin:0'>"+item.n+"</p>";
+    h+="<p style='color:var(--tinta-2);font-size:10px;margin:4px 0 0'>"+item.l+"</p>";
+    h+="</div>";
+  });
+  h+="</div>";
+  // Checklist
+  h+="<p style='color:var(--ambar-2);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0 0 10px'>Procedimentos</p>";
+  [["📋","Revisar ocorrências pendentes","Identifique casos novos e em triagem."],
+   ["🌸","Verificar alertas VCM","Medidas protetivas ativas e vítimas sem visita."],
+   ["📅","Conferir agenda do dia","Visitas agendadas e compromissos comunitários."]
+  ].forEach(function(item){
+    h+="<div style='display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:var(--madeira-3);border:1px solid var(--madeira-2);border-radius:8px;margin-bottom:6px'>";
+    h+="<span style='font-size:18px;flex-shrink:0'>"+item[0]+"</span>";
+    h+="<div><p style='color:var(--papel);font-size:12px;font-weight:700;margin:0 0 2px'>"+item[1]+"</p><p style='color:var(--tinta-2);font-size:11px;line-height:1.5;margin:0'>"+item[2]+"</p></div>";
+    h+="</div>";
+  });
+  h+="<button onclick='confirmarPassagemTurno()' style='width:100%;margin-top:12px;background:var(--ambar);border:none;color:var(--madeira-3);padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer'>Entendido — Iniciar Turno</button>";
+  h+="</div></div>";
+  modal.innerHTML=h;
+  document.body.appendChild(modal);
+}
+
+function mostrarModalTurnoProj(turnoLabel){
+  if(document.getElementById("modal-turno"))return;
+  var modal=document.createElement("div");
+  modal.id="modal-turno";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)";
+  var projs=(state.projetos||[]).filter(function(p){return p.ativo!==false;});
+  var ags=(state.db.agendamentos||[]).filter(function(a){return a.data===hoje()&&(a.status||"Agendado")==="Agendado";});
+  var h="<div style='background:var(--papel-2);border:2px solid var(--verde);border-radius:18px;max-width:460px;width:100%;box-shadow:0 0 50px rgba(110,143,82,.4)'>";
+  h+="<div style='background:var(--madeira-2);padding:18px 22px;border-bottom:1px solid var(--verde);border-radius:16px 16px 0 0;display:flex;align-items:center;gap:12px'>";
+  h+="<span style='font-size:26px'>🌱</span><div>";
+  h+="<p style='color:var(--verde);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0'>Projetos Sociais · 77ª CIPM</p>";
+  h+="<p style='color:var(--papel);font-size:17px;font-weight:700;margin:4px 0 0'>Bom dia — Resumo do Dia</p>";
+  h+="</div></div>";
+  h+="<div style='padding:20px 22px'>";
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px'>";
+  [{n:projs.length,l:"Projetos ativos",c:"var(--verde)"},{n:ags.length,l:"Agenda hoje",c:"var(--ambar)"}].forEach(function(item){
+    h+="<div style='background:var(--madeira-3);border:1px solid var(--madeira-2);border-radius:10px;padding:14px'>";
+    h+="<p style='color:"+item.c+";font-size:24px;font-weight:900;margin:0'>"+item.n+"</p>";
+    h+="<p style='color:var(--tinta-2);font-size:10px;margin:4px 0 0'>"+item.l+"</p>";
+    h+="</div>";
+  });
+  h+="</div>";
+  h+="<p style='color:var(--verde);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0 0 10px'>Foco do dia</p>";
+  [["📋","Acompanhar projetos em andamento","Verifique frequência e atividades previstas."],
+   ["📅","Conferir agenda","Reuniões, capacitações e eventos comunitários."],
+   ["📝","Registrar atividades","Lance participantes e ocorrências do dia."]
+  ].forEach(function(item){
+    h+="<div style='display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:var(--madeira-3);border:1px solid var(--madeira-2);border-radius:8px;margin-bottom:6px'>";
+    h+="<span style='font-size:18px;flex-shrink:0'>"+item[0]+"</span>";
+    h+="<div><p style='color:var(--papel);font-size:12px;font-weight:700;margin:0 0 2px'>"+item[1]+"</p><p style='color:var(--tinta-2);font-size:11px;line-height:1.5;margin:0'>"+item[2]+"</p></div>";
+    h+="</div>";
+  });
+  h+="<button onclick='confirmarPassagemTurno()' style='width:100%;margin-top:12px;background:var(--verde);border:none;color:#fff;padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer'>Entendido — Começar</button>";
   h+="</div></div>";
   modal.innerHTML=h;
   document.body.appendChild(modal);
