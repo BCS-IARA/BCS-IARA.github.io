@@ -1307,7 +1307,7 @@ try{ var _plEx=localStorage.getItem("bcs_pol_excluidos"); state._deletedPolIds=_
 
 // ── Arquivar automaticamente OCs anteriores a maio/2025 ──
 function _arquivarOcsAntigas() {
-  var CORTE = "2025-06-15"; // zerar fila — só contar registros novos daqui pra frente
+  var CORTE = "2026-06-15"; // zerar fila — só contar registros novos daqui pra frente
   var PENDENTES = ["nova", "em_triagem", "em_acompanhamento"];
   // Parser inline — _pdLocal pode não estar definido ainda na inicialização
   function _toISO(s) {
@@ -12728,8 +12728,8 @@ function renderFilaAuxiliar(main) {
   var agVenc = ags.filter(function(a){ return a.data<hoje_str && (a.status||"Agendado")==="Agendado"; })
     .sort(function(a,b){ return (b.data||"").localeCompare(a.data||""); }).slice(0,5);
 
-  // 3. Para triar — OCs novas, VD first
-  var ocsNovas = ocs.filter(function(o){ return (o.situacao||"nova")==="nova"; });
+  // 3. Para triar — só OCs após o corte (_ocNaFila), VD first
+  var ocsNovas = ocs.filter(_ocNaFila);
   var vds = ocsNovas.filter(function(o){ return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||""); });
   var resto = ocsNovas.filter(function(o){ return !vds.includes(o); });
   function porDataAsc(a,b){ return (a.data||"").localeCompare(b.data||""); }
@@ -12954,7 +12954,7 @@ window._concluirEncFila = function(encId) {
   if(main) renderFilaEncaminhamentos(main);
 };
 
-var _CORTE_FILA = "2025-06-15"; // OCs com data até este dia nunca entram na fila
+var _CORTE_FILA = "2026-06-15"; // OCs com data até este dia nunca entram na fila
 function _ocNaFila(o){
   // Só entra na fila se situacao nova E (data ausente/inválida É após o corte)
   if((o.situacao||"nova")!=="nova") return false;
@@ -12971,20 +12971,67 @@ function renderTriagem(main) {
   function porDataDesc(a,b){ return (b.data||"").localeCompare(a.data||""); }
   vds.sort(porDataDesc); resto.sort(porDataDesc);
   var fila = vds.concat(resto);
+
+  // Filtro mês/dia
+  var _fMes = state._triagemFiltroMes||"";
+  var _fDia = state._triagemFiltroDia||"";
+  function _isoOc(o){ var s=String(o.data||"").trim(); var m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m?m[3]+"-"+m[2]+"-"+m[1]:s; }
+  var filaFiltrada = fila.filter(function(o){
+    var iso = _isoOc(o);                    // YYYY-MM-DD
+    if(_fMes && iso.substring(0,7)!==_fMes) return false;
+    if(_fDia  && iso.substring(8,10)!==_fDia) return false;
+    return true;
+  });
+
+  // Meses disponíveis na fila
+  var _mesesDisp = [];
+  var _mesesSet = {};
+  fila.forEach(function(o){ var iso=_isoOc(o); var ym=iso.substring(0,7); if(ym&&!_mesesSet[ym]){_mesesSet[ym]=1;_mesesDisp.push(ym);} });
+  _mesesDisp.sort().reverse();
+
+  // Dias disponíveis no mês filtrado
+  var _diasDisp = [];
+  if(_fMes){
+    var _diasSet = {};
+    fila.filter(function(o){ return _isoOc(o).substring(0,7)===_fMes; }).forEach(function(o){
+      var d=_isoOc(o).substring(8,10); if(d&&!_diasSet[d]){_diasSet[d]=1;_diasDisp.push(d);}
+    });
+    _diasDisp.sort().reverse();
+  }
+
   var ocSel = state._triagemOcId ? ocs.find(function(o){ return o.id===state._triagemOcId; }) : null;
   // Se OC selecionada já foi triada, limpa seleção
   if(ocSel && (ocSel.situacao||"nova")!=="nova") { state._triagemOcId=null; ocSel=null; }
+
+  var _SS = "width:100%;padding:5px 7px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:11px;cursor:pointer";
+  var _MESES_PT = {"-01":"Jan","-02":"Fev","-03":"Mar","-04":"Abr","-05":"Mai","-06":"Jun","-07":"Jul","-08":"Ago","-09":"Set","-10":"Out","-11":"Nov","-12":"Dez"};
 
   var h = "<div style='display:flex;height:calc(100vh - 80px);overflow:hidden'>";
 
   // ── COLUNA ESQUERDA — fila ──
   h += "<div style='width:310px;min-width:220px;border-right:1px solid var(--papel-3);overflow-y:auto;background:var(--papel-2);flex-shrink:0'>";
-  h += "<div style='padding:12px 14px;border-bottom:1px solid var(--papel-3);background:var(--papel-2);position:sticky;top:0;z-index:2'>";
-  h += "<div style='display:flex;align-items:center;gap:8px'>";
+  h += "<div style='padding:10px 12px;border-bottom:1px solid var(--papel-3);background:var(--papel-2);position:sticky;top:0;z-index:2'>";
+  h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>";
   h += "<span style='font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--tinta)'>📥 Triagem</span>";
-  if(fila.length) h += "<span style='background:var(--verm);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:900'>"+fila.length+"</span>";
+  if(filaFiltrada.length) h += "<span style='background:var(--verm);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:900'>"+filaFiltrada.length+"</span>";
+  if(filaFiltrada.length<fila.length) h += "<span style='color:var(--tinta-2);font-size:10px'>de "+fila.length+"</span>";
   h += "</div>";
-  h += "<p style='font-size:10px;color:var(--tinta-2);margin:3px 0 0'>"+vds.length+" VD · "+resto.length+" outras</p>";
+  // Filtros mês/dia
+  h += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:6px'>";
+  h += "<select onchange='state._triagemFiltroMes=this.value;state._triagemFiltroDia=\"\";var m=document.getElementById(\"main\");if(m)renderTriagem(m)' style='"+_SS+"'>";
+  h += "<option value=''>Todos os meses</option>";
+  _mesesDisp.forEach(function(ym){
+    var suf=ym.substring(4); var ano=ym.substring(0,4);
+    h += "<option value='"+ym+"'"+(ym===_fMes?" selected":"")+">"+(_MESES_PT[suf]||suf)+" "+ano+"</option>";
+  });
+  h += "</select>";
+  h += "<select onchange='state._triagemFiltroDia=this.value;var m=document.getElementById(\"main\");if(m)renderTriagem(m)' style='"+_SS+"'"+((!_fMes)?" disabled":"")+">";
+  h += "<option value=''>Todos os dias</option>";
+  _diasDisp.forEach(function(d){
+    h += "<option value='"+d+"'"+(d===_fDia?" selected":"")+">Dia "+d+"</option>";
+  });
+  h += "</select>";
+  h += "</div>";
   h += "</div>";
 
   if(!fila.length){
@@ -13732,9 +13779,15 @@ function renderTela() {
       h.push("<div><label style='"+LS+"'>Posto de Serviço</label><input id='oc-posto' type='text' value='BCS / Setor 1' style='"+IS+"'></div>");
       h.push("</div>");
       h.push("<div style='display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px'>");
-      h.push("<div><label style='"+LS+"'>Tipo de Ocorrência *</label><select id='oc-tipo' style='"+IS+"'>");
-      tiposOc.forEach(function(t){ h.push("<option>"+t+"</option>"); });
-      h.push("</select></div>");
+      var _tiposCustom = state.tiposOcCustom||[];
+      var _todostipos = tiposOc.slice(0,-1).concat(_tiposCustom).concat(["Outro"]);
+      h.push("<div><label style='"+LS+"'>Tipo de Ocorrência *</label>");
+      h.push("<div style='display:flex;gap:6px;align-items:center'>");
+      h.push("<select id='oc-tipo' style='"+IS+";flex:1'>");
+      _todostipos.forEach(function(t){ h.push("<option>"+esc(t)+"</option>"); });
+      h.push("</select>");
+      h.push("<button type='button' title='Cadastrar novo tipo' onclick='_novoTipoOc()' style='background:var(--ambar);color:var(--madeira-3);border:none;border-radius:5px;padding:0 10px;height:34px;font-size:18px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1'>+</button>");
+      h.push("</div></div>");
       h.push("<div><label style='"+LS+"'>Data *</label><input id='oc-data' type='date' value='"+hoje()+"' style='"+IS+"'></div>");
       h.push("<div><label style='"+LS+"'>Hora *</label><input id='oc-hora' type='time' value='"+new Date().toTimeString().slice(0,5)+"' style='"+IS+"'></div>");
       h.push("<div><label style='"+LS+"'>Zona</label><select id='oc-zona' style='"+IS+"'><option>Urbana</option><option>Rural</option></select></div>");
@@ -18902,6 +18955,27 @@ function gerarJanelaPDF(oc){
   w.document.write(h);
   w.document.close();
   setTimeout(function(){w.print();},800);
+}
+
+function _novoTipoOc(){
+  var nome = prompt("Nome do novo tipo de ocorrência:");
+  if(!nome||!nome.trim()) return;
+  nome = nome.trim();
+  if(!state.tiposOcCustom) state.tiposOcCustom=[];
+  if(state.tiposOcCustom.indexOf(nome)>=0){ showToast("Tipo já existe","error"); return; }
+  state.tiposOcCustom.push(nome);
+  salvarLocal();
+  // Atualiza o select sem re-renderizar tudo
+  var sel = document.getElementById("oc-tipo");
+  if(sel){
+    var opt = document.createElement("option");
+    opt.value = nome; opt.text = nome; opt.selected = true;
+    // Insere antes de "Outro" (último item)
+    var ultimo = sel.options[sel.options.length-1];
+    sel.insertBefore(opt, ultimo);
+    sel.value = nome;
+  }
+  showToast("Tipo \""+nome+"\" cadastrado","ok");
 }
 
 function _fecharEditorOc(el){
