@@ -12686,6 +12686,10 @@ function renderFilaAuxiliar(main) {
   var agHoje = ags.filter(function(a){ return a.data===hoje_str && (a.status||"Agendado")==="Agendado"; })
     .sort(function(a,b){ return (a.hora||"").localeCompare(b.hora||""); });
 
+  // 2b. Agendamentos vencidos (data < hoje, sem resultado)
+  var agVenc = ags.filter(function(a){ return a.data<hoje_str && (a.status||"Agendado")==="Agendado"; })
+    .sort(function(a,b){ return (b.data||"").localeCompare(a.data||""); }).slice(0,5);
+
   // 3. Para triar — OCs novas, VD first
   var ocsNovas = ocs.filter(function(o){ return (o.situacao||"nova")==="nova"; });
   var vds = ocsNovas.filter(function(o){ return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||""); });
@@ -12759,6 +12763,24 @@ function renderFilaAuxiliar(main) {
     if(agHoje.length>5) h += "<p style='font-size:11px;color:var(--tinta-2);margin:6px 0 0'>+"+(agHoje.length-5)+" mais — <a href='#' onclick='setTela(\"calendario\");return false' style='color:var(--ambar)'>abrir calendário</a></p>";
   }
   h += "</div>";
+
+  // Seção 2b — Agendamentos vencidos sem resultado
+  if(agVenc.length){
+    h += "<div class='card' style='margin-bottom:14px;padding:12px 16px;border-left:3px solid var(--verm)'>";
+    h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:10px'>";
+    h += "<p style='font-size:10px;font-weight:700;color:var(--verm-2);text-transform:uppercase;letter-spacing:.8px;margin:0'>⏰ Visitas Vencidas Sem Confirmação</p>";
+    h += "<span style='background:var(--verm);color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:900'>"+agVenc.length+"</span>";
+    h += "<button onclick='state.calHistorico=true;setTela(\"calendario\")' style='margin-left:auto;background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);border-radius:5px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer'>Ver no calendário</button>";
+    h += "</div>";
+    agVenc.forEach(function(a){
+      var diasAtras=a.data?Math.floor((new Date()-new Date(a.data+"T12:00"))/864e5):0;
+      h += "<div style='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--papel-3)'>";
+      h += "<div style='flex:1'><p style='font-size:12px;font-weight:700;color:var(--tinta);margin:0'>"+esc(a.tipo||"Visita")+(a.vitima_nome?" — "+esc(a.vitima_nome):"")+"</p>";
+      h += "<p style='font-size:10px;color:var(--verm-2);margin:0'>"+esc(a.data||"—")+" ("+diasAtras+"d atrás)"+(a.responsavel?" · "+esc(a.responsavel):"")+"</p></div>";
+      h += "</div>";
+    });
+    h += "</div>";
+  }
 
   // Seção 3 — Para triar
   h += "<div class='card' style='margin-bottom:14px;padding:12px 16px'>";
