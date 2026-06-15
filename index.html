@@ -1194,6 +1194,7 @@ async function carregarDoSheets() {
       });
     }
 
+    _arquivarOcsAntigas();
     salvarLocal();
     const n = state.db.ocorrencias.length;
     showToast(n+" oc · "+(_nNovas>0?"+"+_nNovas+" novas do Sheets":"sem novas do Sheets"));
@@ -1303,6 +1304,28 @@ try{ var _evEx=localStorage.getItem("bcs_ev_excluidos"); state._deletedEvIds=_ev
 try{ var _prEx=localStorage.getItem("bcs_proj_excluidos"); state._deletedProjIds=_prEx?new Set(JSON.parse(_prEx)):new Set(); }catch(e){ state._deletedProjIds=new Set(); }
 try{ var _mtEx=localStorage.getItem("bcs_mat_excluidos"); state._deletedMatIds=_mtEx?new Set(JSON.parse(_mtEx)):new Set(); }catch(e){ state._deletedMatIds=new Set(); }
 try{ var _plEx=localStorage.getItem("bcs_pol_excluidos"); state._deletedPolIds=_plEx?new Set(JSON.parse(_plEx)):new Set(); }catch(e){ state._deletedPolIds=new Set(); }
+
+// ── Arquivar automaticamente OCs anteriores a maio/2025 ──
+function _arquivarOcsAntigas() {
+  var CORTE = "2025-04-30";
+  var PENDENTES = ["nova", "em_triagem", "em_acompanhamento"];
+  var mod = 0;
+  (state.db.ocorrencias || []).forEach(function(oc) {
+    if(!oc.data || oc.data > CORTE) return;
+    if(PENDENTES.indexOf(oc.situacao || "nova") < 0) return;
+    oc.situacao = "historico";
+    oc._autoArquivada = true;
+    mod++;
+    _sheetsGet({acao:"atualizarSituacaoOc", id:oc.id, situacao:"historico"}).catch(function(){});
+  });
+  if(mod > 0) {
+    salvarLocal();
+    console.log("[BCS] Arquivadas "+mod+" OC(s) anteriores a maio/2025");
+  }
+  return mod;
+}
+// Rodar na inicialização
+_arquivarOcsAntigas();
 
 // Normalizar datas e horas dos agendamentos
 function _normDataStr(d){
