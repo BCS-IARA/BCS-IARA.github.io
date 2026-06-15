@@ -1307,11 +1307,21 @@ try{ var _plEx=localStorage.getItem("bcs_pol_excluidos"); state._deletedPolIds=_
 
 // ── Arquivar automaticamente OCs anteriores a maio/2025 ──
 function _arquivarOcsAntigas() {
-  var CORTE = "2025-04-30";
+  var CORTE = "2025-04-30"; // inclusive
   var PENDENTES = ["nova", "em_triagem", "em_acompanhamento"];
+  // Parser inline — _pdLocal pode não estar definido ainda na inicialização
+  function _toISO(s) {
+    if(!s) return null;
+    var str = String(s).trim();
+    var m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if(m) return m[3]+"-"+m[2]+"-"+m[1]; // DD/MM/YYYY → YYYY-MM-DD
+    if(/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0,10);
+    return null;
+  }
   var mod = 0;
   (state.db.ocorrencias || []).forEach(function(oc) {
-    if(!oc.data || oc.data > CORTE) return;
+    var iso = _toISO(oc.data);
+    if(!iso || iso > CORTE) return;
     if(PENDENTES.indexOf(oc.situacao || "nova") < 0) return;
     oc.situacao = "historico";
     oc._autoArquivada = true;
