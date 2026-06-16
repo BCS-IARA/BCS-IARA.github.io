@@ -12688,6 +12688,82 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
   win.document.close();
 };
 
+// Dossiê a partir de uma OC quando não há ficha formal de vítima
+function _buildDossieCorpoDeOc(oc, nomeVit){
+  if(!oc) return null;
+  function _fmtD(d){
+    if(!d) return "—";
+    var s=String(d).trim();
+    if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+    var iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso) return iso[3]+"/"+iso[2]+"/"+iso[1];
+    return s.substring(0,10)||"—";
+  }
+  var dataDossie=new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+  var relato=oc.descricao_dinamica||oc.texto_original||oc.narrativa||oc.descricao||"";
+  var fridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===oc.id;})
+    .sort(function(a,b){return (b.data||"").localeCompare(a.data||"");});
+  var encsOc=(state.encaminhamentos||[]).filter(function(enc){return enc.ocorrencia_id===oc.id;});
+  // Atendimentos vinculados (atendimentos da auxiliar/gestor)
+  var atends=(state.db.atendimentos||[]).filter(function(a){
+    return a.ocorrenciaId===oc.id || (nomeVit&&nomeVit!=="—"&&(a.nome||"").toLowerCase()===nomeVit.toLowerCase());
+  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var h="";
+  h+="<h2>Identificação</h2>";
+  var telOc=oc.vitima_telefone||(oc.solicitante?oc.solicitante.telefone:"")||"";
+  var campos=[["Nome",nomeVit],["Bairro",oc.bairro||""],["Telefone",telOc]];
+  campos.forEach(function(c){if(c[1]&&c[1]!=="—") h+="<div class='campo'><div class='label'>"+c[0]+"</div><div class='valor'>"+esc(c[1])+"</div></div>";});
+  if(fridas.length){
+    h+="<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
+    fridas.forEach(function(f){
+      var nivelCls=f.nivel==="E"?"frida-E":f.nivel==="M"?"frida-M":"frida-B";
+      var nivelLabel=f.nivel==="E"?"ELEVADO":f.nivel==="M"?"MÉDIO":"BAIXO";
+      h+="<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+_fmtD(f.data)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio):"")+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
+    });
+  }
+  h+="<h2>Ocorrência de Origem</h2>";
+  h+="<div class='oc-item'>";
+  var isVD=oc.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(oc.tipo||"");
+  h+="<div style='display:flex;align-items:center;margin-bottom:4px'><strong style='font-size:13px'>"+esc(oc.tipo||"—")+"</strong>";
+  if(isVD) h+="<span class='badge-vd'>VD</span>";
+  h+="</div><div class='oc-meta'>"+_fmtD(oc.data);
+  if(oc.hora) h+=" · "+esc(oc.hora);
+  if(oc.bairro) h+=" · "+esc(oc.bairro);
+  if(oc.numero) h+=" · Nº "+esc(oc.numero);
+  h+="</div>";
+  if(relato) h+="<p style='font-size:12px;color:#3a2818;margin-top:6px'>"+esc(relato)+"</p>";
+  if(oc.medidas) h+="<div class='sec-medidas'><strong>Medidas adotadas:</strong> "+esc(oc.medidas)+"</div>";
+  if(oc.policiais) h+="<div style='font-size:11px;color:#5a2a0a;margin-top:4px'>👮 Guarnição: "+esc(oc.policiais)+"</div>";
+  if(oc.resumo_atendimento) h+="<div style='margin-top:8px;padding:6px 10px;background:#f5f0e8;border-radius:4px;font-size:12px;color:#3a2818'><strong>Resumo do atendimento:</strong> "+esc(oc.resumo_atendimento)+"</div>";
+  h+="</div>";
+  if(atends.length){
+    h+="<h2>Atendimentos Registrados ("+atends.length+")</h2>";
+    atends.forEach(function(a){
+      h+="<div class='enc-item'><div style='display:flex;gap:8px;align-items:center;margin-bottom:4px'>";
+      h+="<strong>"+esc(a.tipo||"Atendimento")+"</strong>";
+      h+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(a.data)+(a.hora?" · "+a.hora:"")+"</span></div>";
+      if(a.descricao) h+="<p style='font-size:12px;color:#3a2818'>"+esc(a.descricao)+"</p>";
+      if(a.encaminhamento) h+="<p style='font-size:11px;color:#5a2a0a;margin-top:4px'>📤 "+esc(a.encaminhamento)+"</p>";
+      h+="</div>";
+    });
+  }
+  if(encsOc.length){
+    h+="<h2>Encaminhamentos ("+encsOc.length+")</h2>";
+    var stLabel={pendente:"Pendente",aguardando_devolutiva:"Aguardando resposta",concluido:"Concluído"};
+    encsOc.forEach(function(enc){
+      h+="<div class='enc-item'><div style='display:flex;gap:8px;align-items:center;margin-bottom:4px'>";
+      h+="<strong>"+esc(enc.tipo||enc.orgao||"—")+"</strong>";
+      h+="<span style='background:#f5ede0;border:1px solid #e8d5b7;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:#5a2a0a'>"+(stLabel[enc.status]||enc.status||"—")+"</span>";
+      h+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(enc.data)+"</span></div>";
+      if(enc.descricao) h+="<p style='font-size:12px;color:#3a2818'>"+esc(enc.descricao)+"</p>";
+      if(enc.relato_devolutiva) h+="<p style='font-size:12px;color:#1a4a1a;margin-top:4px;padding:6px 8px;background:#f0fff0;border-radius:4px'>Devolutiva: "+esc(enc.relato_devolutiva)+"</p>";
+      h+="</div>";
+    });
+  }
+  h+="<div class='footer'><span>77ª CIPM BCS — Sistema IARA</span><span>Emitido em "+dataDossie+"</span></div>";
+  return {html:h, nome:nomeVit};
+}
+
 // Constrói o conteúdo HTML do dossiê (sem a tag <html> externa) — reutilizável no ofício
 window._buildDossieCorpo = function(vitimaId, opts) {
   opts = opts||{};
@@ -13310,8 +13386,8 @@ function renderFilaEncaminhamentos(main) {
     var hoje_str = hoje();
     pendentes.forEach(function(e){
       var atrasado = e.prazo && e.prazo < hoje_str;
-      var vit = (state.vitimas||[]).find(function(v){ return v.id===e.vitima_id; });
-      var nomeVit = vit ? vit.nome : (e.vitima_id||"Vítima não vinculada");
+      var nomeVit = _nomeEncLimpo(e);
+      if(nomeVit==="—") nomeVit="Vítima não vinculada";
       h += "<div class='card' style='margin-bottom:10px;border-left:4px solid "+(atrasado?"var(--verm)":"var(--ambar)")+";padding:12px 16px'>";
       h += "<div style='display:flex;align-items:flex-start;gap:12px'>";
       h += "<div style='flex:1'>";
@@ -13489,7 +13565,7 @@ window._gerarPdfEncaminhamento = function(encId) {
     return m ? m[3]+"/"+m[2]+"/"+m[1] : d;
   })(_dtEnv);
   var _orgLabels = {crav:"CRAV","delegacia":"Delegacia da Mulher","ministerio":"Ministério Público","assistencia":"Assistência Social","saude":"CAPS / Saúde Mental","conselho":"Conselho Tutelar"};
-  var _orgNome = _orgLabels[e.orgao]||e.orgao||"Órgão não informado";
+  var _orgNome = _orgLabels[e.orgao]||e.orgao||_orgLabels[e.tipo]||e.tipo||"Órgão não informado";
   var _unidade = "77ª CIPM — BCS / Barreiras-BA";
   var _dataHoje = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   // OC vinculada
@@ -13546,8 +13622,15 @@ window._gerarPdfEncaminhamento = function(encId) {
   html += "<p style='font-size:11px;color:#444;line-height:1.7'>Encaminhamos à <strong>"+esc(_orgNome)+"</strong> a situação da vítima <strong>"+esc(nomeVit)+"</strong>, conforme Política Nacional de Enfrentamento à Violência contra as Mulheres (Lei nº 11.340/2006 — Lei Maria da Penha). Solicitamos devolutiva das providências adotadas pelo link acima, imprescindível para acompanhamento do caso pela 77ª CIPM.</p>";
   html += "<div class='assinatura'><p>______________________________________</p><p style='margin-top:4px'><strong>Comandante — 77ª CIPM / BCS</strong></p><p>Barreiras — BA</p></div>";
   // ── DOSSIÊ COMPLETO (anexo ao ofício) ───────────────────────────
-  if(e.vitima_id && typeof _buildDossieCorpo === "function"){
-    var _dc = _buildDossieCorpo(e.vitima_id);
+  // Tenta por vitima_id; se não tiver, busca vítima pelo nome na OC
+  var _vitIdParaDossie = e.vitima_id;
+  if(!_vitIdParaDossie && nomeVit && nomeVit!=="—"){
+    var _nomeBuscaD = nomeVit.trim().toLowerCase();
+    var _vitMatch = (state.vitimas||[]).find(function(v){ return (v.nome||"").toLowerCase().includes(_nomeBuscaD)||(v.nome||"").toLowerCase()===_nomeBuscaD; });
+    if(_vitMatch) _vitIdParaDossie = _vitMatch.id;
+  }
+  if(typeof _buildDossieCorpo === "function"){
+    var _dc = _vitIdParaDossie ? _buildDossieCorpo(_vitIdParaDossie) : _buildDossieCorpoDeOc(oc, nomeVit);
     if(_dc){
       html += "<div style='page-break-before:always'></div>";
       html += "<div style='background:#1B3A6B;padding:10px 16px;display:flex;align-items:center;gap:10px;margin-bottom:8px'>";
