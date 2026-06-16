@@ -12801,6 +12801,139 @@ function renderFilaAuxiliar(main) {
   _renderCentralBar(main,"fila_auxiliar");
 }
 
+function renderHistoricoAtendimento(main) {
+  var busca = (state._histBusca||'').toLowerCase().trim();
+  var filtroPeriodo = state._histPeriodo||'';
+  var tipoFiltro = state._histTipo||'';
+
+  var registros = [];
+
+  // Ocorrencias encerradas
+  (state.db.ocorrencias||[]).forEach(function(o){
+    if(!(o.status==='encerrada'||o.status==='encerrado'||o.encerrada)) return;
+    registros.push({
+      tipo:'ocorrencia', icone:'\u{1F4CB}',
+      data:o.data||'',
+      titulo:'OC #'+(o.numero||o.id||'')+(o.tipo?' \u2014 '+o.tipo:''),
+      subtitulo:o.nome_vitima||o.envolvidos||'',
+      descricao:o.narrativa||o.descricao||'',
+      bairro:o.bairro||'', status:o.status||'encerrada', cor:'var(--tinta-2)'
+    });
+  });
+
+  // Atendimentos
+  (state.db.atendimentos||[]).forEach(function(a){
+    registros.push({
+      tipo:'atendimento', icone:'\u{1F91D}',
+      data:a.data||'',
+      titulo:'Atendimento'+(a.tipo?' \u2014 '+a.tipo:''),
+      subtitulo:a.nome||a.envolvido||'',
+      descricao:a.descricao||a.observacoes||'',
+      bairro:a.bairro||a.local||'', status:a.status||'realizado', cor:'var(--azul)'
+    });
+  });
+
+  // Encaminhamentos concluidos
+  (state.encaminhamentos||[]).filter(function(e){return e.status==='concluido';}).forEach(function(e){
+    registros.push({
+      tipo:'encaminhamento', icone:'\u{1F4E4}',
+      data:e.data||'',
+      titulo:'Encaminhamento \u2014 '+(e.destino||e.orgao||''),
+      subtitulo:e.nome||e.vitima||'',
+      descricao:e.descricao||e.relato_devolutiva||'',
+      bairro:'', status:'conclu\u00EDdo', cor:'var(--verde)'
+    });
+  });
+
+  registros.sort(function(a,b){return (b.data||'').localeCompare(a.data||'');});
+
+  var hoje_iso = hoje();
+  if(filtroPeriodo){
+    registros = registros.filter(function(r){
+      var d=(r.data||'').substring(0,10);
+      if(filtroPeriodo==='hoje') return d===hoje_iso;
+      if(filtroPeriodo==='semana'){
+        var ms=new Date(hoje_iso).getTime(); var rd=new Date(d).getTime();
+        return (ms-rd)>=0&&(ms-rd)<7*86400000;
+      }
+      if(filtroPeriodo==='mes') return d.substring(0,7)===hoje_iso.substring(0,7);
+      return true;
+    });
+  }
+
+  var filtrados = registros.filter(function(r){
+    if(!busca) return true;
+    return (r.titulo+r.subtitulo+r.descricao+r.bairro+r.data).toLowerCase().indexOf(busca)>=0;
+  });
+
+  if(tipoFiltro) filtrados = filtrados.filter(function(r){return r.tipo===tipoFiltro;});
+
+  var h = "<div style='max-width:860px;margin:0 auto;padding:0 4px'>";
+
+  h += "<div style='display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap'>";
+  h += "<h2 style='font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--tinta);margin:0'>\u{1F5C2}\uFE0F Hist\u00F3rico de Atendimentos</h2>";
+  h += "<span style='background:var(--papel-3);color:var(--tinta-2);border-radius:12px;padding:2px 10px;font-size:12px'>"+filtrados.length+" registro"+(filtrados.length!==1?'s':'')+" encontrado"+(filtrados.length!==1?'s':'')+"</span>";
+  h += "</div>";
+
+  h += "<div style='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap'>";
+  h += "<div style='flex:1;min-width:200px;position:relative'>";
+  h += "<span style='position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none'>\u{1F50D}</span>";
+  h += "<input id='hist-busca' type='text' value='"+esc(state._histBusca||'')+"' "
+     + "placeholder='Buscar por nome, tipo, bairro, narrativa\u2026' "
+     + "oninput='state._histBusca=this.value;renderHistoricoAtendimento(document.getElementById(\"fila-dia-content\"))' "
+     + "style='width:100%;box-sizing:border-box;padding:9px 12px 9px 34px;border:1px solid var(--papel-3);border-radius:8px;background:var(--papel);color:var(--tinta);font-size:13px'>";
+  h += "</div>";
+  var periodos=[{v:'',l:'Todos'},{v:'hoje',l:'Hoje'},{v:'semana',l:'7 dias'},{v:'mes',l:'Este m\u00EAs'}];
+  h += "<div style='display:flex;gap:4px'>";
+  periodos.forEach(function(p){
+    var av=filtroPeriodo===p.v;
+    h += "<button onclick='state._histPeriodo=\""+p.v+"\";renderHistoricoAtendimento(document.getElementById(\"fila-dia-content\"))' "
+       + "style='padding:8px 11px;border:1px solid "+(av?'var(--azul)':'var(--papel-3)')+";border-radius:8px;background:"+(av?'var(--azul)':'var(--papel)')+";color:"+(av?'#fff':'var(--tinta-2)')+";font-size:11px;font-weight:"+(av?'700':'400')+";cursor:pointer;white-space:nowrap'>"+p.l+"</button>";
+  });
+  h += "</div></div>";
+
+  h += "<div style='display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap'>";
+  [{v:'',l:'Todos',ic:''},{v:'ocorrencia',l:'Ocorr\u00EAncias',ic:'\u{1F4CB}'},{v:'atendimento',l:'Atendimentos',ic:'\u{1F91D}'},{v:'encaminhamento',l:'Encaminhamentos',ic:'\u{1F4E4}'}].forEach(function(t){
+    var av=tipoFiltro===t.v;
+    h += "<button onclick='state._histTipo=\""+t.v+"\";renderHistoricoAtendimento(document.getElementById(\"fila-dia-content\"))' "
+       + "style='padding:5px 12px;border-radius:20px;border:1px solid "+(av?'var(--azul)':'var(--papel-3)')+";background:"+(av?'var(--azul)':'transparent')+";color:"+(av?'#fff':'var(--tinta-2)')+";font-size:11px;font-weight:"+(av?'700':'400')+";cursor:pointer'>"+(t.ic?t.ic+' ':'')+t.l+"</button>";
+  });
+  h += "</div>";
+
+  if(!filtrados.length){
+    h += "<div class='card' style='text-align:center;padding:56px'>";
+    h += "<p style='font-size:32px;margin-bottom:10px'>\u{1F50E}</p>";
+    h += "<p style='font-size:15px;font-weight:700;color:var(--tinta);font-family:Georgia,serif'>Nenhum registro encontrado</p>";
+    h += "<p style='font-size:13px;color:var(--tinta-2);margin-top:6px'>Tente outros termos ou ajuste o filtro.</p>";
+    h += "</div>";
+  } else {
+    filtrados.forEach(function(r){
+      var dFmt=(r.data||'').substring(0,10);
+      h += "<div class='card' style='margin-bottom:10px;padding:14px 16px;border-left:3px solid "+r.cor+"'>";
+      h += "<div style='display:flex;align-items:flex-start;gap:10px'>";
+      h += "<span style='font-size:18px;flex-shrink:0;margin-top:1px'>"+r.icone+"</span>";
+      h += "<div style='flex:1;min-width:0'>";
+      h += "<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px'>";
+      h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>"+esc(r.titulo)+"</span>";
+      if(r.subtitulo) h += "<span style='font-size:12px;color:var(--tinta-2)'>"+esc(r.subtitulo)+"</span>";
+      h += "</div>";
+      if(r.descricao){
+        var desc=r.descricao.length>160?r.descricao.substring(0,160)+'\u2026':r.descricao;
+        h += "<p style='font-size:12px;color:var(--tinta-2);margin:4px 0 0;line-height:1.45'>"+esc(desc)+"</p>";
+      }
+      h += "<div style='display:flex;gap:10px;margin-top:6px;flex-wrap:wrap'>";
+      if(dFmt) h += "<span style='font-size:11px;color:var(--tinta-3)'>\u{1F4C5} "+esc(dFmt)+"</span>";
+      if(r.bairro) h += "<span style='font-size:11px;color:var(--tinta-3)'>\u{1F4CD} "+esc(r.bairro)+"</span>";
+      h += "<span style='font-size:10px;background:var(--papel-3);color:var(--tinta-2);border-radius:10px;padding:1px 7px'>"+esc(r.status)+"</span>";
+      h += "</div></div></div></div>";
+    });
+  }
+
+  h += "</div>";
+  main.innerHTML = h;
+  setTimeout(function(){var el=document.getElementById('hist-busca');if(el&&!busca)el.focus();},80);
+}
+
 function renderFilaDia(main) {
   if(!state._filaTab) state._filaTab = "triagem";
   var tab = state._filaTab;
@@ -12820,7 +12953,8 @@ function renderFilaDia(main) {
     {k:"triagem",       label:"Triagem",          badge:_nTri,  cor:"var(--verm)"},
     {k:"agenda",        label:"Fila do Dia",       badge:0,      cor:"var(--ambar)"},
     {k:"encaminhamentos",label:"Encaminhamentos",  badge:_nEnc,  cor:"var(--ambar)"},
-    {k:"devolutivas",   label:"Devolutivas",       badge:_nDev,  cor:"var(--verde)"}
+    {k:"devolutivas",   label:"Devolutivas",       badge:_nDev,  cor:"var(--verde)"},
+    {k:"historico",      label:"Histórico",         badge:0,      cor:"var(--azul)"}
   ];
 
   // Injeta wrapper com barra de abas no topo
@@ -12842,6 +12976,7 @@ function renderFilaDia(main) {
     else if(tab === "vcm")             renderDashboardVCM(content);
     else if(tab === "encaminhamentos") renderFilaEncaminhamentos(content);
     else if(tab === "devolutivas")     renderDevolutivas(content);
+    else if(tab === "historico")          renderHistoricoAtendimento(content);
     else                               renderFilaAuxiliar(content);
   } finally {
     state._inFilaDia = false;
