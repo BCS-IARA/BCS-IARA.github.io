@@ -13186,19 +13186,13 @@ function renderTriagem(main) {
     // BLOCO 3 — Decisão
     h += "<div class='card' style='margin-bottom:16px;padding:14px 16px'>";
     h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px'>③ Decisão</p>";
-    h += "<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:10px'>";
+    h += "<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px'>";
     h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Situação</label>";
     h += "<select id='tri-situacao' style='width:100%;padding:8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px'>";
     h += "<option value='em_acompanhamento'>Em acompanhamento</option>";
     h += "<option value='encerrada'>Encerrada</option>";
     h += "<option value='historico'>Histórico</option>";
     h += "</select></div>";
-    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Próxima Ação</label>";
-    h += "<input id='tri-proxacao' type='text' placeholder='Ex: Ligar para verificar situação' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px;box-sizing:border-box'></div>";
-    h += "</div>";
-    h += "<div style='display:grid;grid-template-columns:160px 1fr;gap:10px'>";
-    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Data da Próxima Ação</label>";
-    h += "<input id='tri-proxdata' type='date' style='width:100%;padding:8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px;box-sizing:border-box'></div>";
     h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Observações finais</label>";
     h += "<input id='tri-obs' type='text' placeholder='Opcional' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:13px;box-sizing:border-box'></div>";
     h += "</div></div>";
@@ -13349,27 +13343,6 @@ window._salvarTriagem = function(ocId) {
     } else {
       showToast("Informe a data da visita","error"); return;
     }
-  }
-
-  // Próxima ação → agendamento
-  var proxAcao  = (document.getElementById("tri-proxacao")||{value:""}).value.trim();
-  var proxData  = (document.getElementById("tri-proxdata")||{value:""}).value;
-  if(proxAcao && proxData){
-    if(!state.db.agendamentos) state.db.agendamentos=[];
-    var agProx = {
-      id:"ag_prox_"+Date.now(),
-      ocorrenciaId: ocId,
-      vitima_id: oc.vitima_id||"",
-      tipo:"Próxima ação",
-      subtipo:"proxima_acao",
-      descricao: proxAcao,
-      data: proxData,
-      responsavel:"",
-      status:"Agendado",
-      criadoEm: new Date().toISOString()
-    };
-    state.db.agendamentos.push(agProx);
-    enviarSheets("agendamentos", agProx);
   }
 
   // Observações finais
