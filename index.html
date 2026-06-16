@@ -13172,8 +13172,7 @@ function renderHistoricoAtendimento(main) {
       var dMostrar = dFmt;
       if(/^\d{4}-\d{2}-\d{2}$/.test(dFmt)) dMostrar = dFmt.substring(8,10)+'/'+dFmt.substring(5,7)+'/'+dFmt.substring(0,4);
       var _clicavel = r.tipo==='ocorrencia'&&r.id;
-      var _onclick = _clicavel ? "onclick=\"state.popEditarOc='"+r.id+"';state.tela='ocorrencias';renderOcorrenciasGestor(document.getElementById('main'))\"" : "";
-      h += "<div class='card' "+_onclick+" style='margin-bottom:8px;padding:12px 16px;border-left:4px solid "+r.cor+";cursor:"+(_clicavel?'pointer':'default')+"'>";
+      h += "<div class='card' style='margin-bottom:8px;padding:12px 16px;border-left:4px solid "+r.cor+";cursor:default'>";
       h += "<div style='display:flex;align-items:flex-start;gap:10px'>";
       h += "<span style='font-size:16px;flex-shrink:0;margin-top:2px'>"+r.icone+"</span>";
       h += "<div style='flex:1;min-width:0'>";
@@ -13196,6 +13195,14 @@ function renderHistoricoAtendimento(main) {
       if(r.hora) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udd50 "+esc(r.hora)+"</span>";
       if(r.bairro) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udccd "+esc(r.bairro)+"</span>";
       h += "</div>";
+
+      // Botões Editar e Dossiê (apenas para OCs)
+      if(r.tipo==='ocorrencia'&&r.id){
+        h += "<div style='display:flex;gap:6px;margin-top:8px'>";
+        h += "<button onclick='event.stopPropagation();state.popEditarOc=\""+r.id+"\";state.tela=\"ocorrencias\";renderOcorrenciasGestor(document.getElementById(\"main\"))' style='background:#1a1a2a;border:1px solid #4a5a7a;color:#8a9aba;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>✏ Editar</button>";
+        h += "<button onclick='event.stopPropagation();_dossieByOcId(\""+r.id+"\")' style='background:#1a0e00;border:1px solid #c8860a;color:#e8a020;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>📄 Dossiê</button>";
+        h += "</div>";
+      }
 
       h += "</div></div></div>";
     });
