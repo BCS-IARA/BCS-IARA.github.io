@@ -12841,6 +12841,36 @@ function renderHistoricoAtendimento(main) {
     });
   });
 
+  // Visitas realizadas
+  (state.db.visitas||[]).forEach(function(v){
+    registros.push({
+      tipo:'visita', icone:'\u{1F3E0}',
+      data:v.data||'',
+      titulo:'Visita'+(v.tipo?' \u2014 '+v.tipo:''),
+      subtitulo:v.vitima_nome||v.nome||'',
+      descricao:v.resultado||v.observacoes||'',
+      bairro:v.endereco||v.bairro||'',
+      status:'realizada', cor:'var(--ambar)'
+    });
+  });
+
+  // FRIDA \u2014 avaliacoes de risco VD
+  var _fridaNivelLabel = {B:'Risco Baixo', M:'Risco M\u00e9dio', E:'Risco Elevado'};
+  var _fridaNivelCor   = {B:'var(--verde)', M:'var(--ambar)', E:'var(--verm)'};
+  (state.db.frida||[]).forEach(function(f){
+    var nivel = f.nivel||'';
+    registros.push({
+      tipo:'frida', icone:'\u{1F6E1}\ufe0f',
+      data:(f.data||'').substring(0,10),
+      titulo:'FRIDA \u2014 '+ (_fridaNivelLabel[nivel]||nivel||'Avalia\u00e7\u00e3o de Risco'),
+      subtitulo:f.vitima_nome||'',
+      descricao:f.relatorio||'',
+      bairro:'',
+      status:_fridaNivelLabel[nivel]||'avaliado',
+      cor:_fridaNivelCor[nivel]||'var(--ambar)'
+    });
+  });
+
   // Encaminhamentos concluidos
   (state.encaminhamentos||[]).filter(function(e){return e.status==='concluido';}).forEach(function(e){
     registros.push({
@@ -12901,7 +12931,7 @@ function renderHistoricoAtendimento(main) {
   h += "</div></div>";
 
   h += "<div style='display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap'>";
-  [{v:'',l:'Todos',ic:''},{v:'ocorrencia',l:'Ocorr\u00EAncias',ic:'\u{1F4CB}'},{v:'atendimento',l:'Atendimentos',ic:'\u{1F91D}'},{v:'encaminhamento',l:'Encaminhamentos',ic:'\u{1F4E4}'}].forEach(function(t){
+  [{v:'',l:'Todos',ic:''},{v:'ocorrencia',l:'Ocorr\u00EAncias',ic:'\u{1F4CB}'},{v:'atendimento',l:'Atendimentos',ic:'\u{1F91D}'},{v:'visita',l:'Visitas',ic:'\u{1F3E0}'},{v:'frida',l:'FRIDA',ic:'\u{1F6E1}\uFE0F'},{v:'encaminhamento',l:'Encaminhamentos',ic:'\u{1F4E4}'}].forEach(function(t){
     var av=tipoFiltro===t.v;
     h += "<button onclick='state._histTipo=\""+t.v+"\";renderHistoricoAtendimento(document.getElementById(\"fila-dia-content\"))' "
        + "style='padding:5px 12px;border-radius:20px;border:1px solid "+(av?'var(--azul)':'var(--papel-3)')+";background:"+(av?'var(--azul)':'transparent')+";color:"+(av?'#fff':'var(--tinta-2)')+";font-size:11px;font-weight:"+(av?'700':'400')+";cursor:pointer'>"+(t.ic?t.ic+' ':'')+t.l+"</button>";
