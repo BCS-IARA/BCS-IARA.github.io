@@ -12543,6 +12543,16 @@ window._dossieByOcId = function(ocId){
 };
 
 window._gerarDossieByNome = function(nomeVitima, ocIdRef){
+  function _fmtD(d){
+    if(!d) return "—";
+    var s = String(d).trim();
+    if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso) return iso[3]+"/"+iso[2]+"/"+iso[1];
+    var dt = new Date(s);
+    if(isNaN(dt.getTime())) return s.substring(0,10)||"—";
+    return dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"});
+  }
   var nome = (nomeVitima||"").trim();
   var nomeLower = nome.toLowerCase();
   function _ocTemNome(o){
@@ -12550,10 +12560,19 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
     if((o.vitima_nome||"").toLowerCase().indexOf(nomeLower)>=0) return true;
     if((o.nome_vitima||"").toLowerCase().indexOf(nomeLower)>=0) return true;
     if((o.vitimas||[]).some(function(v){return (v.nome||"").toLowerCase().indexOf(nomeLower)>=0;})) return true;
+    if(o.solicitante&&(o.solicitante.nome||"").toLowerCase().indexOf(nomeLower)>=0) return true;
     return false;
   }
-  // Sempre inclui a OC de origem; adiciona demais que tenham o nome
   var ocRef = (state.db.ocorrencias||[]).find(function(o){return o.id===ocIdRef;});
+  // Se o nome ainda é genérico, tenta extrair do ocRef
+  if((!nome||nome==="Vítima") && ocRef){
+    nome = ocRef.vitima_nome||ocRef.nome_vitima
+      ||(ocRef.vitimas&&ocRef.vitimas[0]?ocRef.vitimas[0].nome:"")
+      ||(ocRef.solicitante?ocRef.solicitante.nome:"")
+      ||"Vítima";
+    nomeLower = nome.toLowerCase();
+  }
+  // Sempre inclui a OC de origem; adiciona demais que tenham o nome
   var ocsVit = (state.db.ocorrencias||[]).filter(function(o){
     return o.id===ocIdRef || _ocTemNome(o);
   }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
@@ -12568,9 +12587,13 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
     return (v.vitima_nome||v.nome||"").toLowerCase().indexOf(nomeLower)>=0
         || ocsIds.indexOf(v.ocorrenciaId||"")>=0;
   }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  // Se o nome ainda é genérico, tenta extrair do ocRef
-  if((!nome||nome==="Vítima") && ocRef){
-    nome = ocRef.vitima_nome||ocRef.nome_vitima||(ocRef.vitimas&&ocRef.vitimas[0]?ocRef.vitimas[0].nome:"")||"Vítima";
+  // Extrai dados da vítima do ocRef para a seção Identificação
+  var vTel="", vSexo="", vIdade="", vEnd="";
+  if(ocRef){
+    vTel  = ocRef.vitima_telefone||(ocRef.solicitante?ocRef.solicitante.telefone:"")||"";
+    vSexo = ocRef.vitima_sexo==="F"?"Feminino":ocRef.vitima_sexo==="M"?"Masculino":(ocRef.vitima_sexo||"");
+    vIdade= ocRef.vitima_idade?ocRef.vitima_idade+" anos":"";
+    vEnd  = ocRef.vitima_endereco||(ocRef.solicitante?ocRef.solicitante.endereco:"")||"";
   }
   var dataDossie = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   var html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Dossiê — "+esc(nome)+"</title><style>";
@@ -12578,11 +12601,13 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
   html += "h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a2a0a;margin:22px 0 8px;border-bottom:1px solid #e8d5b7;padding-bottom:5px}";
   html += ".campo{display:grid;grid-template-columns:150px 1fr;gap:6px;margin-bottom:6px;font-size:13px}.label{color:#8a6a4a;font-weight:700}.valor{color:#1a0e00}";
   html += ".oc-item{border:1px solid #e8d5b7;border-left:4px solid #5a2a0a;border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:12px}";
+  html += ".oc-meta{color:#8a6a4a;font-size:11px;margin-bottom:6px}";
   html += ".enc-item{border:1px solid #e8d5b7;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:12px}";
   html += ".badge-vd{background:#dc2626;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px}";
   html += ".frida-badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px}";
   html += ".frida-E{background:#dc2626;color:#fff}.frida-M{background:#f59e0b;color:#1a0e00}.frida-B{background:#22c55e;color:#fff}";
   html += ".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e8d5b7;font-size:11px;color:#8a6a4a;display:flex;justify-content:space-between}";
+  html += ".sec-medidas{margin-top:6px;padding:6px 8px;background:#f5ede0;border-radius:4px;font-size:12px;color:#3a2818}";
   html += "@media print{body{margin:20px;padding:0}button{display:none!important}}</style></head><body>";
   html += "<div style='background:#1B3A6B;padding:14px 20px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:4px'>";
   html += "<img src='"+BCS_LOGO_B64+"' style='width:60px;height:60px;border-radius:50%;object-fit:cover;flex-shrink:0'>";
@@ -12590,32 +12615,55 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
   html += "<div style='color:#adc8ff;font-size:12px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
   html += "<div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:11px'>Emitido em "+dataDossie+"<br><span style='color:#ff9999;font-weight:700'>CONFIDENCIAL</span></div></div>";
   html += "<h2>Identificação</h2>";
-  html += "<div class='campo'><div class='label'>Nome</div><div class='valor'>"+esc(nome)+"</div></div>";
+  html += "<div class='campo'><div class='label'>Nome</div><div class='valor'>"+esc(nome||"—")+"</div></div>";
+  if(vSexo) html += "<div class='campo'><div class='label'>Sexo</div><div class='valor'>"+esc(vSexo)+"</div></div>";
+  if(vIdade) html += "<div class='campo'><div class='label'>Idade</div><div class='valor'>"+esc(vIdade)+"</div></div>";
+  if(vTel) html += "<div class='campo'><div class='label'>Telefone</div><div class='valor'>"+esc(vTel)+"</div></div>";
+  if(vEnd) html += "<div class='campo'><div class='label'>Endereço</div><div class='valor'>"+esc(vEnd)+"</div></div>";
   if(fridas.length){
     html += "<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
     fridas.forEach(function(f){
       var nivelCls=f.nivel==="E"?"frida-E":f.nivel==="M"?"frida-M":"frida-B";
       var nivelLabel=f.nivel==="E"?"ELEVADO":f.nivel==="M"?"MÉDIO":"BAIXO";
-      html += "<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+(f.data||"—").substring(0,10)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio.substring(0,120)):"")+"</div>";
+      html += "<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+_fmtD(f.data)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio):"")+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
     });
   }
   html += "<h2>Histórico de Ocorrências ("+ocsVit.length+")</h2>";
   if(!ocsVit.length) html += "<p style='color:#8a6a4a;font-size:12px'>Nenhuma ocorrência localizada.</p>";
   ocsVit.forEach(function(o){
     var isVD=o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
-    html += "<div class='oc-item'><div style='display:flex;align-items:center;margin-bottom:6px'>";
+    var relato = o.descricao_dinamica||o.texto_original||o.narrativa||o.descricao||"";
+    html += "<div class='oc-item'>";
+    html += "<div style='display:flex;align-items:center;margin-bottom:4px'>";
     html += "<strong style='font-size:13px'>"+esc(o.tipo||"—")+"</strong>";
     if(isVD) html += "<span class='badge-vd'>VD</span>";
-    html += "<span style='margin-left:auto;color:#8a6a4a;font-size:11px'>"+esc(o.data||"—")+(o.hora?" · "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+"</span></div>";
-    if(o.narrativa||o.descricao) html += "<p style='font-size:12px;color:#3a2818'>"+esc((o.narrativa||o.descricao||"").substring(0,300))+"</p>";
-    if(o.numero) html += "<p style='font-size:11px;color:#8a6a4a;margin-top:4px'>Nº "+esc(o.numero)+"</p>";
+    html += "</div>";
+    // Linha de metadados: data, hora, bairro, nº SIGESPOL
+    html += "<div class='oc-meta'>";
+    html += _fmtD(o.data);
+    if(o.hora) html += " · "+esc(o.hora);
+    if(o.bairro) html += " · "+esc(o.bairro);
+    if(o.numero) html += " · Nº "+esc(o.numero);
+    html += "</div>";
+    // Nome da vítima se diferente do nome principal
+    var nOc = o.vitima_nome||o.nome_vitima||(o.vitimas&&o.vitimas[0]?o.vitimas[0].nome:"")||(o.solicitante?o.solicitante.nome:"");
+    if(nOc && nOc.toLowerCase()!==nomeLower) html += "<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>👤 "+esc(nOc)+"</div>";
+    // Telefone da vítima nesta OC
+    var telOc = o.vitima_telefone||(o.solicitante?o.solicitante.telefone:"");
+    if(telOc) html += "<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>📞 "+esc(telOc)+"</div>";
+    // Relato completo
+    if(relato) html += "<p style='font-size:12px;color:#3a2818;margin-bottom:4px'>"+esc(relato)+"</p>";
+    // Medidas da guarnição
+    if(o.medidas) html += "<div class='sec-medidas'><strong>Medidas adotadas:</strong> "+esc(o.medidas)+"</div>";
+    // Efetivo/guarnição
+    if(o.policiais) html += "<div style='font-size:11px;color:#5a2a0a;margin-top:4px'>👮 Guarnição: "+esc(o.policiais)+"</div>";
     html += "</div>";
   });
   if(visitas.length){
     html += "<h2>Visitas Realizadas ("+visitas.length+")</h2>";
     visitas.forEach(function(v){
       html += "<div class='enc-item'><strong>"+(v.tipo||"Visita")+"</strong>";
-      html += "<span style='margin-left:12px;font-size:11px;color:#8a6a4a'>"+(v.data||"—")+(v.endereco?" · "+esc(v.endereco):"")+"</span>";
+      html += "<span style='margin-left:12px;font-size:11px;color:#8a6a4a'>"+_fmtD(v.data)+(v.hora?" · "+esc(v.hora):"")+(v.endereco?" · "+esc(v.endereco):"")+"</span>";
       if(v.resultado) html += "<p style='font-size:12px;color:#3a2818;margin-top:4px'>"+esc(v.resultado)+"</p>";
       html += "</div>";
     });
@@ -12627,7 +12675,7 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
     html += "<div class='enc-item'><div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>";
     html += "<strong>"+esc(e.destino||e.orgao||e.tipo||"—")+"</strong>";
     html += "<span style='background:#f5ede0;border:1px solid #e8d5b7;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:#5a2a0a'>"+(stLabel[e.status]||e.status||"—")+"</span>";
-    html += "<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+esc(e.data||"—")+"</span></div>";
+    html += "<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(e.data)+"</span></div>";
     if(e.descricao) html += "<p style='font-size:12px;color:#3a2818'>"+esc(e.descricao)+"</p>";
     if(e.relato_devolutiva) html += "<p style='font-size:12px;color:#1a4a1a;margin-top:4px;padding:6px 8px;background:#f0fff0;border-radius:4px'>Devolutiva: "+esc(e.relato_devolutiva)+"</p>";
     html += "</div>";
@@ -12641,6 +12689,16 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
 };
 
 window._gerarDossie = function(vitimaId){
+  function _fmtD(d){
+    if(!d) return "—";
+    var s = String(d).trim();
+    if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso) return iso[3]+"/"+iso[2]+"/"+iso[1];
+    var dt = new Date(s);
+    if(isNaN(dt.getTime())) return s.substring(0,10)||"—";
+    return dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"});
+  }
   var vit=(state.vitimas||[]).find(function(v){return v.id===vitimaId;});
   if(!vit){showToast("Vítima não encontrada","error");return;}
   var ocsVit=(state.db.ocorrencias||[]).filter(function(o){
@@ -12664,6 +12722,8 @@ window._gerarDossie = function(vitimaId){
   html+=".frida-badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px}";
   html+=".frida-E{background:#dc2626;color:#fff}.frida-M{background:#f59e0b;color:#1a0e00}.frida-B{background:#22c55e;color:#fff}";
   html+=".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e8d5b7;font-size:11px;color:#8a6a4a;display:flex;justify-content:space-between}";
+  html+=".oc-meta{color:#8a6a4a;font-size:11px;margin-bottom:6px}";
+  html+=".sec-medidas{margin-top:6px;padding:6px 8px;background:#f5ede0;border-radius:4px;font-size:12px;color:#3a2818}";
   html+="@media print{body{margin:20px;padding:0}button{display:none!important}}";
   html+="</style></head><body>";
   html+="<div style='background:#1B3A6B;padding:14px 20px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:4px'>";
@@ -12671,17 +12731,20 @@ window._gerarDossie = function(vitimaId){
   html+="<div><div style='color:#fff;font-size:20px;font-weight:700;font-family:Georgia,serif'>Dossiê da Vítima</div>";
   html+="<div style='color:#adc8ff;font-size:12px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
   html+="<div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:11px'>Emitido em "+dataDossie+"<br><span style='color:#ff9999;font-weight:700'>CONFIDENCIAL</span></div></div>";
-  // Identificação
+  // Identificação — limpa nome que pode ter ", sexo X, idade Y," concatenado por import antigo
+  var _nomeClean = (vit.nome||"").replace(/,?\s*sexo\s+\w+\s*/i,"").replace(/,?\s*idade\s+\d+\s*anos?\s*/i,"").replace(/,\s*$/,"").trim()||"—";
+  var _sexoDisplay = vit.sexo==="F"?"Feminino":vit.sexo==="M"?"Masculino":vit.sexo||"";
+  if(!_sexoDisplay){var _sm=(vit.nome||"").match(/sexo\s+(Feminino|Masculino)/i);if(_sm) _sexoDisplay=_sm[1];}
   html+="<h2>Identificação</h2>";
-  var idCampos=[["Nome",vit.nome||"—"],["Sexo",vit.sexo==="F"?"Feminino":vit.sexo==="M"?"Masculino":(vit.sexo||"—")],["Idade",vit.idade?vit.idade+" anos":"—"],["Telefone",vit.telefone||"—"],["Endereço",vit.endereco||"—"]];
-  idCampos.forEach(function(c){html+="<div class='campo'><div class='label'>"+c[0]+"</div><div class='valor'>"+c[1]+"</div></div>";});
+  var idCampos=[["Nome",_nomeClean],["Sexo",_sexoDisplay],["Idade",vit.idade?vit.idade+" anos":""],["Telefone",vit.telefone||""],["Endereço",vit.endereco||""]];
+  idCampos.forEach(function(c){if(c[1]&&c[1]!=="—") html+="<div class='campo'><div class='label'>"+c[0]+"</div><div class='valor'>"+esc(c[1])+"</div></div>";});
   // FRIDAs
   if(fridas.length){
     html+="<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
     fridas.forEach(function(f){
       var nivelCls=f.nivel==="E"?"frida-E":f.nivel==="M"?"frida-M":"frida-B";
       var nivelLabel=f.nivel==="E"?"ELEVADO":f.nivel==="M"?"MÉDIO":"BAIXO";
-      html+="<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+esc(f.data||"—")+"</strong>"+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
+      html+="<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+_fmtD(f.data)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio):"")+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
     });
   }
   // Ocorrências
@@ -12689,13 +12752,24 @@ window._gerarDossie = function(vitimaId){
   if(!ocsVit.length) html+="<p style='color:#8a6a4a;font-size:12px'>Nenhuma ocorrência vinculada.</p>";
   ocsVit.forEach(function(o){
     var isVD=o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
+    var relato = o.descricao_dinamica||o.texto_original||o.narrativa||o.descricao||"";
     html+="<div class='oc-item'>";
-    html+="<div style='display:flex;align-items:center;margin-bottom:6px'>";
+    html+="<div style='display:flex;align-items:center;margin-bottom:4px'>";
     html+="<strong style='font-size:13px'>"+esc(o.tipo||"—")+"</strong>";
     if(isVD) html+="<span class='badge-vd'>VD</span>";
-    html+="<span style='margin-left:auto;color:#8a6a4a;font-size:11px'>"+esc(o.data||"—")+(o.hora?" · "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+"</span></div>";
-    if(o.descricao) html+="<p style='font-size:12px;color:#3a2818'>"+esc(o.descricao)+"</p>";
-    if(o.situacao) html+="<p style='font-size:11px;color:#8a6a4a;margin-top:4px'>Situação: "+esc(o.situacao.replace(/_/g," "))+"</p>";
+    html+="</div>";
+    html+="<div class='oc-meta'>";
+    html+=_fmtD(o.data);
+    if(o.hora) html+=" · "+esc(o.hora);
+    if(o.bairro) html+=" · "+esc(o.bairro);
+    if(o.numero) html+=" · Nº "+esc(o.numero);
+    html+="</div>";
+    var telOc = o.vitima_telefone||(o.solicitante?o.solicitante.telefone:"");
+    if(telOc) html+="<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>📞 "+esc(telOc)+"</div>";
+    if(relato) html+="<p style='font-size:12px;color:#3a2818;margin-bottom:4px'>"+esc(relato)+"</p>";
+    if(o.medidas) html+="<div class='sec-medidas'><strong>Medidas adotadas:</strong> "+esc(o.medidas)+"</div>";
+    if(o.policiais) html+="<div style='font-size:11px;color:#5a2a0a;margin-top:4px'>👮 Guarnição: "+esc(o.policiais)+"</div>";
+    if(o.situacao) html+="<div style='font-size:11px;color:#8a6a4a;margin-top:4px'>Situação: "+esc(o.situacao.replace(/_/g," "))+"</div>";
     html+="</div>";
   });
   // Encaminhamentos
@@ -12707,7 +12781,7 @@ window._gerarDossie = function(vitimaId){
     html+="<strong>"+esc(e.tipo||e.orgao||"—")+"</strong>";
     var stLabel={pendente:"Pendente",enviado:"Enviado",aguardando_devolutiva:"Aguardando resposta",concluido:"Concluído",encerrado:"Encerrado"};
     html+="<span style='background:#f5ede0;border:1px solid #e8d5b7;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:#5a2a0a'>"+(stLabel[e.status]||e.status||"—")+"</span>";
-    html+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+esc(e.data||"—")+"</span></div>";
+    html+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(e.data)+"</span></div>";
     if(e.descricao) html+="<p style='font-size:12px;color:#3a2818'>"+esc(e.descricao)+"</p>";
     if(e.relato_devolutiva) html+="<p style='font-size:12px;color:#1a4a1a;margin-top:4px;padding:6px 8px;background:#f0fff0;border-radius:4px'>Devolutiva: "+esc(e.relato_devolutiva)+"</p>";
     html+="</div>";
