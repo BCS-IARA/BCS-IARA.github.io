@@ -12888,7 +12888,7 @@ function renderHistoricoAtendimento(main) {
   h += "<span style='position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none'>\u{1F50D}</span>";
   h += "<input id='hist-busca' type='text' value='"+esc(state._histBusca||'')+"' "
      + "placeholder='Buscar por nome, tipo, bairro, narrativa\u2026' "
-     + "oninput='state._histBusca=this.value;renderHistoricoAtendimento(document.getElementById(\"fila-dia-content\"))' "
+     + "oninput='state._histBusca=this.value;clearTimeout(window._histTimer);window._histTimer=setTimeout(function(){var c=document.getElementById(\"fila-dia-content\");if(c)renderHistoricoAtendimento(c);},320)' "
      + "style='width:100%;box-sizing:border-box;padding:9px 12px 9px 34px;border:1px solid var(--papel-3);border-radius:8px;background:var(--papel);color:var(--tinta);font-size:13px'>";
   h += "</div>";
   var periodos=[{v:'',l:'Todos'},{v:'hoje',l:'Hoje'},{v:'semana',l:'7 dias'},{v:'mes',l:'Este m\u00EAs'}];
@@ -12941,7 +12941,7 @@ function renderHistoricoAtendimento(main) {
 
   h += "</div>";
   main.innerHTML = h;
-  setTimeout(function(){var el=document.getElementById('hist-busca');if(el&&!busca)el.focus();},80);
+  setTimeout(function(){var el=document.getElementById('hist-busca');if(el){el.focus();var v=el.value.length;el.setSelectionRange(v,v);}},50);
 }
 
 function renderFilaDia(main) {
