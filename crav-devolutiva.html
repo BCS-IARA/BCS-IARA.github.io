@@ -334,34 +334,53 @@ function enviar(e){
   btn.disabled = true;
   btn.textContent = "⏳ Enviando...";
 
-  var cb = "dev_cb_"+Date.now();
-  var s  = document.createElement("script");
-  var ok = false;
-  var t  = setTimeout(function(){
-    if(ok) return;
-    s.remove(); delete window[cb];
-    try{ localStorage.setItem("dev_pendente_"+reg.id, JSON.stringify(reg)); }catch(err){}
-    mostrarStatus(false, "⚠️ Sem conexão. Sua devolutiva foi salva localmente. Tente novamente mais tarde.");
-    btn.disabled = false;
-    btn.textContent = org.ico + " Tentar novamente";
-  }, 12000);
-
-  window[cb] = function(resp){
-    ok = true; clearTimeout(t); s.remove(); delete window[cb];
-    if(resp && resp.ok === false){
-      mostrarStatus(false, "❌ Erro ao salvar: "+(resp.erro||"Resposta inválida do servidor."));
-      btn.disabled = false; btn.textContent = org.ico + " Tentar novamente";
-      return;
+  // Envia via fetch POST (sem limite de URL) e confirma via JSONP depois
+  var _postOk = false;
+  var _netTimeout = setTimeout(function(){
+    if(!_postOk){
+      try{ localStorage.setItem("dev_pendente_"+reg.id, JSON.stringify(reg)); }catch(e){}
+      mostrarStatus(false, "⚠️ Sem conexão. Sua devolutiva foi salva localmente. Tente novamente mais tarde.");
+      btn.disabled = false;
+      btn.textContent = org.ico + " Tentar novamente";
     }
-    mostrarStatus(true, "✅ Devolutiva enviada!\n\nObrigada, "+reg.tecnica+". O registro de "+reg.nome+" foi atualizado no sistema da 77ª CIPM BCS.");
-  };
+  }, 15000);
 
-  s.src = SHEETS_URL
-    + "?acao=salvar&tipo=devolutivas_crav"
-    + "&dados=" + encodeURIComponent(JSON.stringify(reg))
-    + "&token=" + TOKEN
-    + "&callback=" + cb;
-  document.head.appendChild(s);
+  fetch(SHEETS_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify({ token: TOKEN, tipo: "devolutivas_crav", registro: reg })
+  }).then(function(){
+    // POST enviado — aguarda 3s e confirma via JSONP
+    setTimeout(function(){
+      var vcb = "vdev_"+Date.now();
+      var vs = document.createElement("script");
+      var vt = setTimeout(function(){
+        vs.remove(); delete window[vcb];
+        _postOk = true; clearTimeout(_netTimeout);
+        // Timeout na verificação: assume sucesso (POST chegou sem erro de rede)
+        mostrarStatus(true, "✅ Devolutiva enviada!\n\nObrigada, "+reg.tecnica+". O registro de "+reg.nome+" foi atualizado no sistema da 77ª CIPM BCS.");
+      }, 8000);
+      window[vcb] = function(dados){
+        clearTimeout(vt); vs.remove(); delete window[vcb];
+        _postOk = true; clearTimeout(_netTimeout);
+        var lista = (dados && (dados.registros || dados.dados)) || [];
+        var found = lista.some(function(r){ return r.id === reg.id; });
+        if(found){
+          mostrarStatus(true, "✅ Devolutiva enviada!\n\nObrigada, "+reg.tecnica+". O registro de "+reg.nome+" foi atualizado no sistema da 77ª CIPM BCS.");
+        } else {
+          mostrarStatus(false, "❌ O servidor não confirmou o salvamento. Tente novamente ou contate a 77ª CIPM.");
+          btn.disabled = false; btn.textContent = org.ico + " Tentar novamente";
+        }
+      };
+      vs.src = SHEETS_URL+"?acao=listar&tipo=devolutivas_crav&token="+TOKEN+"&callback="+vcb;
+      document.head.appendChild(vs);
+    }, 3000);
+  }).catch(function(err){
+    _postOk = true; clearTimeout(_netTimeout);
+    try{ localStorage.setItem("dev_pendente_"+reg.id, JSON.stringify(reg)); }catch(e){}
+    mostrarStatus(false, "⚠️ Erro de rede. Sua devolutiva foi salva localmente.");
+    btn.disabled = false; btn.textContent = org.ico + " Tentar novamente";
+  });
 }
 
 function mostrarStatus(ok, msg){

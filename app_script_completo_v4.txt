@@ -1010,6 +1010,7 @@ function doPost(e) {
       if (d.acao==="editar"&&d.id&&d.campos) return saida(editarOc(ss,d.id,d.campos),cb);
       if (d.acao==="ia"&&d.messages&&d.system) return saida(chamarIA(d.system,d.messages),cb);
       if (d.acao==="uploadFoto"&&d.id&&d.foto) return saida(uploadFotoInventario(d.id,d.foto,d.nome||""),cb);
+      if (d.tipo==="devolutivas_crav"&&d.registro) return saida(salvarDevolutivaCrav(ss,d.registro),cb);
       if (d.tipo==="carga_armamento"&&d.registro) return saida(salvarCargaArmamento(ss,d.registro),cb);
       if (d.tipo==="candidatura"&&d.registro) return saida(salvarCandidatura(ss,d.registro),cb);
       if (d.tipo==="projeto_social"&&d.registro) return saida(salvarProjetoSocial(ss,d.registro),cb);
