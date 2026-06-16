@@ -12604,6 +12604,8 @@ window._dossieByOcId = function(ocId){
     || (oc.vitimas&&oc.vitimas.length?oc.vitimas[0].nome:"")
     || (oc.solicitante&&oc.solicitante.nome?oc.solicitante.nome:"")
     || "";
+  // Remove sufixos como ", sexo Feminino, idade 30 anos" que vêm colados no campo
+  nomeVitima = nomeVitima.replace(/,\s*(sexo|idade|cpf|rg|fone|tel)\b.*/i,"").trim();
 
   function _gerarComDados(){
     var vitimaId = oc.vitima_id;
@@ -12635,7 +12637,8 @@ window._dossieByOcId = function(ocId){
       if(!state.encaminhamentos) state.encaminhamentos = [];
       var existentes = new Set(state.encaminhamentos.map(function(e){ return e.id; }));
       devs.forEach(function(dev){
-        if((dev.nome||"").toLowerCase().indexOf(nomeLower)<0) return;
+        var devNomeLower=(dev.nome||"").toLowerCase();
+        if(!devNomeLower||(!devNomeLower.includes(nomeLower)&&!nomeLower.includes(devNomeLower))) return;
         var encId = dev.encaminhamentoId || dev.id;
         if(!encId || existentes.has(encId)) return;
         state.encaminhamentos.push({
