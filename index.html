@@ -4105,11 +4105,6 @@ function _renderCentralBar(main, abaAtiva){
   var _nTriar=(state.db.ocorrencias||[]).filter(_ocNaFila).length;
   var _fridas=state.db.frida||[];
   var _hoje=hoje();
-    if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;
-    var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;}).sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;});
-    var _uf=_fs[0];
-    return _uf&&_uf.nivel==="E";
-  }).length;
   var _nDev=(state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length;
   var abas=[
     {k:"fila_auxiliar",icon:"📋",label:"Fila do Dia",badge:0,fn:function(){setTela("fila_auxiliar");}},
