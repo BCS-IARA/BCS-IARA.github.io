@@ -11077,6 +11077,36 @@ function _migrarTrilhoAparaB() {
   setTela("config");
 }
 
+window._restaurarEncaminhamentosDoSheets = function(){
+  showToast("⏳ Buscando encaminhamentos na planilha...");
+  var cb = "_restEnc_"+Date.now();
+  var s = document.createElement("script");
+  var done = false;
+  var t = setTimeout(function(){ done=true; s.remove(); delete window[cb]; showToast("⚠️ Tempo esgotado — tente novamente","error"); }, 15000);
+  window[cb] = function(resp){
+    if(done) return; done=true; clearTimeout(t); s.remove(); delete window[cb];
+    var lista = (resp && (resp.registros||resp.dados)) || [];
+    if(!lista.length){ showToast("Nenhum encaminhamento encontrado na planilha"); return; }
+    if(!state.encaminhamentos) state.encaminhamentos = [];
+    var existentes = new Set(state.encaminhamentos.map(function(e){ return e.id; }));
+    var novos = 0;
+    lista.forEach(function(enc){
+      if(enc.id && !existentes.has(enc.id)){
+        state.encaminhamentos.push(enc);
+        existentes.add(enc.id);
+        novos++;
+      }
+    });
+    localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
+    showToast("✅ "+novos+" encaminhamento(s) restaurado(s) do Sheets");
+    if(novos>0 && typeof _syncDevolutivas==="function"){
+      _syncDevolutivas(function(n){ if(n>0) showToast("✅ "+n+" devolutiva(s) aplicada(s)"); });
+    }
+  };
+  s.src = SHEETS_URL+"?acao=listar&tipo=encaminhamentos&token="+BCS_TOKEN+"&callback="+cb;
+  document.head.appendChild(s);
+};
+
 function renderConfiguracoes(main){
   var temIaKey = !!(localStorage.getItem("bcs_anthropic_key")||"");
   var temSheetsUrl = !!(typeof SHEETS_URL !== "undefined" && SHEETS_URL);
@@ -11139,6 +11169,7 @@ function renderConfiguracoes(main){
   h.push("<button onclick='if(confirm(\"Reenviar todos os dados para a planilha?\")){ reenviarTudoParaPlanilha(); }' style='"+btnS+"'>🔄 <span>Sincronizar tudo com a planilha</span></button>");
   h.push("<button onclick='testarConexaoSheets()' style='"+btnS+"'>🔌 <span>Testar conexão com o Sheets</span></button>");
   h.push("<button onclick='reimportarParaSheets()' style='"+btnS+"'>📤 <span>Reenviar ocorrências ao Sheets</span></button>");
+  h.push("<button onclick='_restaurarEncaminhamentosDoSheets()' style='"+btnS+"'>📥 <span>Restaurar Encaminhamentos do Sheets</span></button>");
   h.push("</div>");
 
   // ── Seção: Dados Locais ──────────────────────────
