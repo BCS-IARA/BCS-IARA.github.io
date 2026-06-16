@@ -12518,6 +12518,113 @@ window._salvarEncaminhamento = function(vitimaId) {
   if(main) renderFichaVitima(main, vitimaId);
 };
 
+window._dossieByOcId = function(ocId){
+  var oc = (state.db.ocorrencias||[]).find(function(o){return o.id===ocId;});
+  if(!oc){ showToast("Ocorrência não encontrada","error"); return; }
+  // Tenta vitimaId vinculado; senão busca por nome na lista de vítimas
+  var vitimaId = oc.vitima_id;
+  if(!vitimaId && oc.vitima_nome){
+    var nomeBusca = (oc.vitima_nome||"").trim().toLowerCase();
+    var vit = (state.vitimas||[]).find(function(v){
+      return (v.nome||"").trim().toLowerCase() === nomeBusca;
+    });
+    if(vit) vitimaId = vit.id;
+  }
+  if(vitimaId){
+    _gerarDossie(vitimaId);
+  } else {
+    // Não tem cadastro formal de vítima — gera dossiê inline pelo nome
+    _gerarDossieByNome(oc.vitima_nome||oc.nome_vitima||"Vítima", ocId);
+  }
+};
+
+window._gerarDossieByNome = function(nomeVitima, ocIdRef){
+  var nome = (nomeVitima||"").trim();
+  var nomeLower = nome.toLowerCase();
+  // Coleta todas as OCs que mencionam esse nome
+  var ocsVit = (state.db.ocorrencias||[]).filter(function(o){
+    return (o.vitima_nome||o.nome_vitima||"").toLowerCase().indexOf(nomeLower)>=0
+        || (o.vitimas||[]).some(function(v){return (v.nome||"").toLowerCase().indexOf(nomeLower)>=0;});
+  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var ocsIds = ocsVit.map(function(o){return o.id;});
+  var fridas = (state.db.frida||[]).filter(function(f){return ocsIds.indexOf(f.ocorrenciaId)>=0;})
+    .sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var encs = (state.encaminhamentos||[]).filter(function(e){
+    return (e.nome||e.vitima||e.vitimaNome||"").toLowerCase().indexOf(nomeLower)>=0
+        || ocsIds.indexOf(e.ocorrenciaId||"")>=0;
+  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var visitas = (state.db.visitas||[]).filter(function(v){
+    return (v.vitima_nome||v.nome||"").toLowerCase().indexOf(nomeLower)>=0
+        || ocsIds.indexOf(v.ocorrenciaId||"")>=0;
+  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var dataDossie = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+  var html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Dossiê — "+esc(nome)+"</title><style>";
+  html += "*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;max-width:720px;margin:40px auto;color:#1a0e00;line-height:1.6;padding:0 20px}";
+  html += "h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a2a0a;margin:22px 0 8px;border-bottom:1px solid #e8d5b7;padding-bottom:5px}";
+  html += ".campo{display:grid;grid-template-columns:150px 1fr;gap:6px;margin-bottom:6px;font-size:13px}.label{color:#8a6a4a;font-weight:700}.valor{color:#1a0e00}";
+  html += ".oc-item{border:1px solid #e8d5b7;border-left:4px solid #5a2a0a;border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:12px}";
+  html += ".enc-item{border:1px solid #e8d5b7;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:12px}";
+  html += ".badge-vd{background:#dc2626;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px}";
+  html += ".frida-badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px}";
+  html += ".frida-E{background:#dc2626;color:#fff}.frida-M{background:#f59e0b;color:#1a0e00}.frida-B{background:#22c55e;color:#fff}";
+  html += ".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e8d5b7;font-size:11px;color:#8a6a4a;display:flex;justify-content:space-between}";
+  html += "@media print{body{margin:20px;padding:0}button{display:none!important}}</style></head><body>";
+  html += "<div style='background:#1B3A6B;padding:14px 20px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:4px'>";
+  html += "<img src='"+BCS_LOGO_B64+"' style='width:60px;height:60px;border-radius:50%;object-fit:cover;flex-shrink:0'>";
+  html += "<div><div style='color:#fff;font-size:20px;font-weight:700;font-family:Georgia,serif'>Dossiê da Vítima</div>";
+  html += "<div style='color:#adc8ff;font-size:12px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
+  html += "<div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:11px'>Emitido em "+dataDossie+"<br><span style='color:#ff9999;font-weight:700'>CONFIDENCIAL</span></div></div>";
+  html += "<h2>Identificação</h2>";
+  html += "<div class='campo'><div class='label'>Nome</div><div class='valor'>"+esc(nome)+"</div></div>";
+  if(fridas.length){
+    html += "<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
+    fridas.forEach(function(f){
+      var nivelCls=f.nivel==="E"?"frida-E":f.nivel==="M"?"frida-M":"frida-B";
+      var nivelLabel=f.nivel==="E"?"ELEVADO":f.nivel==="M"?"MÉDIO":"BAIXO";
+      html += "<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+(f.data||"—").substring(0,10)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio.substring(0,120)):"")+"</div>";
+    });
+  }
+  html += "<h2>Histórico de Ocorrências ("+ocsVit.length+")</h2>";
+  if(!ocsVit.length) html += "<p style='color:#8a6a4a;font-size:12px'>Nenhuma ocorrência localizada.</p>";
+  ocsVit.forEach(function(o){
+    var isVD=o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
+    html += "<div class='oc-item'><div style='display:flex;align-items:center;margin-bottom:6px'>";
+    html += "<strong style='font-size:13px'>"+esc(o.tipo||"—")+"</strong>";
+    if(isVD) html += "<span class='badge-vd'>VD</span>";
+    html += "<span style='margin-left:auto;color:#8a6a4a;font-size:11px'>"+esc(o.data||"—")+(o.hora?" · "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+"</span></div>";
+    if(o.narrativa||o.descricao) html += "<p style='font-size:12px;color:#3a2818'>"+esc((o.narrativa||o.descricao||"").substring(0,300))+"</p>";
+    if(o.numero) html += "<p style='font-size:11px;color:#8a6a4a;margin-top:4px'>Nº "+esc(o.numero)+"</p>";
+    html += "</div>";
+  });
+  if(visitas.length){
+    html += "<h2>Visitas Realizadas ("+visitas.length+")</h2>";
+    visitas.forEach(function(v){
+      html += "<div class='enc-item'><strong>"+(v.tipo||"Visita")+"</strong>";
+      html += "<span style='margin-left:12px;font-size:11px;color:#8a6a4a'>"+(v.data||"—")+(v.endereco?" · "+esc(v.endereco):"")+"</span>";
+      if(v.resultado) html += "<p style='font-size:12px;color:#3a2818;margin-top:4px'>"+esc(v.resultado)+"</p>";
+      html += "</div>";
+    });
+  }
+  html += "<h2>Encaminhamentos ("+encs.length+")</h2>";
+  if(!encs.length) html += "<p style='color:#8a6a4a;font-size:12px'>Nenhum encaminhamento registrado.</p>";
+  encs.forEach(function(e){
+    var stLabel={pendente:"Pendente",enviado:"Enviado",aguardando_devolutiva:"Aguard. resposta",concluido:"Concluído"};
+    html += "<div class='enc-item'><div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>";
+    html += "<strong>"+esc(e.destino||e.orgao||e.tipo||"—")+"</strong>";
+    html += "<span style='background:#f5ede0;border:1px solid #e8d5b7;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:#5a2a0a'>"+(stLabel[e.status]||e.status||"—")+"</span>";
+    html += "<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+esc(e.data||"—")+"</span></div>";
+    if(e.descricao) html += "<p style='font-size:12px;color:#3a2818'>"+esc(e.descricao)+"</p>";
+    if(e.relato_devolutiva) html += "<p style='font-size:12px;color:#1a4a1a;margin-top:4px;padding:6px 8px;background:#f0fff0;border-radius:4px'>Devolutiva: "+esc(e.relato_devolutiva)+"</p>";
+    html += "</div>";
+  });
+  html += "<div class='footer'><span>77ª CIPM BCS — Sistema IARA</span><span>Emitido em "+dataDossie+"</span></div>";
+  html += "<br><button onclick='window.print()' style='padding:10px 24px;font-size:14px;cursor:pointer;background:#3c1810;color:#f5ede0;border:none;border-radius:6px;font-weight:700'>⬇ Imprimir / Salvar PDF</button>";
+  html += "</body></html>";
+  var win = window.open("","_blank");
+  win.document.write(html);
+  win.document.close();
+};
+
 window._gerarDossie = function(vitimaId){
   var vit=(state.vitimas||[]).find(function(v){return v.id===vitimaId;});
   if(!vit){showToast("Vítima não encontrada","error");return;}
@@ -19234,7 +19341,9 @@ function renderOcorrenciasGestor(el, perfil_atual){
       mh.push("<div style='display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:4px'>");
       mh.push("<button id='btn-cancelar-editar' style='background:#070e1c;border:1px solid #1a3358;color:#4a6a8a;padding:11px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>Cancelar</button>");
       mh.push("<button id='btn-salvar-editar' style='background:linear-gradient(135deg,#0c2d5c,#1a4d9a);border:1px solid #4a9fd4;color:#c5daf5;padding:11px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>💾 Salvar Alterações</button>");
-      mh.push("</div></div>");
+      mh.push("</div>");
+      mh.push("<button onclick='_dossieByOcId(\""+esc(ocM.id)+"\")' style='width:100%;margin-top:8px;background:linear-gradient(135deg,#1a0e00,#2a1800);border:1px solid #c8860a;color:#e8a020;padding:11px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>📄 PDF Consolidado da Vítima</button>");
+      mh.push("</div>");
       modal.innerHTML = mh.join("");
       modal.onclick = function(e){ if(e.target===this){ _fecharEditorOc(el); } };
       document.body.appendChild(modal);
