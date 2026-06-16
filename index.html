@@ -12903,7 +12903,7 @@ function renderHistoricoAtendimento(main) {
 
   var filtrados = registros.filter(function(r){
     if(!busca) return true;
-    return (r.titulo+r.subtitulo+r.descricao+r.bairro+r.data).toLowerCase().indexOf(busca)>=0;
+    return (r.titulo+' '+(r.tipoOc||'')+' '+(r.nome||'')+' '+(r.subtitulo||'')+' '+(r.descricao||'')+' '+(r.bairro||'')+' '+(r.data||'')+' '+(r.hora||'')+' '+(r.status||'')).toLowerCase().indexOf(busca)>=0;
   });
 
   if(tipoFiltro) filtrados = filtrados.filter(function(r){return r.tipo===tipoFiltro;});
