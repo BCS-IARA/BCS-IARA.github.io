@@ -12521,24 +12521,30 @@ window._salvarEncaminhamento = function(vitimaId) {
 window._dossieByOcId = function(ocId){
   var oc = (state.db.ocorrencias||[]).find(function(o){return o.id===ocId;});
   if(!oc){ showToast("Ocorrência não encontrada","error"); return; }
-  // Extrai nome da vítima — verifica todos os campos possíveis
-  var nomeVitima = oc.vitima_nome || oc.nome_vitima
-    || (oc.vitimas&&oc.vitimas.length?oc.vitimas[0].nome:"")
-    || (oc.solicitante&&oc.solicitante.nome?oc.solicitante.nome:"")
-    || "";
-  // Tenta vitimaId vinculado; senão busca por nome na lista de vítimas cadastradas
-  var vitimaId = oc.vitima_id;
-  if(!vitimaId && nomeVitima){
-    var nomeBusca = nomeVitima.trim().toLowerCase();
-    var vit = (state.vitimas||[]).find(function(v){
-      return (v.nome||"").trim().toLowerCase() === nomeBusca;
-    });
-    if(vit) vitimaId = vit.id;
+  showToast("⏳ Buscando devolutivas...");
+  function _gerarComDados(){
+    var nomeVitima = oc.vitima_nome || oc.nome_vitima
+      || (oc.vitimas&&oc.vitimas.length?oc.vitimas[0].nome:"")
+      || (oc.solicitante&&oc.solicitante.nome?oc.solicitante.nome:"")
+      || "";
+    var vitimaId = oc.vitima_id;
+    if(!vitimaId && nomeVitima){
+      var nomeBusca = nomeVitima.trim().toLowerCase();
+      var vit = (state.vitimas||[]).find(function(v){
+        return (v.nome||"").trim().toLowerCase() === nomeBusca;
+      });
+      if(vit) vitimaId = vit.id;
+    }
+    if(vitimaId){
+      _gerarDossie(vitimaId);
+    } else {
+      _gerarDossieByNome(nomeVitima||"Vítima", ocId);
+    }
   }
-  if(vitimaId){
-    _gerarDossie(vitimaId);
+  if(typeof _syncDevolutivas === "function"){
+    _syncDevolutivas(function(){ _gerarComDados(); });
   } else {
-    _gerarDossieByNome(nomeVitima||"Vítima", ocId);
+    _gerarComDados();
   }
 };
 
