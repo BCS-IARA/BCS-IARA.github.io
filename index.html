@@ -13108,7 +13108,11 @@ function renderTriagem(main) {
     }
     var relato = o.descricao_dinamica||o.texto_original||o.descricao||"";
     h += "<label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>Relato / Dinâmica dos fatos</label>";
-    h += "<textarea id='tri-relato' rows='5' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(relato)+"</textarea>";
+    h += "<textarea id='tri-relato' rows='4' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(relato)+"</textarea>";
+    h += "<div style='margin-top:10px'>";
+    h += "<label style='font-size:10px;font-weight:700;color:var(--ambar-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>📝 Resumo do Atendimento</label>";
+    h += "<textarea id='tri-resumo-atend' rows='3' placeholder='Descreva o que foi conversado, orientações dadas, providências tomadas no atendimento...' style='width:100%;padding:8px 10px;border:1.5px solid var(--ambar-2);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(o.resumo_atendimento||"")+"</textarea>";
+    h += "</div>";
     h += "</div>";
 
     // BLOCO 2 — Quatro trilhos
@@ -13274,6 +13278,13 @@ window._salvarTriagem = function(ocId) {
     oc.descricao_dinamica = relatoEl.value.trim();
     oc.texto_original     = relatoEl.value.trim();
     oc.descricao          = relatoEl.value.trim().substring(0,150);
+  }
+
+  // Resumo do atendimento
+  var resumoEl = document.getElementById("tri-resumo-atend");
+  if(resumoEl && resumoEl.value.trim()){
+    oc.resumo_atendimento = resumoEl.value.trim();
+    oc.data_atendimento   = hoje();
   }
 
   // Trilho Menor — encaminhamento automático Conselho Tutelar
