@@ -1,0 +1,1491 @@
+// ══════════════════════════════════════════════════════════════════
+//  IARA — Backend Google Apps Script  v4.0
+//  Fase 1 integrada: vítimas, encaminhamentos, situação OC, avisos auditoria
+//
+//  COMO USAR:
+//  1. Apague tudo no editor, cole este código, salve (Ctrl+S)
+//  2. Implantar → Gerenciar implantações → Nova versão
+// ══════════════════════════════════════════════════════════════════
+
+var TOKEN_FIXO = "bcs-token-secreto-2025";
+
+function props()  { return PropertiesService.getScriptProperties(); }
+function tok()    { return TOKEN_FIXO; }
+
+function getSS() {
+  var id = props().getProperty("SHEET_ID");
+  if (!id) throw new Error("Planilha não configurada — execute a função setup() primeiro.");
+  return SpreadsheetApp.openById(id);
+}
+
+var NOME = {
+  oc: "Ocorrências",
+  at: "Atendimentos",
+  ag: "Agendamentos",
+  vi: "Visitas Realizadas",
+  av: "Avisos",
+  fr: "FRIDA"
+};
+
+var HDRS = {
+  oc: [
+    "ID","Data Lançamento","Nº BO","Data","Hora","Tipo",
+    "Bairro","Município",
+    "Vítima Nome","Vítima Idade","Vítima Sexo",
+    "Vítima Telefone","Vítima Endereço","Vítima CPF",
+    "Suspeito Nome","Suspeito Apelido","Suspeito Características",
+    "Veículo","Medida Protetiva","Violência Doméstica",
+    "Requer Visita","Reincidente",
+    "Descrição",          // col 23
+    "Dinâmica dos fatos", // col 24
+    "Medidas adotadas",   // col 25
+    "Vítima ID",          // col 26 — FK → vitimas.id
+    "Situação"            // col 27 — nova|em_triagem|em_acompanhamento|encerrada|historico
+  ],
+  at: ["ID","Data Lançamento","Data","Hora","Nome","Telefone","Tipo","Descrição","Encaminhamento"],
+  ag: ["ID","Data Lançamento","Data","Hora","Tipo Visita","Nome/Local","Endereço","Responsável","Objetivo","Status"],
+  vi: ["ID","Data Lançamento","Data","Tipo Visita","Nome/Local","Endereço","Resultado","Próxima Ação"],
+  av: ["ID","Criado Em","Texto","Expira","Leituras","Anexo Nome","Anexo Tipo","Anexo B64",
+       "Origem","Indicador","Prioridade"],  // cols 9-11 novos (auditoria comandante)
+  fr: ["ID","Ocorrência ID","Data","Vítima Nome","Nível","Sim","NaoSabe","Respostas","Relatório","Responsável","Anexo Nome","Anexo Tipo","Anexo B64"]
+};
+
+var TIPO_KEY = {
+  ocorrencias:"oc", atendimentos:"at", agendamentos:"ag",
+  visitas:"vi", avisos:"av", frida:"fr",
+  oc:"oc", at:"at", ag:"ag", vi:"vi", av:"av", fr:"fr"
+};
+
+// ── Abas ───────────────────────────────────────────────────────────
+function getAba(ss, key)   { return ss.getSheetByName(NOME[key]); }
+
+function criarAba(ss, key) {
+  var aba = ss.insertSheet(NOME[key]);
+  var h   = HDRS[key];
+  aba.getRange(1,1,1,h.length)
+     .setValues([h])
+     .setFontWeight("bold")
+     .setFontFamily("Arial")
+     .setFontSize(11)
+     .setBackground("#1a1a2e")
+     .setFontColor("#ffffff");
+  aba.setFrozenRows(1);
+  aba.setColumnWidth(1, 160);
+  if (key === "oc") {
+    aba.setColumnWidth(23, 220);
+    aba.setColumnWidth(24, 450);
+    aba.setColumnWidth(25, 260);
+  }
+  return aba;
+}
+
+function garantirAba(ss, key) { return getAba(ss,key) || criarAba(ss,key); }
+
+// ══════════════════════════════════════════════════════════════════
+//  CRIAR ABAS QUE FALTAM
+// ══════════════════════════════════════════════════════════════════
+function criarAbasFaltantes() {
+  var ss = getSS();
+
+  if (!ss.getSheetByName("carga_armamento")) {
+    var arm = ss.insertSheet("carga_armamento");
+    arm.getRange(1,1,1,15).setValues([[
+      "protocolo","data","hora","nome","matricula",
+      "tipo_carga","itens_json","obs","assinatura","assinatura_adjunto",
+      "matricula_adjunto","nome_adjunto","data_registro","origem","qtd_itens"
+    ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#6a9ae8");
+    arm.setFrozenRows(1);
+    arm.setColumnWidth(7, 400);
+    Logger.log("Aba 'carga_armamento' criada.");
+  } else { Logger.log("Aba 'carga_armamento' já existe."); }
+
+  if (!ss.getSheetByName("policiais")) {
+    var pol = ss.insertSheet("policiais");
+    pol.getRange(1,1,1,8).setValues([["id","matricula","posto","nome","telefone","turno","status","criadoEm"]])
+       .setFontWeight("bold").setBackground("#1a1028").setFontColor("#a78bfa");
+    pol.setFrozenRows(1);
+    Logger.log("Aba 'policiais' criada.");
+  } else { Logger.log("Aba 'policiais' já existe."); }
+
+  if (!ss.getSheetByName("materiais_patrimonio")) {
+    var mat = ss.insertSheet("materiais_patrimonio");
+    mat.getRange(1,1,1,8).setValues([["id","codigo","tipo","descricao","serie","obs","status","criadoEm"]])
+       .setFontWeight("bold").setBackground("#0a1628").setFontColor("#60a5fa");
+    mat.setFrozenRows(1);
+    Logger.log("Aba 'materiais_patrimonio' criada.");
+  } else { Logger.log("Aba 'materiais_patrimonio' já existe."); }
+
+  if (!ss.getSheetByName("solicitacoes")) {
+    var sol = ss.insertSheet("solicitacoes");
+    sol.getRange(1,1,1,13).setValues([[
+      "protocolo","data","hora","matricula","nome","posto","telefone","turno",
+      "destinatario","assunto","texto","status","data_registro"
+    ]]).setFontWeight("bold").setBackground("#1a1028").setFontColor("#d4a87a");
+    sol.setFrozenRows(1);
+    Logger.log("Aba 'solicitacoes' criada.");
+  } else { Logger.log("Aba 'solicitacoes' já existe."); }
+
+  if (!ss.getSheetByName("atividades_escolares")) {
+    var atesc = ss.insertSheet("atividades_escolares");
+    atesc.getRange(1,1,1,11).setValues([[
+      "id","data","hora","tipo","subtipo","escolaNome","responsavel","tema","resultado","criadoEm","escolaId"
+    ]]).setFontWeight("bold").setBackground("#0f2035").setFontColor("#38bdf8");
+    atesc.setFrozenRows(1);
+    Logger.log("Aba 'atividades_escolares' criada.");
+  } else { Logger.log("Aba 'atividades_escolares' já existe."); }
+
+  if (!ss.getSheetByName("chamadas_projetos")) {
+    var cha = ss.insertSheet("chamadas_projetos");
+    cha.getRange(1,1,1,8).setValues([[
+      "id","data","projetoId","projetoNome","instrutor","total_presentes","total_participantes","criadoEm"
+    ]]).setFontWeight("bold").setBackground("#2d1b69").setFontColor("#a78bfa");
+    cha.setFrozenRows(1);
+    Logger.log("Aba 'chamadas_projetos' criada.");
+  } else { Logger.log("Aba 'chamadas_projetos' já existe."); }
+
+  if (!ss.getSheetByName("eventos_avulsos")) {
+    var evav = ss.insertSheet("eventos_avulsos");
+    evav.getRange(1,1,1,10).setValues([[
+      "id","data","hora","tipo","titulo","descricao","cor","status","resultado","criadoEm"
+    ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#fbbf24");
+    evav.setFrozenRows(1);
+    Logger.log("Aba 'eventos_avulsos' criada.");
+  } else { Logger.log("Aba 'eventos_avulsos' já existe."); }
+
+  Logger.log("Concluído.");
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SETUP
+// ══════════════════════════════════════════════════════════════════
+function setup() {
+  var ss = SpreadsheetApp.create("IARA — BCS");
+  props().setProperty("SHEET_ID", ss.getId());
+  var planPadrao = ss.getSheets()[0];
+  Object.keys(NOME).forEach(function(key) { criarAba(ss, key); });
+
+  var log = ss.insertSheet("Log");
+  log.getRange(1,1,1,4).setValues([["Data/Hora","Ação","Entidade","Detalhe"]])
+     .setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
+  log.setFrozenRows(1);
+
+  var arm = ss.insertSheet("carga_armamento");
+  arm.getRange(1,1,1,15).setValues([[
+    "protocolo","data","hora","nome","matricula",
+    "tipo_carga","itens_json","obs","assinatura","assinatura_adjunto",
+    "matricula_adjunto","nome_adjunto","data_registro","origem","qtd_itens"
+  ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#6a9ae8");
+  arm.setFrozenRows(1);
+  arm.setColumnWidth(7, 400);
+  arm.setColumnWidth(9, 50);
+
+  var pol = ss.insertSheet("policiais");
+  pol.getRange(1,1,1,8).setValues([["id","matricula","posto","nome","telefone","turno","status","criadoEm"]])
+     .setFontWeight("bold").setBackground("#1a1028").setFontColor("#a78bfa");
+  pol.setFrozenRows(1);
+  pol.setColumnWidth(4, 250);
+
+  var mat = ss.insertSheet("materiais_patrimonio");
+  mat.getRange(1,1,1,8).setValues([["id","codigo","tipo","descricao","serie","obs","status","criadoEm"]])
+     .setFontWeight("bold").setBackground("#0a2810").setFontColor("#4ade80");
+  mat.setFrozenRows(1);
+  mat.setColumnWidth(4, 300);
+
+  var sol = ss.insertSheet("solicitacoes");
+  sol.getRange(1,1,1,16).setValues([[
+    "protocolo","data","hora","matricula","posto","nome","destinatario","assunto",
+    "texto","assinatura","status","nome_cmt","assinatura_cmt","obs_cmt",
+    "data_decisao","data_registro"
+  ]]).setFontWeight("bold").setBackground("#1a0e00").setFontColor("#d4a87a");
+  sol.setFrozenRows(1);
+
+  var insc = ss.insertSheet("inscricoes_projetos");
+  insc.getRange(1,1,1,9).setValues([[
+    "id","projeto_id","projeto_nome","nome","telefone",
+    "cursos","sugestao","data_inscricao","origem"
+  ]]).setFontWeight("bold").setBackground("#1a0a3a").setFontColor("#c89ae8");
+  insc.setFrozenRows(1);
+
+  var evav = ss.insertSheet("eventos_avulsos");
+  evav.getRange(1,1,1,10).setValues([[
+    "id","data","hora","tipo","titulo","descricao","cor","status","resultado","criadoEm"
+  ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#fbbf24");
+  evav.setFrozenRows(1);
+
+  try { ss.deleteSheet(planPadrao); } catch(e) {}
+
+  Logger.log("✓ Planilha criada com sucesso!");
+  Logger.log("🔗 URL: " + ss.getUrl());
+}
+
+// ── Utilitários ────────────────────────────────────────────────────
+function saida(obj, cb) {
+  var json = JSON.stringify(obj);
+  var out  = cb ? cb+"("+json+");" : json;
+  return ContentService.createTextOutput(out)
+    .setMimeType(cb ? ContentService.MimeType.JAVASCRIPT : ContentService.MimeType.JSON);
+}
+
+function registrarLog(ss, acao, entidade, detalhe) {
+  try {
+    var aba = ss.getSheetByName("Log");
+    if (!aba) return;
+    aba.appendRow([
+      Utilities.formatDate(new Date(),"America/Bahia","dd/MM/yyyy HH:mm:ss"),
+      acao, entidade||"", detalhe||""
+    ]);
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CARGA DE ARMAMENTO
+// ══════════════════════════════════════════════════════════════════
+function salvarCargaArmamento(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("carga_armamento");
+    if (!aba) {
+      aba = ss.insertSheet("carga_armamento");
+      aba.getRange(1,1,1,12).setValues([[
+        "protocolo","data","hora","nome","matricula",
+        "tipo_carga","itens_json","obs","assinatura","data_registro","origem","qtd_itens"
+      ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#6a9ae8");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var protos = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i = 0; i < protos.length; i++) {
+        if (String(protos[i][0]) === String(dados.protocolo)) {
+          return { ok: true, protocolo: dados.protocolo, acao: "ja_existia" };
+        }
+      }
+    }
+    var itens = dados.itens || [];
+    var itensJson = JSON.stringify(itens);
+    var resumoLog = itens.map(function(it){ return it.codigo+"("+it.tipo+")"; }).join(", ");
+    aba.appendRow([
+      dados.protocolo||"", dados.data||"", dados.hora||"",
+      dados.nome||"", dados.matricula||"", dados.tipo_carga||"Carga",
+      itensJson, dados.obs||"", dados.assinatura||"",
+      dados.assinatura_adjunto||"", dados.matricula_adjunto||"",
+      dados.nome_adjunto||"", dados.data_registro||new Date().toISOString(),
+      dados.origem||"qr_armamento", itens.length
+    ]);
+    registrarLog(ss, "carga_armamento", dados.nome, dados.tipo_carga+" · "+resumoLog);
+    return { ok: true, protocolo: dados.protocolo, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function verificarStatusItem(ss, codigo) {
+  try {
+    var aba = ss.getSheetByName("carga_armamento");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, livre: true };
+    var nCols  = Math.max(12, aba.getLastColumn());
+    var rows   = aba.getRange(2, 1, aba.getLastRow()-1, nCols).getValues();
+    var registros = [];
+    rows.forEach(function(r){
+      if (!r[0]) return;
+      var itens = [];
+      try { itens = JSON.parse(String(r[6] || "[]")); } catch(ex) {}
+      var temItem = itens.some(function(it){
+        return (it.codigo||"").toUpperCase() === codigo.toUpperCase();
+      });
+      if (temItem) registros.push({
+        protocolo:String(r[0]),data:String(r[1]),hora:String(r[2]),
+        nome:String(r[3]),matricula:String(r[4]),tipo_carga:String(r[5])
+      });
+    });
+    if (!registros.length) return { ok: true, livre: true };
+    registros.sort(function(a,b){
+      var da=a.data+"T"+(a.hora||"00:00"), db=b.data+"T"+(b.hora||"00:00");
+      return da>db?-1:1;
+    });
+    var ultimo = registros[0];
+    return { ok: true, livre: ultimo.tipo_carga !== "Carga", ultimo: ultimo };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function _fmtDataSheets(v){
+  if(!v) return "";
+  if(v instanceof Date) return Utilities.formatDate(v,"America/Bahia","dd/MM/yyyy");
+  var s=String(v).trim();
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[3]+"/"+m[2]+"/"+m[1];
+  return s;
+}
+function _fmtHoraSheets(v){
+  if(!v) return "";
+  if(v instanceof Date) return Utilities.formatDate(v,"America/Bahia","HH:mm");
+  var s=String(v).trim();
+  if(/^\d{1,2}:\d{2}/.test(s)) return s.substring(0,5);
+  return s;
+}
+
+function listarCargasArmamento(ss) {
+  try {
+    var aba = ss.getSheetByName("carga_armamento");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var nCols = Math.max(12, aba.getLastColumn());
+    var rows = aba.getRange(2, 1, aba.getLastRow()-1, nCols).getValues();
+    var dados = rows.filter(function(r){ return r[0]; }).map(function(r){
+      var obj = {
+        protocolo:String(r[0]||""), data:_fmtDataSheets(r[1]), hora:_fmtHoraSheets(r[2]),
+        nome:String(r[3]||""), matricula:String(r[4]||""), tipo_carga:String(r[5]||""),
+        itens:[], obs:String(r[7]||""), assinatura:String(r[8]||""),
+        assinatura_adjunto:String(r[9]||""), matricula_adjunto:String(r[10]||""),
+        nome_adjunto:String(r[11]||""), data_registro:String(r[12]||""), origem:String(r[13]||"")
+      };
+      try { obj.itens = JSON.parse(String(r[6]||"[]")); } catch(ex) {}
+      if(!obj.itens.length && r[5] && !["Carga","Descarga","Transferência","Conferência"].includes(String(r[5]))){
+        obj.tipo_carga=String(r[9]||"Carga"); obj.tipo_arma=String(r[5]||"");
+        obj.serie=String(r[6]||""); obj.municao=String(r[7]||"");
+        obj.carregadores=String(r[8]||""); obj.obs=String(r[10]||"");
+        obj.assinatura=String(r[11]||""); obj.data_registro=String(r[12]||"");
+      }
+      return obj;
+    });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  POLICIAIS
+// ══════════════════════════════════════════════════════════════════
+function salvarPolicial(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("policiais");
+    if (!aba) {
+      aba = ss.insertSheet("policiais");
+      aba.getRange(1,1,1,8).setValues([["id","matricula","posto","nome","telefone","turno","status","criadoEm"]])
+         .setFontWeight("bold").setBackground("#1a1028").setFontColor("#a78bfa");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var linhas = aba.getRange(2,1,aba.getLastRow()-1,2).getValues();
+      for (var i = 0; i < linhas.length; i++) {
+        if (String(linhas[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+        if (dados.matricula && String(linhas[i][1]).toLowerCase() === String(dados.matricula).toLowerCase())
+          return { ok: true, id: String(linhas[i][0]), acao: "ja_existia_matricula" };
+      }
+    }
+    aba.appendRow([dados.id||("POL-"+Date.now()), dados.matricula||"", dados.posto||"",
+      dados.nome||"", dados.telefone||"", dados.turno||"", dados.status||"ativo",
+      dados.criadoEm||new Date().toISOString()]);
+    registrarLog(ss, "policial", dados.matricula, dados.posto+" "+dados.nome);
+    return { ok: true, id: dados.id, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function atualizarStatusPolicial(ss, id, status) {
+  try {
+    var aba = ss.getSheetByName("policiais");
+    if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
+    var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(id)) { aba.getRange(i+2,7).setValue(status); return { ok: true }; }
+    }
+    return { ok: false, erro: "ID não encontrado" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarPoliciais(ss) {
+  try {
+    var aba = ss.getSheetByName("policiais");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,8).getValues();
+    var headers = ["id","matricula","posto","nome","telefone","turno","status","criadoEm"];
+    var dados = rows.filter(function(r){ return r[0]; }).map(function(r){
+      var obj={}; headers.forEach(function(h,i){ obj[h]=String(r[i]||""); }); return obj;
+    });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  MATERIAIS / PATRIMÔNIO
+// ══════════════════════════════════════════════════════════════════
+function salvarMaterialPatrimonio(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("materiais_patrimonio");
+    if (!aba) {
+      aba = ss.insertSheet("materiais_patrimonio");
+      aba.getRange(1,1,1,8).setValues([["id","codigo","tipo","descricao","serie","obs","status","criadoEm"]])
+         .setFontWeight("bold").setBackground("#0a2810").setFontColor("#4ade80");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+      }
+    }
+    aba.appendRow([dados.id||("MAT-"+Date.now()), (dados.codigo||"").toUpperCase(),
+      dados.tipo||"", dados.descricao||"", (dados.serie||"").toUpperCase(),
+      dados.obs||"", dados.status||"ativo", dados.criadoEm||new Date().toISOString()]);
+    registrarLog(ss, "material_patrimonio", dados.codigo, dados.tipo+" — "+dados.descricao);
+    return { ok: true, id: dados.id, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function atualizarStatusMaterial(ss, id, status) {
+  try {
+    var aba = ss.getSheetByName("materiais_patrimonio");
+    if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
+    var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(id)) {
+        aba.getRange(i+2,7).setValue(status);
+        registrarLog(ss, "material_status", id, status);
+        return { ok: true };
+      }
+    }
+    return { ok: false, erro: "ID não encontrado" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarMateriaisPatrimonio(ss) {
+  try {
+    var aba = ss.getSheetByName("materiais_patrimonio");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,8).getValues();
+    var headers = ["id","codigo","tipo","descricao","serie","obs","status","criadoEm"];
+    var dados = rows.filter(function(r){ return r[0]; }).map(function(r){
+      var obj={}; headers.forEach(function(h,i){ obj[h]=String(r[i]||""); }); return obj;
+    });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ATIVIDADES ESCOLARES
+// ══════════════════════════════════════════════════════════════════
+function salvarAtividadeEscolar(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("atividades_escolares");
+    if (!aba) {
+      aba = ss.insertSheet("atividades_escolares");
+      aba.getRange(1,1,1,11).setValues([[
+        "id","data","hora","tipo","subtipo","escolaNome","responsavel","tema","resultado","criadoEm","escolaId"
+      ]]).setFontWeight("bold").setBackground("#0f2035").setFontColor("#38bdf8");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+      }
+    }
+    aba.appendRow([dados.id||("ATESC-"+Date.now()), dados.data||"", dados.hora||"",
+      dados.tipo||"", dados.subtipo||"", dados.escolaNome||"", dados.responsavel||"",
+      dados.tema||"", dados.resultado||"", dados.criadoEm||new Date().toISOString(), dados.escolaId||""]);
+    return { ok: true, id: dados.id, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarAtividadesEscolares(ss) {
+  try {
+    var aba = ss.getSheetByName("atividades_escolares");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var hdrs = ["id","data","hora","tipo","subtipo","escolaNome","responsavel","tema","resultado","criadoEm","escolaId"];
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,hdrs.length).getValues();
+    var dados = rows.map(function(r){ var o={}; hdrs.forEach(function(h,i){ o[h]=r[i]; }); return o; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CHAMADAS DE PROJETOS SOCIAIS
+// ══════════════════════════════════════════════════════════════════
+function salvarChamadaProjeto(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("chamadas_projetos");
+    if (!aba) {
+      aba = ss.insertSheet("chamadas_projetos");
+      aba.getRange(1,1,1,8).setValues([[
+        "id","data","projetoId","projetoNome","instrutor","total_presentes","total_participantes","criadoEm"
+      ]]).setFontWeight("bold").setBackground("#2d1b69").setFontColor("#a78bfa");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+      }
+    }
+    var presencas = Array.isArray(dados.presencas) ? dados.presencas : [];
+    aba.appendRow([dados.id||("CHA-"+Date.now()), dados.data||"", dados.projetoId||"",
+      dados.projetoNome||"", dados.instrutor||"",
+      presencas.filter(function(p){ return p&&p.presente; }).length, presencas.length,
+      dados.criadoEm||new Date().toISOString()]);
+    return { ok: true, id: dados.id, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarChamadasProjetos(ss) {
+  try {
+    var aba = ss.getSheetByName("chamadas_projetos");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var hdrs = ["id","data","projetoId","projetoNome","instrutor","total_presentes","total_participantes","criadoEm"];
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,hdrs.length).getValues();
+    var dados = rows.map(function(r){ var o={}; hdrs.forEach(function(h,i){ o[h]=r[i]; }); return o; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  EVENTOS AVULSOS DO CALENDÁRIO
+// ══════════════════════════════════════════════════════════════════
+function salvarEventoAvulso(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("eventos_avulsos");
+    if (!aba) {
+      aba = ss.insertSheet("eventos_avulsos");
+      aba.getRange(1,1,1,10).setValues([[
+        "id","data","hora","tipo","titulo","descricao","cor","status","resultado","criadoEm"
+      ]]).setFontWeight("bold").setBackground("#0a1628").setFontColor("#fbbf24");
+      aba.setFrozenRows(1);
+    }
+    if (aba.getLastRow() >= 2) {
+      var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+      }
+    }
+    aba.appendRow([dados.id||("EV-"+Date.now()), dados.data||"", dados.hora||"",
+      dados.tipo||"", dados.titulo||"", dados.descricao||"", dados.cor||"",
+      dados.status||"", dados.resultado||"", dados.criadoEm||new Date().toISOString()]);
+    return { ok: true, id: dados.id, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarEventosAvulsos(ss) {
+  try {
+    var aba = ss.getSheetByName("eventos_avulsos");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var hdrs = ["id","data","hora","tipo","titulo","descricao","cor","status","resultado","criadoEm"];
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,hdrs.length).getValues();
+    var dados = rows.map(function(r){ var o={}; hdrs.forEach(function(h,i){ o[h]=r[i]; }); return o; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  INSCRIÇÕES DE PROJETOS / CURSOS
+// ══════════════════════════════════════════════════════════════════
+function salvarInscricaoProjeto(ss, dados) {
+  try {
+    var aba = ss.getSheetByName("inscricoes_projetos");
+    if (!aba) {
+      aba = ss.insertSheet("inscricoes_projetos");
+      aba.getRange(1,1,1,9).setValues([[
+        "id","projeto_id","projeto_nome","nome","telefone","cursos","sugestao","data_inscricao","origem"
+      ]]).setFontWeight("bold").setBackground("#1a0a3a").setFontColor("#c89ae8");
+      aba.setFrozenRows(1);
+    }
+    var idRegistro = dados.id || ("INS_"+Date.now());
+    aba.appendRow([idRegistro, dados.projeto_id||"", dados.projeto_nome||"",
+      dados.nome||"", dados.telefone||"", dados.cursos||"", dados.sugestao||"",
+      dados.data_inscricao||new Date().toISOString(), dados.origem||"qr_card"]);
+    registrarLog(ss, "inscricao_projeto", dados.nome, dados.projeto_nome);
+    return { ok: true, id: idRegistro, acao: "inserido" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarInscricoesProjeto(ss, projetoId) {
+  try {
+    var aba = ss.getSheetByName("inscricoes_projetos");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,9).getValues();
+    var headers = ["id","projeto_id","projeto_nome","nome","telefone","cursos","sugestao","data_inscricao","origem"];
+    var dados = rows.filter(function(r){ return r[0]&&(!projetoId||String(r[1])===String(projetoId)); })
+      .map(function(r){ var obj={}; headers.forEach(function(h,i){ obj[h]=String(r[i]||""); }); return obj; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SOLICITAÇÕES
+// ══════════════════════════════════════════════════════════════════
+function salvarSolicitacao(ss, dados) {
+  try {
+    if (!dados.protocolo) return { ok: false, erro: "Protocolo obrigatório" };
+    var aba = ss.getSheetByName("solicitacoes");
+    if (!aba) {
+      aba = ss.insertSheet("solicitacoes");
+      aba.getRange(1,1,1,16).setValues([[
+        "protocolo","data","hora","matricula","posto","nome","destinatario","assunto",
+        "texto","assinatura","status","nome_cmt","assinatura_cmt","obs_cmt","data_decisao","data_registro"
+      ]]).setFontWeight("bold");
+      aba.setFrozenRows(1);
+    }
+    aba.appendRow([dados.protocolo||"", dados.data||"", dados.hora||"",
+      dados.matricula||"", dados.posto||"", dados.nome||"", dados.destinatario||"",
+      dados.assunto||"", dados.texto||"", dados.assinatura||"", dados.status||"pendente",
+      dados.nome_cmt||"", dados.assinatura_cmt||"", dados.obs_cmt||"",
+      dados.data_decisao||"", dados.data_registro||new Date().toISOString()]);
+    return { ok: true, protocolo: dados.protocolo };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarSolicitacoes(ss) {
+  try {
+    var aba = ss.getSheetByName("solicitacoes");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,16).getValues();
+    var headers = ["protocolo","data","hora","matricula","posto","nome","destinatario","assunto",
+                   "texto","assinatura","status","nome_cmt","assinatura_cmt","obs_cmt","data_decisao","data_registro"];
+    var dados = rows.filter(function(r){ return r[0]; }).map(function(r){
+      var obj={}; headers.forEach(function(h,i){ obj[h]=String(r[i]||""); }); return obj;
+    });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function atualizarSolicitacao(ss, dados) {
+  try {
+    if (!dados.protocolo) return { ok: false, erro: "Protocolo obrigatório" };
+    var aba = ss.getSheetByName("solicitacoes");
+    if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Planilha vazia" };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,16).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(dados.protocolo)) {
+        var row = i + 2;
+        aba.getRange(row,11).setValue(dados.status||"pendente");
+        aba.getRange(row,12).setValue(dados.nome_cmt||"");
+        aba.getRange(row,13).setValue(dados.assinatura_cmt||"");
+        aba.getRange(row,14).setValue(dados.obs_cmt||"");
+        aba.getRange(row,15).setValue(dados.data_decisao||"");
+        return { ok: true, atualizado: dados.protocolo };
+      }
+    }
+    return { ok: false, erro: "Protocolo não encontrado" };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SALVAR (tipos originais) — PATCH 2 e 5 integrados
+// ══════════════════════════════════════════════════════════════════
+function salvar(ss, tipo, reg) {
+  var key = TIPO_KEY[tipo];
+  if (!key)        return {ok:false, erro:"Tipo desconhecido: "+tipo};
+  if (!reg||!reg.id) return {ok:false, erro:"Campo id obrigatório"};
+
+  var aba   = garantirAba(ss, key);
+  var agora = Utilities.formatDate(new Date(),"America/Bahia","dd/MM/yyyy HH:mm:ss");
+
+  // PATCH 5: avisos com origem/indicador/prioridade
+  if (key==="av") {
+    aba.appendRow([reg.id||"", reg.criadoEm||new Date().toISOString(),
+      reg.texto||"", reg.expira||"", JSON.stringify(reg.leituras||[]),
+      reg.anexo?reg.anexo.nome:"", reg.anexo?reg.anexo.tipo:"", reg.anexo?reg.anexo.b64:"",
+      reg.origem||"", reg.indicador||"", reg.prioridade||""]);
+    return {ok:true};
+  }
+
+  // PATCH 2: ocorrências com vitima_id e situacao
+  if (key==="oc") {
+    var narrativa = String(reg.descricao_dinamica||reg.texto_original||reg.descricao||"");
+    var medidas   = String(reg.medidas||"");
+    var linha = [
+      reg.id||"", agora, reg.numero||"", reg.data||"", reg.hora||"", reg.tipo||"",
+      reg.bairro||"", reg.municipio||"",
+      reg.vitima_nome||"", reg.vitima_idade||"", reg.vitima_sexo||"",
+      reg.vitima_telefone||"", reg.vitima_endereco||"", reg.vitima_cpf||"",
+      reg.suspeito_nome||"", reg.suspeito_apelido||"", reg.suspeito_caracteristicas||"",
+      reg.veiculo||"", reg.medida_protetiva||"Não",
+      reg.violencia_domestica?"Sim":"Não",
+      reg.requer_visita?"Sim":"Não",
+      reg.reincidente?"Sim":"Não",
+      reg.descricao||"", narrativa, medidas,
+      reg.vitima_id||"",        // col 26
+      reg.situacao||"nova"      // col 27
+    ];
+    if (aba.getLastRow()>=2) {
+      var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+      for (var i=0;i<ids.length;i++) {
+        if (String(ids[i][0]).trim()===String(reg.id).trim()) {
+          var n=i+2;
+          aba.getRange(n,1,1,25).setValues([linha.slice(0,25)]);
+          aba.getRange(n,26).setValue(reg.vitima_id||"");
+          aba.getRange(n,27).setValue(reg.situacao||"nova");
+          if (reg.reincidente) aba.getRange(n,1,1,27).setBackground("#3d1a00").setFontColor("#ffaa44");
+          return {ok:true, id:reg.id, acao:"atualizado"};
+        }
+      }
+    }
+    aba.appendRow(linha);
+    var nL = aba.getLastRow();
+    aba.getRange(nL,24).setValue(narrativa);
+    aba.getRange(nL,25).setValue(medidas);
+    if (reg.reincidente) aba.getRange(nL,1,1,27).setBackground("#3d1a00").setFontColor("#ffaa44");
+    return {ok:true, id:reg.id, acao:"inserido"};
+  }
+
+  var l;
+  if (key==="at") l=[reg.id||"",agora,reg.data||"",reg.hora||"",reg.nome||"",reg.telefone||"",reg.tipo||"",reg.descricao||"",reg.encaminhamento||""];
+  if (key==="ag") l=[reg.id||"",agora,reg.data||"",reg.hora||"",reg.tipo||"",reg.vitima_nome||"",reg.endereco||"",reg.responsavel||"",reg.objetivo||"",reg.status||""];
+  if (key==="vi") l=[reg.id||"",agora,reg.data||"",reg.tipo||"",reg.vitima_nome||"",reg.endereco||"",reg.resultado||"",reg.proxima_acao||""];
+  if (key==="fr") l=[reg.id||"",reg.ocorrenciaId||"",reg.data||"",reg.vitima_nome||"",reg.nivel||"",reg.sim||0,reg.naoSabe||0,reg.respostas||"[]",reg.relatorio||"",reg.responsavel||"",reg.anexo_nome||"",reg.anexo_tipo||"",reg.anexo_b64||""];
+  if (!l) return {ok:false, erro:"Tipo não mapeado: "+key};
+  aba.appendRow(l);
+  return {ok:true, id:reg.id, acao:"inserido"};
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  LER — PATCH 3 e 6 integrados
+// ══════════════════════════════════════════════════════════════════
+function fmtDataBR(v){
+  if(!v) return "";
+  if(v instanceof Date) return Utilities.formatDate(v,"America/Bahia","dd/MM/yyyy");
+  var s=String(v).trim();
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[3]+"/"+m[2]+"/"+m[1];
+  return s;
+}
+
+// PATCH 3: lerOcs retorna vitima_id e situacao
+function lerOcs(ss, pag, tam) {
+  var aba = getAba(ss,"oc");
+  if (!aba||aba.getLastRow()<2) return {total:0,dados:[],temMais:false};
+  var nCols = Math.max(27, aba.getLastColumn());
+  var total = aba.getLastRow()-1;
+  var ini   = 2+pag*tam;
+  if (ini>aba.getLastRow()) return {total:total,dados:[],temMais:false};
+  var qtd   = Math.min(tam,aba.getLastRow()-ini+1);
+  var rows  = aba.getRange(ini,1,qtd,nCols).getValues();
+  var dados = [];
+  for (var i=0;i<rows.length;i++) {
+    var r=rows[i]; if(!r[0]) continue;
+    dados.push({
+      id:r[0]+"", criadoEm:r[1]+"", numero:r[2]+"",
+      data:fmtDataBR(r[3]), hora:r[4]+"", tipo:r[5]+"",
+      bairro:r[6]+"", municipio:r[7]+"",
+      vitima_nome:r[8]+"", vitima_idade:r[9]+"", vitima_sexo:r[10]||"F",
+      vitima_telefone:r[11]+"", vitima_endereco:r[12]+"", vitima_cpf:r[13]+"",
+      suspeito_nome:r[14]+"", suspeito_apelido:r[15]+"", suspeito_caracteristicas:r[16]+"",
+      veiculo:r[17]+"", medida_protetiva:r[18]||"Não",
+      violencia_domestica:r[19]==="Sim", requer_visita:r[20]==="Sim", reincidente:r[21]==="Sim",
+      descricao:r[22]+"",
+      descricao_dinamica:String(r[23]||""),
+      medidas:String(r[24]||""),
+      texto_original:String(r[23]||r[22]||""),
+      vitima_id:String(r[25]||""),    // col 26
+      situacao:String(r[26]||"nova")  // col 27
+    });
+  }
+  return {total:total, dados:dados, temMais:(ini+qtd-1)<total};
+}
+
+function lerAba(ss, key) {
+  var aba=getAba(ss,key); if(!aba||aba.getLastRow()<2) return [];
+  var cols=HDRS[key].length;
+  var rows=aba.getRange(2,1,aba.getLastRow()-1,cols).getValues();
+  var out=[];
+  for (var i=0;i<rows.length;i++) {
+    var r=rows[i]; if(!r[0]) continue;
+    if(key==="at") out.push({id:r[0]+"",criadoEm:r[1]+"",data:fmtDataBR(r[2]),hora:r[3]+"",nome:r[4]+"",telefone:r[5]+"",tipo:r[6]+"",descricao:r[7]+"",encaminhamento:r[8]+""});
+    if(key==="ag") out.push({id:r[0]+"",criadoEm:r[1]+"",data:fmtDataBR(r[2]),hora:r[3]+"",tipo:r[4]+"",vitima_nome:r[5]+"",endereco:r[6]+"",responsavel:r[7]+"",objetivo:r[8]+"",status:r[9]+""});
+    if(key==="vi") out.push({id:r[0]+"",criadoEm:r[1]+"",data:fmtDataBR(r[2]),tipo:r[3]+"",vitima_nome:r[4]+"",endereco:r[5]+"",resultado:r[6]+"",proxima_acao:r[7]+""});
+    if(key==="fr") out.push({id:r[0]+"",ocorrenciaId:r[1]+"",data:r[2]+"",vitima_nome:r[3]+"",nivel:r[4]+"",sim:r[5]+"",naoSabe:r[6]+"",respostas:r[7]+"",relatorio:r[8]+"",responsavel:r[9]+"",anexo_nome:r[10]+"",anexo_tipo:r[11]+"",anexo_b64:r[12]+""});
+  }
+  return out;
+}
+
+// PATCH 6: lerAvisos retorna origem, indicador, prioridade
+function lerAvisos(ss) {
+  var aba=getAba(ss,"av"); if(!aba||aba.getLastRow()<2) return [];
+  var rows=aba.getRange(2,1,aba.getLastRow()-1,11).getValues();
+  var agora=new Date(), out=[];
+  for (var i=0;i<rows.length;i++) {
+    var r=rows[i]; if(!r[0]) continue;
+    var expira=r[3]?new Date(r[3]):null; if(expira&&expira<agora) continue;
+    var leituras=[]; try{leituras=r[4]?JSON.parse(r[4]):[];}catch(ex){}
+    out.push({
+      id:r[0]+"", criadoEm:r[1]+"", texto:r[2]+"",
+      expira:expira?expira.toISOString():null,
+      leituras:leituras,
+      anexo:r[5]?{nome:r[5]+"",tipo:r[6]+"",b64:r[7]+""}:null,
+      origem:String(r[8]||""), indicador:String(r[9]||""), prioridade:String(r[10]||"")
+    });
+  }
+  return out;
+}
+
+// PATCH 4: editarOc com vitima_id:26 e situacao:27
+function editarOc(ss, id, campos) {
+  var aba=getAba(ss,"oc"); if(!aba||aba.getLastRow()<2) return {ok:false,erro:"Aba não encontrada"};
+  var mapa={
+    numero:3,data:4,hora:5,tipo:6,bairro:7,municipio:8,
+    vitima_nome:9,vitima_idade:10,vitima_sexo:11,vitima_telefone:12,vitima_endereco:13,vitima_cpf:14,
+    suspeito_nome:15,suspeito_apelido:16,suspeito_caracteristicas:17,
+    veiculo:18,medida_protetiva:19,violencia_domestica:20,requer_visita:21,reincidente:22,
+    descricao:23,descricao_dinamica:24,medidas:25,
+    vitima_id:26, situacao:27  // novos
+  };
+  var ids=aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+  for (var i=0;i<ids.length;i++) {
+    if (String(ids[i][0])===String(id)) {
+      var linha=i+2;
+      Object.keys(campos).forEach(function(campo){
+        var col=mapa[campo]; if(!col) return;
+        var val=campos[campo]; if(typeof val==="boolean") val=val?"Sim":"Não";
+        aba.getRange(linha,col).setValue(val);
+      });
+      registrarLog(ss,"editar","oc","ID:"+id+" | "+Object.keys(campos).join(", "));
+      return {ok:true,id:id};
+    }
+  }
+  return {ok:false,erro:"ID não encontrado: "+id};
+}
+
+function deletarRegistro(ss, tipo, id) {
+  var key=TIPO_KEY[tipo]; if(!key) return {ok:false,erro:"Tipo desconhecido"};
+  var aba=getAba(ss,key); if(!aba||aba.getLastRow()<2) return {ok:true};
+  var ids=aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+  for(var i=ids.length-1;i>=0;i--){if(String(ids[i][0])===String(id)){aba.deleteRow(i+2);return {ok:true};}}
+  return {ok:true};
+}
+
+function atualizarLeituraAviso(ss,id,leituras){var aba=getAba(ss,"av");if(!aba||aba.getLastRow()<2)return;var ids=aba.getRange(2,1,aba.getLastRow()-1,1).getValues();for(var i=0;i<ids.length;i++){if(String(ids[i][0])===String(id)){aba.getRange(i+2,5).setValue(JSON.stringify(leituras));return;}}}
+function excluirAviso(ss,id){var aba=getAba(ss,"av");if(!aba||aba.getLastRow()<2)return;var ids=aba.getRange(2,1,aba.getLastRow()-1,1).getValues();for(var i=ids.length-1;i>=0;i--){if(String(ids[i][0])===String(id)){aba.deleteRow(i+2);return;}}}
+
+function dedup(ss){
+  var total=0;
+  Object.keys(NOME).forEach(function(key){
+    var aba=getAba(ss,key);if(!aba||aba.getLastRow()<2)return;
+    var dados=aba.getRange(2,1,aba.getLastRow()-1,aba.getLastColumn()).getValues(),vistas={},remover=[];
+    for(var i=0;i<dados.length;i++){var chave;if(key==="oc"){var t=String(dados[i][5]||"").toLowerCase().trim(),v=String(dados[i][8]||"").toLowerCase().trim(),b=String(dados[i][6]||"").toLowerCase().trim(),d=String(dados[i][3]||"").trim(),h=String(dados[i][4]||"").trim();chave=t+"|"+v+"|"+b+"|"+d+"|"+h;if(chave.replace(/\|/g,"").length<3)chave=String(dados[i][0]||i);}else{chave=String(dados[i][0]||"").trim();if(!chave)continue;}if(vistas[chave])remover.push(i+2);else vistas[chave]=true;}
+    remover.reverse().forEach(function(row){aba.deleteRow(row);});total+=remover.length;
+  });
+  return total;
+}
+
+function validarPin(hash,perfil){var g="4cad08c00f2b858677e00573ff398bd3c971d2a8f9ce006bba54a063786fa50b";var o="46c1776477b5d00910ae5df30970156c98b942253b2abcf792e286c36dd1fe45";if(perfil==="gestor"&&hash===g)return{ok:true,perfil:"gestor"};if(perfil==="operador"&&hash===o)return{ok:true,perfil:"operador"};return{ok:false};}
+
+// ══════════════════════════════════════════════════════════════════
+//  doGet — PATCH 7 integrado
+// ══════════════════════════════════════════════════════════════════
+function doGet(e) {
+  try {
+    var t=tok(), cb=(e.parameter&&e.parameter.callback)||"", acao=(e.parameter&&e.parameter.acao)||"";
+    var tipo=(e.parameter&&e.parameter.tipo)||"";
+
+    if (acao==="login") return saida(validarPin(e.parameter.hash||"",e.parameter.perfil||""),cb);
+    if ((e.parameter&&e.parameter.token)!==t) return saida({ok:false,erro:"Não autorizado"},cb);
+
+    var ss=getSS(), pag=parseInt((e.parameter&&e.parameter.pagina)||"0")||0;
+
+    if(acao==="ping"){var a=getAba(ss,"oc");return saida({ok:true,total:a?a.getLastRow()-1:0},cb);}
+    if(acao==="info"){return saida({ok:true,url:getSS().getUrl(),id:getSS().getId()},cb);}
+    if(acao==="salvarDadoApp"){var ch=e.parameter.chave,vl=e.parameter.valor;if(!ch)return saida({ok:false,erro:"chave obrigatória"},cb);props().setProperty("app__"+ch,vl||"");return saida({ok:true},cb);}
+    if(acao==="lerDadoApp"){var ch2=e.parameter.chave;if(!ch2)return saida({ok:false,erro:"chave obrigatória"},cb);var vl2=props().getProperty("app__"+ch2);return saida({ok:true,valor:vl2},cb);}
+    if(acao==="editar"){var campos={};try{campos=JSON.parse(e.parameter.campos||"{}");}catch(ex){}return saida(editarOc(ss,e.parameter.id,campos),cb);}
+    if(acao==="deletar") return saida(deletarRegistro(ss,e.parameter.tipo,e.parameter.id),cb);
+    if(acao==="deduplicar") return saida({ok:true,removidos:dedup(ss)},cb);
+    if(acao==="lerAvisos") return saida({ok:true,avisos:lerAvisos(ss)},cb);
+    if(acao==="excluirAviso"){if(e.parameter.id)excluirAviso(ss,e.parameter.id);return saida({ok:true},cb);}
+    if(acao==="lerAviso"){var lts=[];try{lts=JSON.parse(e.parameter.leituras||"[]");}catch(ex){}if(e.parameter.id)atualizarLeituraAviso(ss,e.parameter.id,lts);return saida({ok:true},cb);}
+
+    // ── CARGA DE ARMAMENTO ──────────────────────────────────────────
+    if(acao==="verificarStatusItem") return saida(verificarStatusItem(ss,e.parameter.codigo||""),cb);
+    if(acao==="salvar"&&tipo==="carga_armamento"){var d={};try{d=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarCargaArmamento(ss,d),cb);}
+    if(acao==="listar"&&tipo==="carga_armamento") return saida(listarCargasArmamento(ss),cb);
+
+    // ── POLICIAIS ───────────────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="policial"){var dPol={};try{dPol=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarPolicial(ss,dPol),cb);}
+    if(acao==="listar"&&tipo==="policiais") return saida(listarPoliciais(ss),cb);
+    if(acao==="atualizarStatusPolicial") return saida(atualizarStatusPolicial(ss,e.parameter.id||"",e.parameter.status||"inativo"),cb);
+
+    // ── MATERIAIS / PATRIMÔNIO ──────────────────────────────────────
+    if(acao==="salvar"&&tipo==="material_patrimonio"){var dMat={};try{dMat=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarMaterialPatrimonio(ss,dMat),cb);}
+    if(acao==="listar"&&tipo==="materiais_patrimonio") return saida(listarMateriaisPatrimonio(ss),cb);
+    if(acao==="atualizarStatusMaterial") return saida(atualizarStatusMaterial(ss,e.parameter.id||"",e.parameter.status||"inativo"),cb);
+
+    // ── ATIVIDADES ESCOLARES ────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="atividade_escolar"){var dAE={};try{dAE=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarAtividadeEscolar(ss,dAE),cb);}
+    if(acao==="listar"&&tipo==="atividades_escolares") return saida(listarAtividadesEscolares(ss),cb);
+
+    // ── CHAMADAS DE PROJETOS SOCIAIS ────────────────────────────────
+    if(acao==="salvar"&&tipo==="chamada_projeto"){var dCha={};try{dCha=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarChamadaProjeto(ss,dCha),cb);}
+    if(acao==="listar"&&tipo==="chamadas_projetos") return saida(listarChamadasProjetos(ss),cb);
+
+    // ── EVENTOS AVULSOS DO CALENDÁRIO ──────────────────────────────
+    if(acao==="salvar"&&tipo==="evento_avulso"){var dEv={};try{dEv=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarEventoAvulso(ss,dEv),cb);}
+    if(acao==="listar"&&tipo==="eventos_avulsos") return saida(listarEventosAvulsos(ss),cb);
+
+    // ── VÍTIMAS ─────────────────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="vitima"){var dVT={};try{dVT=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarVitima(ss,dVT),cb);}
+    if(acao==="listar"&&tipo==="vitimas") return saida(listarVitimas(ss),cb);
+    if(acao==="buscarVitima") return saida(buscarVitima(ss,e.parameter.nome||"",e.parameter.cpf||""),cb);
+    if(acao==="atualizarVitima"){var camposVT={};try{camposVT=JSON.parse(e.parameter.campos||"{}");}catch(ex){}return saida(atualizarVitima(ss,e.parameter.id||"",camposVT),cb);}
+
+    // ── ENCAMINHAMENTOS ─────────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="encaminhamento"){var dENC={};try{dENC=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarEncaminhamento(ss,dENC),cb);}
+    if(acao==="listar"&&tipo==="encaminhamentos") return saida(listarEncaminhamentos(ss,e.parameter.vitima_id||""),cb);
+    if(acao==="listar"&&tipo==="encaminhamentos_pendentes") return saida(listarEncaminhamentosPendentes(ss),cb);
+    if(acao==="atualizarEncaminhamento"){var camposEnc={};try{camposEnc=JSON.parse(e.parameter.campos||"{}");}catch(ex){}return saida(atualizarEncaminhamento(ss,e.parameter.id||"",camposEnc),cb);}
+
+    // ── SITUAÇÃO DA OCORRÊNCIA (triagem) ────────────────────────────
+    if(acao==="atualizarSituacaoOc") return saida(editarOc(ss,e.parameter.id||"",{situacao:e.parameter.situacao||"nova"}),cb);
+
+    // ── PROJETOS SOCIAIS ────────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="projeto_social"){var dPS={};try{dPS=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarProjetoSocial(ss,dPS),cb);}
+    if(acao==="listar"&&tipo==="projetos_sociais") return saida(listarProjetosSociais(ss),cb);
+    if(acao==="deletar"&&tipo==="projeto_social") return saida(deletarProjetoSocial(ss,e.parameter.id||""),cb);
+
+    // ── CANDIDATURAS ────────────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="candidatura"){var dCA={};try{dCA=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarCandidatura(ss,dCA),cb);}
+    if(acao==="listar"&&tipo==="candidaturas") return saida(listarCandidaturas(ss,e.parameter.projeto_id||""),cb);
+    if(acao==="atualizarCandidatura") return saida(atualizarStatusCandidatura(ss,e.parameter.id||"",e.parameter.status||"pendente",e.parameter.obs||""),cb);
+
+    // ── GESTÃO DE PROJETOS ──────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="projeto_gestor"){var dPG={};try{dPG=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarProjetoGestor(ss,dPG),cb);}
+    if(acao==="listar"&&tipo==="projetos_gestor") return saida(listarProjetosGestor(ss),cb);
+    if(acao==="deletar"&&tipo==="projeto_gestor") return saida(deletarProjetoGestor(ss,e.parameter.id||""),cb);
+
+    // ── ESCOLAS ─────────────────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="escola"){var dESC={};try{dESC=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarEscola(ss,dESC),cb);}
+    if(acao==="listar"&&tipo==="escolas") return saida(listarEscolas(ss),cb);
+
+    // ── CONSELHO COMUNITÁRIO ────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="conselho_ata"){var dCA2={};try{dCA2=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarConselhoAta(ss,dCA2),cb);}
+    if(acao==="listar"&&tipo==="conselho_atas") return saida(listarConselhoAtas(ss),cb);
+    if(acao==="deletar"&&tipo==="conselho_ata") return saida(deletarConselhoAta(ss,e.parameter.id||""),cb);
+    if(acao==="salvar"&&tipo==="conselho_associado"){var dCASS={};try{dCASS=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarConselhoAssociado(ss,dCASS),cb);}
+    if(acao==="listar"&&tipo==="conselho_associados") return saida(listarConselhoAssociados(ss),cb);
+    if(acao==="salvar"&&tipo==="conselho_diretoria"){var dCDIR={};try{dCDIR=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarConselhoDiretoria(ss,dCDIR),cb);}
+    if(acao==="listar"&&tipo==="conselho_diretoria") return saida(listarConselhoDiretoria(ss),cb);
+
+    // ── DEVOLUTIVAS CRAV ────────────────────────────────────────────
+    if(acao==="salvar"&&(tipo==="devolutiva_crav"||tipo==="devolutivas_crav")){var dDC={};try{dDC=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarDevolutivaCrav(ss,dDC),cb);}
+    if(acao==="listar"&&tipo==="devolutivas_crav") return saida(listarDevolutivasCrav(ss),cb);
+
+    // ── INVENTÁRIO ──────────────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="inv_item"){var dINV={};try{dINV=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInvItem(ss,dINV),cb);}
+    if(acao==="listar"&&tipo==="inv_itens") return saida(listarInvItens(ss),cb);
+    if(acao==="deletar"&&tipo==="inv_item") return saida(deletarInvItem(ss,e.parameter.id||""),cb);
+    if(acao==="salvar"&&tipo==="inv_movimentacao"){var dMOV={};try{dMOV=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInvMovimentacao(ss,dMOV),cb);}
+    if(acao==="listar"&&tipo==="inv_movimentacoes") return saida(listarInvMovimentacoes(ss),cb);
+    if(acao==="salvar"&&tipo==="inv_conferencia"){var dCONF={};try{dCONF=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInvConferencia(ss,dCONF),cb);}
+    if(acao==="listar"&&tipo==="inv_conferencias") return saida(listarInvConferencias(ss),cb);
+
+    // ── INSCRIÇÕES DE PROJETOS/CURSOS ───────────────────────────────
+    if(acao==="salvar"&&tipo==="inscricoes_projetos"){var dInsc={};try{dInsc=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInscricaoProjeto(ss,dInsc),cb);}
+    if(acao==="listarInscricoes") return saida(listarInscricoesProjeto(ss,e.parameter.projeto_id||""),cb);
+    if(acao==="listar"&&tipo==="inscricoes_projetos") return saida(listarInscricoesProjeto(ss,e.parameter.projeto_id||""),cb);
+
+    // ── SOLICITAÇÕES ─────────────────────────────────────────────────
+    if(acao==="salvar"&&tipo==="solicitacao"){var d2=JSON.parse(e.parameter.dados||"{}");return saida(salvarSolicitacao(ss,d2),cb);}
+    if(acao==="listar"&&tipo==="solicitacoes") return saida(listarSolicitacoes(ss),cb);
+    if(acao==="atualizarSolicitacao"){var sol2=JSON.parse(e.parameter.dados||"{}");return saida(atualizarSolicitacao(ss,sol2),cb);}
+
+    // ── LER DADOS GERAIS ────────────────────────────────────────────
+    if(acao==="ler"){
+      var res=lerOcs(ss,pag,1500),dados={ocorrencias:res.dados};
+      if(pag===0){dados.atendimentos=lerAba(ss,"at");dados.agendamentos=lerAba(ss,"ag");dados.visitas=lerAba(ss,"vi");dados.avisos=lerAvisos(ss);dados.frida=lerAba(ss,"fr");}
+      else{dados.atendimentos=[];dados.agendamentos=[];dados.visitas=[];dados.avisos=[];dados.frida=[];}
+      return saida({ok:true,total:res.total,pagina:pag,temMais:res.temMais,dados:dados},cb);
+    }
+
+    // ── FALLBACK ────────────────────────────────────────────────────
+    if(e.parameter&&e.parameter.dados){
+      var dp=JSON.parse(e.parameter.dados);
+      return saida(salvar(ss,dp.tipo,dp.registro),cb);
+    }
+
+    return saida({ok:true,msg:"IARA backend v4.0 ativo"},cb);
+  } catch(err){ return saida({ok:false,erro:err.toString()},(e&&e.parameter&&e.parameter.callback)||""); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  doPost — PATCH doPost integrado
+// ══════════════════════════════════════════════════════════════════
+function doPost(e) {
+  try {
+    var t=tok(), ss=getSS(), cb=(e.parameter&&e.parameter.callback)||"";
+    if (e.postData&&e.postData.contents) {
+      var d=JSON.parse(e.postData.contents);
+      if (d.token!==t) return saida({ok:false,erro:"Token inválido"},cb);
+      if (d.acao==="deletar"&&d.tipo&&d.id) return saida(deletarRegistro(ss,d.tipo,d.id),cb);
+      if (d.acao==="editar"&&d.id&&d.campos) return saida(editarOc(ss,d.id,d.campos),cb);
+      if (d.acao==="ia"&&d.messages&&d.system) return saida(chamarIA(d.system,d.messages),cb);
+      if (d.acao==="uploadFoto"&&d.id&&d.foto) return saida(uploadFotoInventario(d.id,d.foto,d.nome||""),cb);
+      if (d.tipo==="carga_armamento"&&d.registro) return saida(salvarCargaArmamento(ss,d.registro),cb);
+      if (d.tipo==="candidatura"&&d.registro) return saida(salvarCandidatura(ss,d.registro),cb);
+      if (d.tipo==="projeto_social"&&d.registro) return saida(salvarProjetoSocial(ss,d.registro),cb);
+      if (d.tipo==="policial"&&d.registro) return saida(salvarPolicial(ss,d.registro),cb);
+      if (d.tipo==="solicitacao"&&d.registro) return saida(salvarSolicitacao(ss,d.registro),cb);
+      if (d.tipo==="atividade_escolar"&&d.registro) return saida(salvarAtividadeEscolar(ss,d.registro),cb);
+      if (d.tipo==="chamada_projeto"&&d.registro) return saida(salvarChamadaProjeto(ss,d.registro),cb);
+      if (d.tipo==="evento_avulso"&&d.registro) return saida(salvarEventoAvulso(ss,d.registro),cb);
+      if (d.tipo==="inscricoes_projetos"&&d.registro) return saida(salvarInscricaoProjeto(ss,d.registro),cb);
+      if (d.tipo==="inv_item"&&d.registro) return saida(salvarInvItem(ss,d.registro),cb);
+      if (d.tipo==="inv_movimentacao"&&d.registro) return saida(salvarInvMovimentacao(ss,d.registro),cb);
+      if (d.tipo==="inv_conferencia"&&d.registro) return saida(salvarInvConferencia(ss,d.registro),cb);
+      if (d.tipo==="vitima"&&d.registro) return saida(salvarVitima(ss,d.registro),cb);
+      if (d.tipo==="encaminhamento"&&d.registro) return saida(salvarEncaminhamento(ss,d.registro),cb);
+      if (d.tipo&&d.registro) return saida(salvar(ss,d.tipo,d.registro),cb);
+      return saida({ok:false,erro:"Payload sem tipo/registro"},cb);
+    }
+    if (e.parameter&&e.parameter.token===t&&e.parameter.dados) {
+      var dp2=JSON.parse(e.parameter.dados);
+      if (dp2.tipo&&dp2.registro) return saida(salvar(ss,dp2.tipo,dp2.registro),cb);
+      return saida({ok:false,erro:"Payload inválido"},cb);
+    }
+    return saida({ok:false,erro:"Nenhum dado recebido"},cb);
+  } catch(err){ return saida({ok:false,erro:"Erro doPost: "+err.toString()}); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  UPLOAD FOTO INVENTÁRIO
+// ══════════════════════════════════════════════════════════════════
+function uploadFotoInventario(itemId, fotoBase64, nomeItem) {
+  try {
+    var partes = fotoBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!partes || partes.length !== 3) return { ok: false, erro: "Formato de imagem inválido" };
+    var mime=partes[1], b64data=partes[2];
+    var bytes=Utilities.base64Decode(b64data);
+    var blob=Utilities.newBlob(bytes, mime, "inv_"+itemId+".jpg");
+    var folders=DriveApp.getFoldersByName("IARA-Inventario");
+    var folder=folders.hasNext()?folders.next():DriveApp.createFolder("IARA-Inventario");
+    var antigos=folder.getFilesByName("inv_"+itemId+".jpg");
+    while(antigos.hasNext()){antigos.next().setTrashed(true);}
+    var file=folder.createFile(blob);
+    file.setName("inv_"+itemId+".jpg");
+    file.setDescription((nomeItem||itemId)+" — 77ª CIPM BCS");
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var url="https://drive.google.com/uc?export=view&id="+file.getId();
+    return { ok: true, url: url, fileId: file.getId(), itemId: itemId };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PROXY IA
+// ══════════════════════════════════════════════════════════════════
+function chamarIA(system, messages) {
+  var chave = props().getProperty("ANTHROPIC_KEY");
+  if(!chave) return {ok:false, erro:"Chave IA não configurada. Execute definirChaveIA() no editor."};
+  try {
+    var payload = JSON.stringify({
+      model: "claude-3-5-haiku-20241022", max_tokens: 2000,
+      system: system, messages: messages
+    });
+    var options = {
+      method:"post", contentType:"application/json",
+      headers:{"x-api-key":chave,"anthropic-version":"2023-06-01"},
+      payload:payload, muteHttpExceptions:true
+    };
+    var res=UrlFetchApp.fetch("https://api.anthropic.com/v1/messages",options);
+    var data=JSON.parse(res.getContentText());
+    if(data.error) return {ok:false,erro:data.error.message};
+    var resposta=data.content&&data.content[0]?data.content[0].text:"";
+    return {ok:true, resposta:resposta};
+  } catch(err) { return {ok:false,erro:"Erro ao chamar IA: "+err.toString()}; }
+}
+
+function definirChaveIA() {
+  var chave = "SUA_CHAVE_AQUI";
+  if (!chave || chave === "SUA_CHAVE_AQUI") { Logger.log("❌ Substitua SUA_CHAVE_AQUI pela chave real."); return; }
+  props().setProperty("ANTHROPIC_KEY", chave);
+  Logger.log("✓ Chave IA salva!");
+}
+
+function verificarChaveIA() {
+  var chave = props().getProperty("ANTHROPIC_KEY");
+  Logger.log(chave ? "✓ Configurada: "+chave.substring(0,20)+"..." : "❌ Não configurada.");
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  UTILITÁRIO JSON — _salvarJson / _listarJson / _deletarJson
+// ══════════════════════════════════════════════════════════════════
+function _garantirAbaJson(ss, nome, corFundo, corTexto) {
+  var aba = ss.getSheetByName(nome);
+  if (!aba) {
+    aba = ss.insertSheet(nome);
+    aba.getRange(1,1,1,3).setValues([["id","criadoEm","dados_json"]])
+       .setFontWeight("bold").setBackground(corFundo||"#1a1a2e").setFontColor(corTexto||"#ffffff");
+    aba.setFrozenRows(1);
+    aba.setColumnWidth(3, 600);
+  }
+  return aba;
+}
+
+function _salvarJson(ss, abaName, corFundo, corTexto, dados) {
+  if (!dados || !dados.id) return { ok: false, erro: "id obrigatório" };
+  var aba = _garantirAbaJson(ss, abaName, corFundo, corTexto);
+  var nRows = aba.getLastRow() - 1;
+  if (nRows > 0) {
+    var ids = aba.getRange(2,1,nRows,1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(dados.id)) {
+        aba.getRange(i+2,2).setValue(dados.criadoEm||new Date().toISOString());
+        aba.getRange(i+2,3).setValue(JSON.stringify(dados));
+        return { ok: true, id: dados.id, acao: "atualizado" };
+      }
+    }
+  }
+  aba.appendRow([dados.id, dados.criadoEm||new Date().toISOString(), JSON.stringify(dados)]);
+  return { ok: true, id: dados.id, acao: "inserido" };
+}
+
+function _listarJson(ss, abaName) {
+  var aba = ss.getSheetByName(abaName);
+  if (!aba || aba.getLastRow() < 2) return [];
+  var rows = aba.getRange(2,1,aba.getLastRow()-1,3).getValues();
+  var out = [];
+  rows.forEach(function(r) {
+    if (!r[0]) return;
+    try { out.push(JSON.parse(String(r[2]))); } catch(e) { out.push({id:String(r[0])}); }
+  });
+  return out;
+}
+
+function _deletarJson(ss, abaName, id) {
+  var aba = ss.getSheetByName(abaName);
+  if (!aba || aba.getLastRow() < 2) return { ok: true };
+  var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+  for (var i = ids.length-1; i >= 0; i--) {
+    if (String(ids[i][0]) === String(id)) { aba.deleteRow(i+2); return { ok: true }; }
+  }
+  return { ok: true };
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  MÓDULOS JSON (projetos, inventário, conselho, etc.)
+// ══════════════════════════════════════════════════════════════════
+function salvarProjetoSocial(ss,d){return _salvarJson(ss,"projetos_sociais","#1a0a3a","#c89ae8",d);}
+function listarProjetosSociais(ss){return{ok:true,dados:_listarJson(ss,"projetos_sociais")};}
+function deletarProjetoSocial(ss,id){return _deletarJson(ss,"projetos_sociais",id);}
+
+function salvarProjetoGestor(ss,d){return _salvarJson(ss,"projetos_gestor","#1a1a0a","#d4a87a",d);}
+function listarProjetosGestor(ss){return{ok:true,dados:_listarJson(ss,"projetos_gestor")};}
+function deletarProjetoGestor(ss,id){return _deletarJson(ss,"projetos_gestor",id);}
+
+function salvarEscola(ss,d){return _salvarJson(ss,"escolas","#0f2035","#38bdf8",d);}
+function listarEscolas(ss){return{ok:true,dados:_listarJson(ss,"escolas")};}
+
+function salvarConselhoAta(ss,d){return _salvarJson(ss,"conselho_atas","#061a0e","#22c55e",d);}
+function listarConselhoAtas(ss){return{ok:true,dados:_listarJson(ss,"conselho_atas")};}
+function deletarConselhoAta(ss,id){return _deletarJson(ss,"conselho_atas",id);}
+function salvarConselhoAssociado(ss,d){return _salvarJson(ss,"conselho_associados","#061a0e","#4ade80",d);}
+function listarConselhoAssociados(ss){return{ok:true,dados:_listarJson(ss,"conselho_associados")};}
+function salvarConselhoDiretoria(ss,d){return _salvarJson(ss,"conselho_diretoria","#061a0e","#86efac",d);}
+function listarConselhoDiretoria(ss){return{ok:true,dados:_listarJson(ss,"conselho_diretoria")};}
+
+function salvarDevolutivaCrav(ss,d){
+  if(!d||!d.id) return {ok:false,erro:"id obrigatório"};
+  // 1. Salva na aba devolutivas_crav
+  _salvarJson(ss,"devolutivas_crav","#1a0a2e","#a78bfa",d);
+  // 2. Atualiza o encaminhamento com relato_devolutiva
+  // O link usa ?oc=<ocId> então ocorrenciaId = ID da OC
+  // Busca o encaminhamento pela ocorrenciaId ou pelo campo enc (id direto)
+  var _encId = d.encaminhamentoId || d.enc || "";
+  if(_encId || d.ocorrenciaId){
+    var relato=[d.tiposTexto,d.situacao,d.observacoes].filter(Boolean).join(" | ");
+    var encUpdate={
+      relato_devolutiva: relato,
+      data_devolutiva:   d.data||new Date().toISOString().slice(0,10),
+      status:            "aguardando_devolutiva",
+      responsavel_devolutiva: d.tecnica||""
+    };
+    if(_encId){ atualizarEncaminhamento(ss, _encId, encUpdate); }
+    else { atualizarEncaminhamentoPorOcId(ss, d.ocorrenciaId, encUpdate); }
+  }
+  return {ok:true};
+}
+function listarDevolutivasCrav(ss){return{ok:true,registros:_listarJson(ss,"devolutivas_crav")};}
+
+function salvarCandidatura(ss,dados){
+  if(!dados||!dados.id)return{ok:false,erro:"id obrigatório"};
+  var copia=Object.assign({},dados);
+  if(copia.comprovante_residencia&&copia.comprovante_residencia.length>20000)copia.comprovante_residencia="[foto_grande_local]";
+  if(copia.responsavel_assinatura&&copia.responsavel_assinatura.length>50000)copia.responsavel_assinatura="[assin_local]";
+  return _salvarJson(ss,"candidaturas","#1a0a3a","#c89ae8",copia);
+}
+function listarCandidaturas(ss,projetoId){
+  var todos=_listarJson(ss,"candidaturas");
+  if(projetoId)todos=todos.filter(function(c){return c.projeto_id===projetoId;});
+  return{ok:true,dados:todos};
+}
+function atualizarStatusCandidatura(ss,id,status,obs){
+  var aba=ss.getSheetByName("candidaturas");
+  if(!aba||aba.getLastRow()<2)return{ok:false,erro:"Aba não encontrada"};
+  var ids=aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+  for(var i=0;i<ids.length;i++){
+    if(String(ids[i][0])===String(id)){
+      try{var cell=aba.getRange(i+2,3);var json=JSON.parse(cell.getValue()||"{}");json.status=status;json.data_decisao=new Date().toISOString();if(obs)json.obs_decisao=obs;cell.setValue(JSON.stringify(json));return{ok:true,id:id,status:status};}
+      catch(e){return{ok:false,erro:e.toString()};}
+    }
+  }
+  return{ok:false,erro:"ID não encontrado"};
+}
+
+function salvarInvItem(ss,dados){var c=Object.assign({},dados);if(c.foto&&c.foto.length>5000)c.foto="[foto_local]";if(c.carga_assinatura&&c.carga_assinatura.length>2000)c.carga_assinatura="[assin_local]";return _salvarJson(ss,"inv_itens","#0a1a0a","#10b981",c);}
+function listarInvItens(ss){return{ok:true,dados:_listarJson(ss,"inv_itens")};}
+function deletarInvItem(ss,id){return _deletarJson(ss,"inv_itens",id);}
+function salvarInvMovimentacao(ss,dados){var c=Object.assign({},dados);if(c.assinatura&&c.assinatura.length>2000)c.assinatura="[assin_local]";return _salvarJson(ss,"inv_movimentacoes","#0a1a12","#34d399",c);}
+function listarInvMovimentacoes(ss){return{ok:true,dados:_listarJson(ss,"inv_movimentacoes")};}
+function salvarInvConferencia(ss,dados){var c=Object.assign({},dados);if(c.assin1&&c.assin1.length>2000)c.assin1="[assin_local]";if(c.assin2&&c.assin2.length>2000)c.assin2="[assin_local]";return _salvarJson(ss,"inv_conferencias","#0a1a10","#6ee7b7",c);}
+function listarInvConferencias(ss){return{ok:true,dados:_listarJson(ss,"inv_conferencias")};}
+
+function salvarAlertaCrescimento(ss,d){return _salvarJson(ss,"alertas_crescimento","#1a0808","#ef4444",d);}
+function listarAlertasCrescimento(ss){return{ok:true,dados:_listarJson(ss,"alertas_crescimento")};}
+
+// ══════════════════════════════════════════════════════════════════
+//  VÍTIMAS — Fase 1
+// ══════════════════════════════════════════════════════════════════
+var VITIMAS_HDRS = ["id","nome","sexo","idade","telefone","endereco","cpf","bairro","criadoEm","atualizadoEm"];
+
+function _garantirAbaVitimas(ss) {
+  var aba = ss.getSheetByName("vitimas");
+  if (!aba) {
+    aba = ss.insertSheet("vitimas");
+    aba.getRange(1,1,1,VITIMAS_HDRS.length).setValues([VITIMAS_HDRS])
+       .setFontWeight("bold").setBackground("#1a0828").setFontColor("#f0abfc");
+    aba.setFrozenRows(1);
+  }
+  return aba;
+}
+
+function salvarVitima(ss, dados) {
+  if (!dados || !dados.id) return { ok: false, erro: "id obrigatório" };
+  var aba = _garantirAbaVitimas(ss);
+  var agora = new Date().toISOString();
+  if (aba.getLastRow() >= 2) {
+    var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(dados.id)) {
+        var row = i + 2;
+        aba.getRange(row,2).setValue(dados.nome||"");
+        aba.getRange(row,3).setValue(dados.sexo||"");
+        aba.getRange(row,4).setValue(dados.idade||"");
+        aba.getRange(row,5).setValue(dados.telefone||"");
+        aba.getRange(row,6).setValue(dados.endereco||"");
+        aba.getRange(row,7).setValue(dados.cpf||"");
+        aba.getRange(row,8).setValue(dados.bairro||"");
+        aba.getRange(row,10).setValue(agora);
+        registrarLog(ss,"vitima",dados.id,"atualizada: "+dados.nome);
+        return { ok: true, id: dados.id, acao: "atualizado" };
+      }
+    }
+  }
+  aba.appendRow([dados.id, dados.nome||"", dados.sexo||"", dados.idade||"",
+    dados.telefone||"", dados.endereco||"", dados.cpf||"",
+    dados.bairro||"", dados.criadoEm||agora, agora]);
+  registrarLog(ss,"vitima",dados.id,"inserida: "+dados.nome);
+  return { ok: true, id: dados.id, acao: "inserido" };
+}
+
+function listarVitimas(ss) {
+  try {
+    var aba = ss.getSheetByName("vitimas");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,VITIMAS_HDRS.length).getValues();
+    var dados = rows.filter(function(r){ return r[0]; }).map(function(r){
+      var o={}; VITIMAS_HDRS.forEach(function(h,i){ o[h]=String(r[i]||""); }); return o;
+    });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function buscarVitima(ss, nome, cpf) {
+  try {
+    var aba = ss.getSheetByName("vitimas");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,VITIMAS_HDRS.length).getValues();
+    var nomeLower=(nome||"").toLowerCase().trim(), cpfLimpo=(cpf||"").replace(/\D/g,"");
+    var dados = rows.filter(function(r){
+      if(!r[0])return false;
+      if(cpfLimpo&&String(r[6]).replace(/\D/g,"")===cpfLimpo)return true;
+      if(nomeLower&&String(r[1]).toLowerCase().indexOf(nomeLower)>=0)return true;
+      return false;
+    }).map(function(r){
+      var o={}; VITIMAS_HDRS.forEach(function(h,i){ o[h]=String(r[i]||""); }); return o;
+    });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function atualizarVitima(ss, id, campos) {
+  try {
+    var aba = ss.getSheetByName("vitimas");
+    if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
+    var mapa={nome:2,sexo:3,idade:4,telefone:5,endereco:6,cpf:7,bairro:8};
+    var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(id)) {
+        var linha = i + 2;
+        Object.keys(campos).forEach(function(c){ var col=mapa[c]; if(col) aba.getRange(linha,col).setValue(campos[c]); });
+        aba.getRange(linha,10).setValue(new Date().toISOString());
+        return { ok: true, id: id };
+      }
+    }
+    return { ok: false, erro: "ID não encontrado: "+id };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ENCAMINHAMENTOS — Fase 1
+// ══════════════════════════════════════════════════════════════════
+var ENC_HDRS = ["id","vitima_id","ocorrencia_id","orgao","situacao",
+                "data_envio","data_devolutiva","relato_devolutiva","responsavel","criadoEm"];
+
+function _garantirAbaEnc(ss) {
+  var aba = ss.getSheetByName("encaminhamentos");
+  if (!aba) {
+    aba = ss.insertSheet("encaminhamentos");
+    aba.getRange(1,1,1,ENC_HDRS.length).setValues([ENC_HDRS])
+       .setFontWeight("bold").setBackground("#0a1a28").setFontColor("#38bdf8");
+    aba.setFrozenRows(1);
+  }
+  return aba;
+}
+
+function salvarEncaminhamento(ss, dados) {
+  if (!dados || !dados.id) return { ok: false, erro: "id obrigatório" };
+  var aba = _garantirAbaEnc(ss);
+  var agora = new Date().toISOString();
+  if (aba.getLastRow() >= 2) {
+    var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(dados.id)) return { ok: true, id: dados.id, acao: "ja_existia" };
+    }
+  }
+  aba.appendRow([dados.id, dados.vitima_id||"", dados.ocorrencia_id||"",
+    dados.orgao||"", dados.situacao||"a_encaminhar",
+    dados.data_envio||"", dados.data_devolutiva||"",
+    dados.relato_devolutiva||"", dados.responsavel||"", dados.criadoEm||agora]);
+  registrarLog(ss,"encaminhamento",dados.id,dados.orgao+" | "+dados.situacao);
+  return { ok: true, id: dados.id, acao: "inserido" };
+}
+
+function listarEncaminhamentos(ss, vitimaId) {
+  try {
+    var aba = ss.getSheetByName("encaminhamentos");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,ENC_HDRS.length).getValues();
+    var dados = rows.filter(function(r){
+      if(!r[0])return false;
+      if(vitimaId&&String(r[1])!==String(vitimaId))return false;
+      return true;
+    }).map(function(r){ var o={}; ENC_HDRS.forEach(function(h,i){ o[h]=String(r[i]||""); }); return o; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function listarEncaminhamentosPendentes(ss) {
+  try {
+    var aba = ss.getSheetByName("encaminhamentos");
+    if (!aba || aba.getLastRow() < 2) return { ok: true, dados: [] };
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,ENC_HDRS.length).getValues();
+    var dados = rows.filter(function(r){
+      if(!r[0])return false;
+      var sit=String(r[4]||"");
+      return sit==="a_encaminhar"||sit==="encaminhado";
+    }).map(function(r){ var o={}; ENC_HDRS.forEach(function(h,i){ o[h]=String(r[i]||""); }); return o; });
+    return { ok: true, dados: dados };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function atualizarEncaminhamento(ss, id, campos) {
+  try {
+    var aba = ss.getSheetByName("encaminhamentos");
+    if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
+    var mapa={orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9};
+    var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(id)) {
+        var linha = i + 2;
+        Object.keys(campos).forEach(function(c){ var col=mapa[c]; if(col) aba.getRange(linha,col).setValue(campos[c]); });
+        registrarLog(ss,"enc_atualizado",id,JSON.stringify(campos));
+        return { ok: true, id: id };
+      }
+    }
+    return { ok: false, erro: "ID não encontrado: "+id };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+function atualizarEncaminhamentoPorOcId(ss, ocId, campos) {
+  try {
+    var aba = ss.getSheetByName("encaminhamentos");
+    if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
+    var mapa={orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9};
+    // Coluna ocorrenciaId — índice 2 (0-based) = coluna 3 (1-based)
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,10).getValues();
+    var found = false;
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][2]) === String(ocId)) { // coluna 3 = ocorrenciaId
+        var linha = i + 2;
+        Object.keys(campos).forEach(function(c){ var col=mapa[c]; if(col) aba.getRange(linha,col).setValue(campos[c]); });
+        found = true;
+        registrarLog(ss,"enc_devolutiva_por_oc",ocId,JSON.stringify(campos));
+      }
+    }
+    return found ? { ok: true } : { ok: false, erro: "OC não encontrada: "+ocId };
+  } catch(e) { return { ok: false, erro: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CRIAR TODAS AS ABAS (execute após colar o script)
+// ══════════════════════════════════════════════════════════════════
+function criarTodasAbasNovas() {
+  var ss = getSS();
+  var abas = ss.getSheets().map(function(s){ return s.getName(); });
+  var novas = [
+    {nome:"projetos_sociais",cor:"#1a0a3a",txt:"#c89ae8"},
+    {nome:"candidaturas",cor:"#1a0a3a",txt:"#a78bfa"},
+    {nome:"projetos_gestor",cor:"#1a1a0a",txt:"#d4a87a"},
+    {nome:"escolas",cor:"#0f2035",txt:"#38bdf8"},
+    {nome:"conselho_atas",cor:"#061a0e",txt:"#22c55e"},
+    {nome:"conselho_associados",cor:"#061a0e",txt:"#4ade80"},
+    {nome:"conselho_diretoria",cor:"#061a0e",txt:"#86efac"},
+    {nome:"devolutivas_crav",cor:"#1a0a2e",txt:"#a78bfa"},
+    {nome:"inv_itens",cor:"#0a1a0a",txt:"#10b981"},
+    {nome:"inv_movimentacoes",cor:"#0a1a12",txt:"#34d399"},
+    {nome:"inv_conferencias",cor:"#0a1a10",txt:"#6ee7b7"},
+    {nome:"alertas_crescimento",cor:"#1a0808",txt:"#ef4444"}
+  ];
+  novas.forEach(function(cfg){
+    if(abas.indexOf(cfg.nome)===-1){_garantirAbaJson(ss,cfg.nome,cfg.cor,cfg.txt);Logger.log("✓ '"+cfg.nome+"' criada.");}
+    else{Logger.log("- '"+cfg.nome+"' já existe.");}
+  });
+  // Abas das novas entidades Fase 1
+  _garantirAbaVitimas(ss);
+  _garantirAbaEnc(ss);
+  // Abas legadas
+  criarAbasFaltantes();
+  Logger.log("✅ Todas as abas verificadas/criadas!");
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  DIAGNÓSTICO DE DADOS (somente leitura)
+// ══════════════════════════════════════════════════════════════════
+function diagnosticarDadosOC() {
+  var ss = getSS();
+  var aba = getAba(ss, "oc");
+  if (!aba || aba.getLastRow() < 2) { Logger.log("Aba oc vazia."); return; }
+  var nCols = Math.max(27, aba.getLastColumn());
+  var nLinhas = aba.getLastRow() - 1;
+  var rows = aba.getRange(2,1,nLinhas,nCols).getValues();
+  var DATE_RE = /^\d{2}\/\d{2}\/\d{4}$/;
+  var total=0, semVitima=0, bairroComData=0, semTipo=0, semData=0, prefixos={}, temSituacao=0;
+  rows.forEach(function(r){
+    if(!r[0])return; total++;
+    var pid=String(r[0]).indexOf("_")>-1?String(r[0]).split("_")[0]:"uuid";
+    prefixos[pid]=(prefixos[pid]||0)+1;
+    if(DATE_RE.test(String(r[6]).trim()))bairroComData++;
+    if(!String(r[8]).trim())semVitima++;
+    if(!String(r[5]).trim())semTipo++;
+    if(!String(r[3]).trim())semData++;
+    if(String(r[26]||"").trim())temSituacao++;
+  });
+  Logger.log("══ DIAGNÓSTICO OC ══════════════════════");
+  Logger.log("Total: "+total);
+  Logger.log("Prefixos de ID: "+JSON.stringify(prefixos));
+  Logger.log("Sem vítima nome: "+semVitima+" ("+Math.round(semVitima/total*100)+"%)");
+  Logger.log("Bairro com data (coluna trocada): "+bairroComData);
+  Logger.log("Sem tipo: "+semTipo);
+  Logger.log("Sem data: "+semData);
+  Logger.log("Col 27 (situacao) preenchida: "+temSituacao);
+  Logger.log("════════════════════════════════════════");
+}
