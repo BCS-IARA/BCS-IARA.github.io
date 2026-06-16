@@ -13523,11 +13523,13 @@ window._syncDevolutivas = function(cb) {
   var t = setTimeout(function(){ done=true; s.remove(); delete window[cbName]; if(cb) cb(0); }, 12000);
   window[cbName] = function(dados){
     done = true; clearTimeout(t); s.remove(); delete window[cbName];
-    if(!dados || !dados.registros) { if(cb) cb(0); return; }
+    var registros = (dados && (dados.registros || dados.dados)) || [];
+    if(!registros.length){ if(cb) cb(0); return; }
     var novos = 0;
-    dados.registros.forEach(function(r){
-      if(!r.encaminhamentoId) return;
-      var enc = (state.encaminhamentos||[]).find(function(e){ return e.id===r.encaminhamentoId; });
+    registros.forEach(function(r){
+      var enc = null;
+      if(r.encaminhamentoId) enc = (state.encaminhamentos||[]).find(function(e){ return e.id===r.encaminhamentoId; });
+      if(!enc && r.ocorrenciaId) enc = (state.encaminhamentos||[]).find(function(e){ return e.ocorrencia_id===r.ocorrenciaId || e.ocorrencia_id===r.ocId; });
       if(!enc) return;
       // Só atualiza se ainda não tiver devolutiva registrada
       if(!enc.relato_devolutiva){
