@@ -21019,10 +21019,13 @@ function _invAbrirItem(id){
   html += "</div>"; // fim bloco carga
 
   // Botões
-  html += "<div style='display:flex;gap:10px;justify-content:flex-end;margin-top:4px'>";
+  html += "<div style='display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:4px;flex-wrap:wrap'>";
+  if(ed) html += "<button onclick='_invExcluirItem(\""+esc(id||"")+"\")'  style='background:#2a0800;border:1px solid #ef4444;color:#ef4444;padding:9px 16px;border-radius:7px;font-size:12px;cursor:pointer'>🗑 Excluir Item</button>";
+  else html += "<span></span>";
+  html += "<div style='display:flex;gap:10px'>";
   html += "<button onclick=\"document.getElementById('modal-inv-item').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
   html += "<button onclick='_invSalvarItem(\""+esc(id||"")+"\")'  style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>💾 Salvar</button>";
-  html += "</div>";
+  html += "</div></div>";
 
   html += "</div></div></div>";
 
@@ -21063,6 +21066,26 @@ function _invLimparPad(id){
   if(!c) return;
   var ctx = c.getContext("2d");
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height);
+}
+
+function _invExcluirItem(id){
+  if(!confirm("Excluir este item do inventário? Esta ação não pode ser desfeita.")) return;
+  state.invItens=(state.invItens||[]).filter(function(x){return x.id!==id;});
+  _invSalvarLocal();
+  var m=document.getElementById("modal-inv-item"); if(m) m.remove();
+  var main=document.getElementById("main-content")||document.getElementById("main");
+  if(main) renderInventario(main);
+  showToast("Item excluído");
+}
+
+function _invLimparTodos(){
+  var n=(state.invItens||[]).filter(function(x){return x.ativo!==false;}).length;
+  if(!confirm("Excluir TODOS os "+n+" itens do inventário?\n\nUse esta opção para limpar uma importação errada e reimportar corretamente.")) return;
+  state.invItens=[];
+  _invSalvarLocal();
+  var main=document.getElementById("main-content")||document.getElementById("main");
+  if(main) renderInventario(main);
+  showToast("Inventário limpo — reimporte os dados");
 }
 
 function _invSalvarItem(idExistente){
@@ -21902,6 +21925,7 @@ function renderInventario(main){
   var _invSincCor=state.sincErro?"#A8492E":state.sincronizando?"#C8A84B":state._invLastSync?"#6E8F52":"#6B5236";
   h+="<span style='font-size:10px;color:"+_invSincCor+";border:1px solid "+_invSincCor+"44;border-radius:6px;padding:3px 8px'>"+_invSincTxt+"</span>";
   h+="<button onclick='_invAbrirImport()' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📤 Importar Lista</button>";
+  if((state.invItens||[]).length) h+="<button onclick='_invLimparTodos()' style='background:#2a0800;border:1px solid #ef444466;color:#ef4444;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>🗑 Limpar Tudo</button>";
   h+="<button onclick='_invGerarPDF()' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📄 Exportar PDF</button>";
   if(state._invFiltLoc) h+="<button onclick='_invGerarPDFSecao(\""+esc(state._invFiltLoc)+"\")' style='background:#1a2a1a;border:1px solid #6E8F52;color:#6E8F52;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📄 PDF da Seção</button>";
   h+="<button onclick='_invAbrirItem(null)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Item</button>";
