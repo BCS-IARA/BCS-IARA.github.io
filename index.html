@@ -5685,80 +5685,6 @@ function renderDashComandante(main){
   } // fim aba escolar
 
   // ══════════════════════════════════════════════════
-  // ABA: MONITOR VCM
-  // ══════════════════════════════════════════════════
-  else if(tabAtiva==="vcm"){
-    var agsVCM = (state.db.agendamentos||[])
-      .filter(function(a){ return /vcm|frida|acompanhamento vcm/i.test(a.tipo||""); })
-      .slice().sort(function(a,b){ return (a.data||"")>(b.data||"")?1:-1; });
-    var vcmPend = agsVCM.filter(function(a){ return (a.status||"Agendado")==="Agendado"; });
-    var vcmConc = agsVCM.filter(function(a){ return (a.status||"Agendado")!=="Agendado"; });
-    var proximaVCM = vcmPend[0] || null;
-
-    // KPIs
-    h.push("<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px'>");
-    h.push("<div style='background:#2a1c10;border:2px solid #ec489944;border-radius:12px;padding:14px 16px'>");
-    h.push("<p style='color:#8a4a6a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px'>Total Agendados</p>");
-    h.push("<p style='font-size:30px;font-weight:800;color:#ec4899;margin:0;line-height:1'>"+agsVCM.length+"</p>");
-    h.push("</div>");
-    h.push("<div style='background:#0a1a10;border:1px solid #ec489940;border-radius:12px;padding:14px 16px'>");
-    h.push("<p style='color:#6a2a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px'>Pendentes</p>");
-    h.push("<p style='font-size:30px;font-weight:800;color:#ec4899;margin:0;line-height:1'>"+vcmPend.length+"</p>");
-    h.push("</div>");
-    h.push("<div style='background:#1a1008;border:1px solid #a07c5840;border-radius:12px;padding:14px 16px'>");
-    h.push("<p style='color:#6a4a2a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px'>Realizados</p>");
-    h.push("<p style='font-size:30px;font-weight:800;color:#a07c58;margin:0;line-height:1'>"+vcmConc.length+"</p>");
-    h.push("</div>");
-    h.push("<div style='background:#2a1c10;border:1px solid #5e4636;border-radius:12px;padding:14px 16px;overflow:hidden'>");
-    h.push("<p style='color:#8a6a4a;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px'>Próximo</p>");
-    h.push("<p style='font-size:13px;font-weight:800;color:#ec4899;margin:0;line-height:1.4'>"+(proximaVCM?fmtData(proximaVCM.data)+(proximaVCM.hora?" · "+proximaVCM.hora:""):"—")+"</p>");
-    if(proximaVCM&&(proximaVCM.vitima_nome||proximaVCM.objetivo)) h.push("<p style='color:#8a6a4a;font-size:10px;margin:4px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+esc(proximaVCM.vitima_nome||proximaVCM.objetivo||"")+"</p>");
-    h.push("</div>");
-    h.push("</div>");
-
-    // Tabela
-    h.push("<div style='background:#2a1c10;border:1px solid #5e4636;border-radius:12px;padding:16px;margin-bottom:18px'>");
-    h.push("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:14px'>");
-    h.push("<p style='color:#ec4899;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0'>🌸 Monitor VCM — Agendamentos ("+agsVCM.length+")</p>");
-    h.push("<button onclick=\"setTela('calendario')\" style='background:#3c2818;border:1px solid #5e4636;color:#d4a87a;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer'>Abrir Calendário →</button>");
-    h.push("</div>");
-    if(!agsVCM.length){
-      h.push("<p style='color:#5e4636;text-align:center;padding:20px 0;font-size:13px'>Nenhum monitoramento VCM agendado.</p>");
-    } else {
-      h.push("<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse;min-width:400px'>");
-      h.push("<thead><tr>");
-      h.push("<th style='text-align:left;color:#8a6a4a;font-size:10px;padding:6px 8px;font-weight:700;border-bottom:1px solid #4a3224'>Data</th>");
-      h.push("<th style='text-align:left;color:#8a6a4a;font-size:10px;padding:6px 8px;font-weight:700;border-bottom:1px solid #4a3224'>Hora</th>");
-      h.push("<th style='text-align:left;color:#8a6a4a;font-size:10px;padding:6px 8px;font-weight:700;border-bottom:1px solid #4a3224'>Tipo</th>");
-      h.push("<th style='text-align:left;color:#8a6a4a;font-size:10px;padding:6px 8px;font-weight:700;border-bottom:1px solid #4a3224'>Vítima / Objetivo</th>");
-      h.push("<th style='text-align:left;color:#8a6a4a;font-size:10px;padding:6px 8px;font-weight:700;border-bottom:1px solid #4a3224'>Responsável</th>");
-      h.push("<th style='text-align:center;color:#8a6a4a;font-size:10px;padding:6px 8px;font-weight:700;border-bottom:1px solid #4a3224'>Status</th>");
-      h.push("</tr></thead><tbody>");
-      agsVCM.forEach(function(a){
-        var stAg=(a.status||"Agendado")==="Agendado";
-        var _dtA=_pdLocal(a.data); var _hjV=new Date(); _hjV.setHours(0,0,0,0);
-        var vencida=stAg&&!!_dtA&&_dtA<_hjV;
-        var statusCor=stAg?(vencida?"#f59e0b":"#ec4899"):"#8a6a4a";
-        var statusTxt=stAg?(vencida?"⚠ Vencido":"⏳ Agendado"):"✅ Realizado";
-        h.push("<tr style='border-bottom:1px solid #3c2818'>");
-        h.push("<td style='padding:8px;color:#a07c58;font-size:11px;white-space:nowrap'>"+fmtData(a.data||"")+"</td>");
-        h.push("<td style='padding:8px;color:#8a6a4a;font-size:11px'>"+esc(a.hora||"—")+"</td>");
-        h.push("<td style='padding:8px;color:#ddd2c0;font-size:11px'>"+esc(a.tipo||"—")+"</td>");
-        h.push("<td style='padding:8px;color:#f5ede0;font-size:12px;font-weight:600'>"+esc(a.vitima_nome||a.objetivo||"—")+"</td>");
-        h.push("<td style='padding:8px;color:#8a6a4a;font-size:11px'>"+esc(a.responsavel||"—")+"</td>");
-        h.push("<td style='padding:8px;text-align:center;white-space:nowrap'>");
-        h.push("<span style='background:"+statusCor+"22;color:"+statusCor+";padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700'>"+statusTxt+"</span>");
-        if(stAg) h.push(" <button onclick=\"marcarVisitaRealizada('"+a.id+"')\" title='Marcar como realizado' style='background:#0a1a10;border:1px solid #ec4899;color:#ec4899;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;margin-left:4px'>✓ OK</button>");
-        h.push("</td>");
-        h.push("</tr>");
-      });
-      h.push("</tbody></table></div>");
-    }
-    h.push("</div>");
-
-  } // fim aba vcm
-
-  // ══════════════════════════════════════════════════
   // ABA: PROJETOS (embed)
   // ══════════════════════════════════════════════════
   if(tabAtiva==="projetos"){
@@ -19715,7 +19641,7 @@ function _vcmEncaminhar(ocId, servico){
   // Re-renderiza a tela atual para atualizar badges e contadores
   var _mainEl=document.getElementById("main-content")||document.getElementById("main");
   if(_mainEl){
-    else if(state.tela==="ocorrencias") renderOcorrenciasGestor(_mainEl, state._ocPerfil);
+    if(state.tela==="ocorrencias") renderOcorrenciasGestor(_mainEl, state._ocPerfil);
   }
 }
 
