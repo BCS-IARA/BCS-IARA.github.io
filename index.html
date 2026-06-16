@@ -22613,10 +22613,12 @@ function _invAbrirImport(){
   html+="<div style='overflow-x:auto;max-height:220px;border:1px solid #DBC79E;border-radius:6px'>";
   html+="<table id='imp-preview-table' style='border-collapse:collapse;font-size:10px;width:100%'></table>";
   html+="</div>";
-  html+="<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:12px'>";
+  html+="<div style='display:flex;align-items:center;gap:8px;justify-content:space-between;margin-top:12px;flex-wrap:wrap'>";
+  html+="<label style='display:flex;align-items:center;gap:6px;font-size:11px;color:#6B5236;cursor:pointer'><input type='checkbox' id='imp-substituir' checked> Substituir itens com mesmo número de patrimônio</label>";
+  html+="<div style='display:flex;gap:8px'>";
   html+="<button onclick=\"document.getElementById('modal-inv-import').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
   html+="<button id='imp-btn-importar' onclick='_invExecutarImport()' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✓ Importar Itens</button>";
-  html+="</div></div>";
+  html+="</div></div></div>";
 
   html+="</div></div></div>";
   document.body.insertAdjacentHTML("beforeend", html);
@@ -22633,43 +22635,71 @@ function _invImportTab(tab){
   });
 }
 
+function _invParseCSVLine(line, sep){
+  // Parser CSV correto: respeita campos entre aspas duplas
+  var fields=[], cur="", inQ=false;
+  for(var i=0;i<line.length;i++){
+    var c=line[i];
+    if(inQ){
+      if(c==='"' && line[i+1]==='"'){ cur+='"'; i++; }
+      else if(c==='"'){ inQ=false; }
+      else cur+=c;
+    } else {
+      if(c==='"'){ inQ=true; }
+      else if(c===sep){ fields.push(cur.trim()); cur=""; }
+      else cur+=c;
+    }
+  }
+  fields.push(cur.trim());
+  return fields;
+}
+
 function _invParseLinhas(texto){
-  // Detecta separador predominante
   var linhas=texto.split(/\r?\n/).map(function(l){return l.trim();}).filter(function(l){return l.length>2;});
   if(!linhas.length) return {cols:[],rows:[]};
-  // Tenta detectar separador: tab, ; ou ,
   var sample=linhas.slice(0,5).join("\n");
   var sep="\t";
   if((sample.match(/;/g)||[]).length>(sample.match(/\t/g)||[]).length) sep=";";
   else if((sample.match(/,/g)||[]).length>(sample.match(/\t/g)||[]).length && (sample.match(/,/g)||[]).length>linhas.length*2) sep=",";
-  var rows=linhas.map(function(l){ return l.split(sep).map(function(c){return c.replace(/^["']|["']$/g,"").trim();}); });
-  // Garante que todas as linhas tenham o mesmo número de colunas
+  var rows=linhas.map(function(l){ return _invParseCSVLine(l, sep); });
   var maxCols=rows.reduce(function(m,r){return Math.max(m,r.length);},0);
   rows=rows.map(function(r){ while(r.length<maxCols) r.push(""); return r; });
-  var cols=rows[0]; // primeira linha = cabeçalhos
+  var cols=rows[0];
   var data=rows.slice(1);
   return {cols:cols, rows:data};
 }
 
+function _invNormStr(s){
+  return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+}
+
 function _invAutoMapCols(cols){
-  // Tenta mapear nomes de colunas do PDF para campos do sistema
   var map={};
   var padroes={
-    tombamento:/tomb|patrim[oô]|n[uú]mero|n[°º]|cod|registro/i,
-    descricao:/descri|item|material|bem|nome/i,
-    categoria:/categ|tipo/i,
-    marca:/marca|fabricante/i,
-    modelo:/modelo/i,
-    numero_serie:/s[eé]rie|serial/i,
-    estado:/estado|condi[çc]/i,
-    localizacao:/local|sala|se[çc][aã]o|setor/i,
-    data_aquisicao:/aquisi|data|compra/i
+    tombamento:/^patrim|^tomb|^n[°º.]|^nro|^cod/i,
+    patr_antigo:/patr.*ant|ant.*patr/i,
+    descricao:/descri.*bem|bem.*descri|descricao/i,
+    conta_contabil:/conta.*cont|contab/i,
+    marca:/^marca$|fabricante/i,
+    modelo:/^modelo$/i,
+    numero_serie:/serie|serial/i,
+    estado:/sit.*fis|fis.*sit|estado|condi/i,
+    localizacao:/local|sala|secao|setor/i,
+    data_aquisicao:/aquisi|data.*aq|compra/i,
+    valor:/valor/i
   };
   cols.forEach(function(col,i){
+    var cn=_invNormStr(col);
     Object.keys(padroes).forEach(function(campo){
-      if(!map[campo] && padroes[campo].test(col)) map[campo]=i;
+      if(map[campo]===undefined && padroes[campo].test(cn)) map[campo]=i;
     });
   });
+  // Se não encontrou tombamento por nome, usa coluna com valores numéricos
+  if(map.tombamento===undefined && cols.length>0) map.tombamento=0;
+  // Se não encontrou descricao mas tem conta_contabil, descricao provavelmente é coluna seguinte
+  if(map.descricao===undefined && map.conta_contabil!==undefined){
+    map.descricao=map.conta_contabil+1;
+  }
   return map;
 }
 
@@ -22687,12 +22717,25 @@ function _invLerCSV(inp){
   var reader=new FileReader();
   reader.onload=function(e){
     var txt=e.target.result;
+    // Se a leitura em windows-1252 gerou caracteres de substituição, tenta UTF-8
+    if(txt.indexOf("�")!==-1){
+      var r2=new FileReader();
+      r2.onload=function(e2){
+        var txt2=e2.target.result;
+        var parsed=_invParseLinhas(txt2);
+        window._invImportLinhas=parsed.rows;
+        window._invImportCols=parsed.cols;
+        _invRenderPreview(parsed.cols, parsed.rows);
+      };
+      r2.readAsText(file,"UTF-8");
+      return;
+    }
     var parsed=_invParseLinhas(txt);
     window._invImportLinhas=parsed.rows;
     window._invImportCols=parsed.cols;
     _invRenderPreview(parsed.cols, parsed.rows);
   };
-  reader.readAsText(file,"UTF-8");
+  reader.readAsText(file,"windows-1252");
 }
 
 function _invRenderPreview(cols, rows){
@@ -22706,15 +22749,18 @@ function _invRenderPreview(cols, rows){
   // Mapeamento de colunas
   var autoMap=_invAutoMapCols(cols);
   var campos=[
-    {key:"tombamento",label:"Tombamento/Nº"},
+    {key:"tombamento",label:"Tombamento/Nº Patrimônio"},
+    {key:"patr_antigo",label:"Patr. Antigo"},
     {key:"descricao",label:"Descrição*"},
-    {key:"categoria",label:"Categoria"},
+    {key:"conta_contabil",label:"Conta Contábil (categoria)"},
+    {key:"categoria",label:"Categoria (texto)"},
     {key:"marca",label:"Marca"},
     {key:"modelo",label:"Modelo"},
     {key:"numero_serie",label:"Nº Série"},
-    {key:"estado",label:"Estado"},
+    {key:"estado",label:"Estado/Sit. Física"},
     {key:"localizacao",label:"Localização"},
     {key:"data_aquisicao",label:"Data Aquisição"},
+    {key:"valor",label:"Valor de Aquisição"},
     {key:"ignorar",label:"— Ignorar —"}
   ];
   var mapEl=document.getElementById("imp-col-map");
@@ -22749,56 +22795,118 @@ function _invRenderPreview(cols, rows){
   }
 }
 
+function _invCatContabil(contaRaw){
+  // Mapeia "N.N − DESCRIÇÃO" do SIAP para categorias internas
+  var n=String(contaRaw||"").match(/^(\d+)\./);
+  var num=n?parseInt(n[1]):0;
+  var txt=_invNormStr(contaRaw);
+  if(/belico|arma|muni|colete|algema/.test(txt)) return "material_belico";
+  if(/consumo|papel|limpeza|expediente/.test(txt)) return "material_consumo";
+  if(num>=1 && num<=9) return "material_permanente"; // equipamentos, mobiliario, veiculos
+  return "material_permanente";
+}
+
+function _invExtrairMarcaModelo(descricao){
+  // Extrai MARCA: e MODELO: embutidos na string de descrição do SIAP
+  var marca="", modelo="", desc=descricao;
+  var mM=desc.match(/[−\-]\s*MARCA:\s*([^−\-;]+)/i);
+  if(mM){ marca=mM[1].trim().replace(/\.$/,""); desc=desc.replace(mM[0],""); }
+  var mMd=desc.match(/[−\-]\s*MODELO:\s*([^−\-;]+)/i);
+  if(mMd){ modelo=mMd[1].trim().replace(/\.$/,""); desc=desc.replace(mMd[0],""); }
+  // Limpa fragmentos de DESCRICAO: que sobram
+  desc=desc.replace(/[−\-]\s*DESCRICAO:\s*/gi," ").replace(/\s{2,}/g," ").trim();
+  // Tira o sufixo da descrição principal (antes do primeiro −)
+  var partes=desc.split(/\s*[−\-]\s*/);
+  desc=partes[0].trim()||desc;
+  return {descricao:desc, marca:marca, modelo:modelo};
+}
+
 function _invExecutarImport(){
   var linhas=window._invImportLinhas||[];
   var cols=window._invImportCols||[];
   if(!linhas.length){ showToast("Nenhuma linha para importar","error"); return; }
 
-  // Monta mapeamento campo → índice coluna
   var mapa={};
   cols.forEach(function(col,i){
     var sel=document.getElementById("imp-map-"+i);
     if(sel && sel.value && sel.value!=="ignorar") mapa[sel.value]=i;
   });
-  if(!mapa.descricao && mapa.descricao!==0){ showToast("Mapeie pelo menos a coluna Descrição","error"); return; }
+  if(mapa.descricao===undefined){ showToast("Mapeie pelo menos a coluna Descrição","error"); return; }
 
-  var importados=0, ignorados=0;
+  var substituir=(document.getElementById("imp-substituir")||{}).checked!==false;
+  if(!state.invItens) state.invItens=[];
+
+  // Índice por tombamento para substituição
+  var idxTomb={};
+  if(substituir){
+    state.invItens.forEach(function(x,i){ if(x.tombamento) idxTomb[String(x.tombamento).trim()]=i; });
+  }
+
+  var importados=0, substituidos=0, ignorados=0;
   linhas.forEach(function(row){
-    var desc=mapa.descricao!==undefined?row[mapa.descricao]:"";
-    if(!desc || !desc.trim()){ ignorados++; return; }
+    var descRaw=mapa.descricao!==undefined?row[mapa.descricao]:"";
+    if(!descRaw || !descRaw.trim()){ ignorados++; return; }
+
+    // Extrai marca/modelo embutidos na descrição (padrão SIAP)
+    var ext=_invExtrairMarcaModelo(descRaw);
+    var desc=ext.descricao;
+    var marcaExtr=ext.marca;
+    var modeloExtr=ext.modelo;
+
     // Normaliza estado
-    var estadoRaw=(mapa.estado!==undefined?row[mapa.estado]:"").toLowerCase();
+    var estadoRaw=_invNormStr(mapa.estado!==undefined?row[mapa.estado]:"");
     var estadoKey="bom";
-    if(/[oó]timo/.test(estadoRaw)) estadoKey="otimo";
+    if(/otimo/.test(estadoRaw)) estadoKey="otimo";
+    else if(/regular/.test(estadoRaw)) estadoKey="regular";
     else if(/defeito/.test(estadoRaw)) estadoKey="com_defeito";
     else if(/inserv/.test(estadoRaw)) estadoKey="inservivel";
-    // Normaliza categoria
-    var catRaw=(mapa.categoria!==undefined?row[mapa.categoria]:"").toLowerCase();
-    var catKey="material_permanente";
-    if(/b[eé]lico|arma|muni|colete|algema/.test(catRaw)) catKey="material_belico";
-    else if(/consumo|papel|limpeza/.test(catRaw)) catKey="material_consumo";
+
+    // Normaliza categoria: usa conta_contabil se disponível
+    var catRaw=mapa.conta_contabil!==undefined?row[mapa.conta_contabil]:(mapa.categoria!==undefined?row[mapa.categoria]:"");
+    var catKey=_invCatContabil(catRaw);
+
+    var tomb=String(mapa.tombamento!==undefined?row[mapa.tombamento]:"").trim();
+
     var item={
       id:_invId("inv"),
       criadoEm:new Date().toISOString(),
-      tombamento: mapa.tombamento!==undefined?row[mapa.tombamento]:"",
+      tombamento: tomb,
       descricao:  desc.trim(),
       categoria:  catKey,
       subcategoria:"",
-      marca:      mapa.marca!==undefined?row[mapa.marca]:"",
-      modelo:     mapa.modelo!==undefined?row[mapa.modelo]:"",
+      marca:      mapa.marca!==undefined?row[mapa.marca]:marcaExtr,
+      modelo:     mapa.modelo!==undefined?row[mapa.modelo]:modeloExtr,
       numero_serie:mapa.numero_serie!==undefined?row[mapa.numero_serie]:"",
       estado:     estadoKey,
       localizacao:mapa.localizacao!==undefined?row[mapa.localizacao]:"",
       data_aquisicao:mapa.data_aquisicao!==undefined?row[mapa.data_aquisicao]:"",
+      valor_aquisicao:mapa.valor!==undefined?row[mapa.valor]:"",
+      patr_antigo:mapa.patr_antigo!==undefined?row[mapa.patr_antigo]:"",
       observacoes:"",foto:"",tipo_carga:"none",ativo:true
     };
-    if(!state.invItens) state.invItens=[];
-    state.invItens.push(item);
-    importados++;
+
+    // Substitui ou adiciona
+    if(substituir && tomb && idxTomb[tomb]!==undefined){
+      var idx=idxTomb[tomb];
+      item.id=state.invItens[idx].id;
+      item.criadoEm=state.invItens[idx].criadoEm;
+      item.localizacao=state.invItens[idx].localizacao||item.localizacao;
+      item.tipo_carga=state.invItens[idx].tipo_carga||"none";
+      item.observacoes=state.invItens[idx].observacoes||"";
+      state.invItens[idx]=item;
+      substituidos++;
+    } else {
+      state.invItens.push(item);
+      importados++;
+    }
   });
+
   _invSalvarLocal();
   document.getElementById("modal-inv-import").remove();
-  showToast("✓ "+importados+" itens importados!"+(ignorados?" ("+ignorados+" ignorados)":""));
+  var msg="✓ "+importados+" importados";
+  if(substituidos) msg+=", "+substituidos+" atualizados";
+  if(ignorados) msg+=" ("+ignorados+" ignorados)";
+  showToast(msg);
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
 }
