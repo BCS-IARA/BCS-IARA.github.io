@@ -4101,6 +4101,7 @@ function _vcmMarcarEnviado(encId){
 }
 
 function _renderCentralBar(main, abaAtiva){
+  if(state._inFilaDia) return; // suprimido dentro da Fila do Dia (tem barra própria)
   var _nTriar=(state.db.ocorrencias||[]).filter(_ocNaFila).length;
   var _fridas=state.db.frida||[];
   var _hoje=hoje();
@@ -12932,11 +12933,16 @@ function renderFilaDia(main) {
   bar.innerHTML = barH;
 
   var content = document.getElementById("fila-dia-content");
-  if(tab === "triagem")         renderTriagem(content);
-  else if(tab === "vcm")        renderDashboardVCM(content);
-  else if(tab === "encaminhamentos") renderFilaEncaminhamentos(content);
-  else if(tab === "devolutivas")renderDevolutivas(content);
-  else                          renderFilaAuxiliar(content);
+  state._inFilaDia = true;
+  try {
+    if(tab === "triagem")              renderTriagem(content);
+    else if(tab === "vcm")             renderDashboardVCM(content);
+    else if(tab === "encaminhamentos") renderFilaEncaminhamentos(content);
+    else if(tab === "devolutivas")     renderDevolutivas(content);
+    else                               renderFilaAuxiliar(content);
+  } finally {
+    state._inFilaDia = false;
+  }
 }
 
 window._avisoAbrirFila = function(indicador) {
