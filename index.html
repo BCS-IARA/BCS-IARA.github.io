@@ -11079,17 +11079,68 @@ function _migrarTrilhoAparaB() {
 
 window._restaurarEncaminhamentosDoSheets = function(){
   showToast("⏳ Buscando encaminhamentos na planilha...");
+  if(!state.encaminhamentos) state.encaminhamentos = [];
+  var existentes = new Set(state.encaminhamentos.map(function(e){ return e.id; }));
+  var novos = 0;
+
+  function _aplicarDevs(){
+    // Lê devolutivas_crav e reconstrói encaminhamentos órfãos
+    var cb2 = "_restDev_"+Date.now();
+    var s2 = document.createElement("script");
+    var d2 = false;
+    var t2 = setTimeout(function(){ d2=true; s2.remove(); delete window[cb2]; _salvarEFim(); }, 12000);
+    window[cb2] = function(resp2){
+      if(d2) return; d2=true; clearTimeout(t2); s2.remove(); delete window[cb2];
+      var devs = (resp2 && resp2.registros) || [];
+      devs.forEach(function(dev){
+        var encId = dev.encaminhamentoId || dev.id;
+        if(!encId) return;
+        if(!existentes.has(encId)){
+          // Reconstrói encaminhamento a partir da devolutiva
+          var enc = {
+            id: encId,
+            vitima_nome: dev.nome || "",
+            orgao: dev.orgao || dev.servico || "CRAV",
+            tipo: dev.orgao || dev.servico || "CRAV",
+            descricao: dev.tiposTexto || "",
+            data: dev.data || new Date().toISOString().slice(0,10),
+            status: "concluido",
+            relato_devolutiva: dev.tiposTexto + (dev.observacoes ? "\n\n"+dev.observacoes : ""),
+            data_devolutiva: dev.data || "",
+            responsavel_devolutiva: dev.tecnica || ""
+          };
+          state.encaminhamentos.push(enc);
+          existentes.add(encId);
+          novos++;
+        } else {
+          // Encaminhamento existe mas pode estar sem devolutiva
+          var idx = state.encaminhamentos.findIndex(function(e){ return e.id===encId; });
+          if(idx>=0 && !state.encaminhamentos[idx].relato_devolutiva){
+            state.encaminhamentos[idx].relato_devolutiva = dev.tiposTexto + (dev.observacoes ? "\n\n"+dev.observacoes : "");
+            state.encaminhamentos[idx].data_devolutiva = dev.data || "";
+            state.encaminhamentos[idx].responsavel_devolutiva = dev.tecnica || "";
+            novos++;
+          }
+        }
+      });
+      _salvarEFim();
+    };
+    s2.src = SHEETS_URL+"?acao=listar&tipo=devolutivas_crav&token="+BCS_TOKEN+"&callback="+cb2;
+    document.head.appendChild(s2);
+  }
+
+  function _salvarEFim(){
+    localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
+    showToast("✅ "+novos+" registro(s) restaurado(s) do Sheets");
+  }
+
   var cb = "_restEnc_"+Date.now();
   var s = document.createElement("script");
   var done = false;
-  var t = setTimeout(function(){ done=true; s.remove(); delete window[cb]; showToast("⚠️ Tempo esgotado — tente novamente","error"); }, 15000);
+  var t = setTimeout(function(){ done=true; s.remove(); delete window[cb]; _aplicarDevs(); }, 15000);
   window[cb] = function(resp){
     if(done) return; done=true; clearTimeout(t); s.remove(); delete window[cb];
     var lista = (resp && (resp.registros||resp.dados)) || [];
-    if(!lista.length){ showToast("Nenhum encaminhamento encontrado na planilha"); return; }
-    if(!state.encaminhamentos) state.encaminhamentos = [];
-    var existentes = new Set(state.encaminhamentos.map(function(e){ return e.id; }));
-    var novos = 0;
     lista.forEach(function(enc){
       if(enc.id && !existentes.has(enc.id)){
         state.encaminhamentos.push(enc);
@@ -11097,11 +11148,7 @@ window._restaurarEncaminhamentosDoSheets = function(){
         novos++;
       }
     });
-    localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
-    showToast("✅ "+novos+" encaminhamento(s) restaurado(s) do Sheets");
-    if(novos>0 && typeof _syncDevolutivas==="function"){
-      _syncDevolutivas(function(n){ if(n>0) showToast("✅ "+n+" devolutiva(s) aplicada(s)"); });
-    }
+    _aplicarDevs();
   };
   s.src = SHEETS_URL+"?acao=listar&tipo=encaminhamentos&token="+BCS_TOKEN+"&callback="+cb;
   document.head.appendChild(s);
