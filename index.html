@@ -22156,10 +22156,16 @@ function renderDevolutivas(main){
         // Link devolutiva
         var _token=e.token||("enc_"+e.id+"_"+Math.random().toString(36).slice(2,8));
         var _link=window.location.origin+window.location.pathname.replace("index.html","")+"crav-devolutiva.html?token="+_token+"&enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"");
-        h.push("<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'>");
+        h.push("<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px'>");
         h.push("<input readonly value='"+esc(_link)+"' style='flex:1;min-width:200px;background:#36221a;border:1px solid #4a3224;color:#8a6a4a;padding:6px 10px;border-radius:6px;font-size:11px;font-family:monospace' onclick='this.select()'/>");
         h.push("<button onclick=\"navigator.clipboard.writeText('"+esc(_link)+"').then(function(){showToast('Link copiado!','success')})\" style='background:#1a3a1a;border:1px solid #2a6a2a;color:#4a9a4a;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>📋 Copiar</button>");
         h.push("<button onclick=\"_reenviarDevolutiva('"+e.id+"')\" style='background:#1a0e00;border:1px solid #4a3224;color:#d4a87a;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>🔄 Reenviar</button>");
+        h.push("</div>");
+        // Campo para registrar devolutiva manualmente (telefone, presencial, etc.)
+        h.push("<div style='border-top:1px solid #4a3224;padding-top:10px'>");
+        h.push("<p style='font-size:10px;color:#5e4636;margin:0 0 6px;font-weight:700;text-transform:uppercase;letter-spacing:.5px'>Registrar devolutiva manualmente</p>");
+        h.push("<textarea id='dev-texto-"+e.id+"' rows='2' placeholder='Descreva a resposta recebida por telefone, e-mail ou presencialmente...' style='width:100%;box-sizing:border-box;background:#36221a;border:1px solid #4a3224;color:#f5ede0;padding:8px 10px;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;margin-bottom:6px'></textarea>");
+        h.push("<button onclick=\"_salvarDevolutivaManu('"+e.id+"')\" style='background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>✅ Salvar devolutiva</button>");
         h.push("</div>");
         h.push("</div>");
       });
@@ -22238,6 +22244,23 @@ function renderDevolutivas(main){
     navigator.clipboard.writeText(_link).then(function(){showToast("Novo link gerado e copiado!","success");}).catch(function(){});
     renderDevolutivas(main);
   };
+  window._salvarDevolutivaManu = function(encId){
+    var e=(state.encaminhamentos||[]).find(function(x){return x.id===encId;});
+    if(!e) return;
+    var el=document.getElementById("dev-texto-"+encId);
+    var texto=(el?el.value:"").trim();
+    if(!texto){ showToast("Digite o texto da devolutiva","error"); return; }
+    e.relato_devolutiva = texto;
+    e.data_devolutiva   = new Date().toISOString().slice(0,10);
+    e.status            = "aguardando_devolutiva";
+    localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
+    salvarLocal();
+    _sheetsGet({acao:"atualizarEncaminhamento", id:encId, relato_devolutiva:texto, status:"aguardando_devolutiva"}).catch(function(){});
+    showToast("✓ Devolutiva registrada — veja aba Recebidas");
+    state._devTab="recebidas";
+    renderDevolutivas(main);
+  };
+
   window._registrarNaFicha = function(encId){
     var e=(state.encaminhamentos||[]).find(function(x){return x.id===encId;});
     if(!e) return;
