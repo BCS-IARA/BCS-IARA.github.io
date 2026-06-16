@@ -19688,8 +19688,9 @@ function renderOcorrenciasGestor(el, perfil_atual){
     if(o.reincidente) h.push("<span style='background:rgba(232,148,58,0.15);color:#e8943a;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700'>⚠ REINC</span>");
     if(o.requer_visita) h.push("<span style='background:rgba(16,185,129,0.12);color:#10b981;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700'>🤝 VISITA</span>");
     h.push("</div>");
-    // Linha 2: data · hora · bairro
-    h.push("<p style='color:#8a6a4a;font-size:11px;margin:0 0 8px'>"+fmtData(o.data)+(o.hora?" · "+(fmtHora(o.hora)||""):"")+(o.bairro?" · "+o.bairro:"")+"</p>");
+    // Linha 2: data · hora · bairro · nome vítima
+    var _nomeCard = nomeValido(o.vitima_nome) ? o.vitima_nome : ((o.vitimas&&o.vitimas[0]&&nomeValido(o.vitimas[0].nome))?o.vitimas[0].nome:"");
+    h.push("<p style='color:#8a6a4a;font-size:11px;margin:0 0 8px'>"+fmtData(o.data)+(o.hora?" · "+(fmtHora(o.hora)||""):"")+(o.bairro?" · "+o.bairro:"")+(_nomeCard?"<span style='color:#d4a87a;margin-left:6px'>👤 "+esc(_nomeCard)+"</span>":"")+"</p>");
     h.push("</div>");
     // Botões de ação
     h.push("<div style='display:flex;gap:6px;flex-wrap:wrap'>");
