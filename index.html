@@ -13019,7 +13019,7 @@ function renderHistoricoAtendimento(main) {
       hora:o.hora||'',
       titulo:'OC #'+(o.numero||o.id||''),
       tipoOc:o.tipo||'',
-      nome:o.nome_vitima||o.envolvidos||'',
+      nome:o.vitima_nome||o.nome_vitima||(o.vitimas&&o.vitimas[0]?o.vitimas[0].nome:'')||(o.solicitante?o.solicitante.nome:'')||'',
       descricao:o.narrativa||o.descricao||'',
       bairro:o.bairro||'',
       status:_sitLabel[sit]||sit,
