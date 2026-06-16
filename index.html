@@ -12820,8 +12820,10 @@ function renderHistoricoAtendimento(main) {
       tipo:'ocorrencia', icone:'\u{1F4CB}',
       id: o.id||'',
       data:o.data||'',
-      titulo:'OC #'+(o.numero||o.id||'')+(o.tipo?' \u2014 '+o.tipo:''),
-      subtitulo:o.nome_vitima||o.envolvidos||'',
+      hora:o.hora||'',
+      titulo:'OC #'+(o.numero||o.id||''),
+      tipoOc:o.tipo||'',
+      nome:o.nome_vitima||o.envolvidos||'',
       descricao:o.narrativa||o.descricao||'',
       bairro:o.bairro||'',
       status:_sitLabel[sit]||sit,
@@ -12833,9 +12835,9 @@ function renderHistoricoAtendimento(main) {
   (state.db.atendimentos||[]).forEach(function(a){
     registros.push({
       tipo:'atendimento', icone:'\u{1F91D}',
-      data:a.data||'',
-      titulo:'Atendimento'+(a.tipo?' \u2014 '+a.tipo:''),
-      subtitulo:a.nome||a.envolvido||'',
+      data:a.data||'', hora:a.hora||'',
+      titulo:'Atendimento', tipoOc:a.tipo||'',
+      nome:a.nome||a.envolvido||'',
       descricao:a.descricao||a.observacoes||'',
       bairro:a.bairro||a.local||'', status:a.status||'realizado', cor:'var(--azul)'
     });
@@ -12845,9 +12847,9 @@ function renderHistoricoAtendimento(main) {
   (state.db.visitas||[]).forEach(function(v){
     registros.push({
       tipo:'visita', icone:'\u{1F3E0}',
-      data:v.data||'',
-      titulo:'Visita'+(v.tipo?' \u2014 '+v.tipo:''),
-      subtitulo:v.vitima_nome||v.nome||'',
+      data:v.data||'', hora:v.hora||'',
+      titulo:'Visita', tipoOc:v.tipo||'',
+      nome:v.vitima_nome||v.nome||'',
       descricao:v.resultado||v.observacoes||'',
       bairro:v.endereco||v.bairro||'',
       status:'realizada', cor:'var(--ambar)'
@@ -12861,9 +12863,9 @@ function renderHistoricoAtendimento(main) {
     var nivel = f.nivel||'';
     registros.push({
       tipo:'frida', icone:'\u{1F6E1}\ufe0f',
-      data:(f.data||'').substring(0,10),
-      titulo:'FRIDA \u2014 '+ (_fridaNivelLabel[nivel]||nivel||'Avalia\u00e7\u00e3o de Risco'),
-      subtitulo:f.vitima_nome||'',
+      data:(f.data||'').substring(0,10), hora:'',
+      titulo:'FRIDA', tipoOc:_fridaNivelLabel[nivel]||nivel||'Avalia\u00e7\u00e3o de Risco',
+      nome:f.vitima_nome||'',
       descricao:f.relatorio||'',
       bairro:'',
       status:_fridaNivelLabel[nivel]||'avaliado',
@@ -12875,11 +12877,11 @@ function renderHistoricoAtendimento(main) {
   (state.encaminhamentos||[]).filter(function(e){return e.status==='concluido';}).forEach(function(e){
     registros.push({
       tipo:'encaminhamento', icone:'\u{1F4E4}',
-      data:e.data||'',
-      titulo:'Encaminhamento \u2014 '+(e.destino||e.orgao||''),
-      subtitulo:e.nome||e.vitima||'',
+      data:e.data||'', hora:'',
+      titulo:'Encaminhamento', tipoOc:e.destino||e.orgao||'',
+      nome:e.nome||e.vitima||e.vitimaNome||'',
       descricao:e.descricao||e.relato_devolutiva||'',
-      bairro:'', status:'conclu\u00EDdo', cor:'var(--verde)'
+      bairro:e.vitimaBairro||'', status:'conclu\u00EDdo', cor:'var(--verde)'
     });
   });
 
@@ -12951,21 +12953,28 @@ function renderHistoricoAtendimento(main) {
       var _onclick = _clicavel ? "onclick=\"state.popEditarOc='"+r.id+"';state.tela='ocorrencias';renderOcorrenciasGestor(document.getElementById('main'))\"" : "";
       h += "<div class='card' "+_onclick+" style='margin-bottom:10px;padding:14px 16px;border-left:3px solid "+r.cor+";cursor:"+(_clicavel?'pointer':'default')+"'>";
       h += "<div style='display:flex;align-items:flex-start;gap:10px'>";
-      h += "<span style='font-size:18px;flex-shrink:0;margin-top:1px'>"+r.icone+"</span>";
+      h += "<span style='font-size:18px;flex-shrink:0;margin-top:2px'>"+r.icone+"</span>";
       h += "<div style='flex:1;min-width:0'>";
-      h += "<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px'>";
-      h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>"+esc(r.titulo)+"</span>";
-      if(r.subtitulo) h += "<span style='font-size:12px;color:var(--tinta-2)'>"+esc(r.subtitulo)+"</span>";
+
+      // Linha 1: n\u00famero/t\u00edtulo + tipo de ocorr\u00eancia
+      h += "<div style='display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px'>";
+      h += "<span style='font-size:13px;font-weight:800;color:var(--tinta)'>"+esc(r.titulo)+"</span>";
+      if(r.tipoOc) h += "<span style='font-size:11px;font-weight:600;color:var(--tinta-2);text-transform:uppercase;letter-spacing:0.3px'>"+esc(r.tipoOc)+"</span>";
       h += "</div>";
-      if(r.descricao){
-        var desc=r.descricao.length>160?r.descricao.substring(0,160)+'\u2026':r.descricao;
-        h += "<p style='font-size:12px;color:var(--tinta-2);margin:4px 0 0;line-height:1.45'>"+esc(desc)+"</p>";
-      }
-      h += "<div style='display:flex;gap:10px;margin-top:6px;flex-wrap:wrap'>";
-      if(dFmt) h += "<span style='font-size:11px;color:var(--tinta-3)'>\u{1F4C5} "+esc(dFmt)+"</span>";
-      if(r.bairro) h += "<span style='font-size:11px;color:var(--tinta-3)'>\u{1F4CD} "+esc(r.bairro)+"</span>";
+
+      // Linha 2: nome da pessoa em destaque
+      var nomePessoa = r.nome || r.subtitulo || '';
+      if(nomePessoa) h += "<div style='font-size:13px;font-weight:700;color:var(--ambar);margin-bottom:5px'>\ud83d\udc64 "+esc(nomePessoa)+"</div>";
+
+      // Linha 3: data, hora, bairro, status
+      h += "<div style='display:flex;gap:10px;flex-wrap:wrap;align-items:center'>";
+      if(dFmt) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udcc5 "+esc(dFmt)+"</span>";
+      if(r.hora) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udd50 "+esc(r.hora)+"</span>";
+      if(r.bairro) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udccd "+esc(r.bairro)+"</span>";
       h += "<span style='font-size:10px;background:var(--papel-3);color:var(--tinta-2);border-radius:10px;padding:1px 7px'>"+esc(r.status)+"</span>";
-      h += "</div></div></div></div>";
+      h += "</div>";
+
+      h += "</div></div></div>";
     });
   }
 
