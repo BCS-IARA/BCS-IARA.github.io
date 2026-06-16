@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "IARA",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": ["-NoProfile", "-Command", "cd 'C:\\Users\\oseia\\Downloads\\BCS'; $listener = [System.Net.HttpListener]::new(); $listener.Prefixes.Add('http://localhost:3000/'); $listener.Start(); Write-Host 'Server started on port 3000'; while($listener.IsListening){ $ctx = $listener.GetContext(); $path = $ctx.Request.Url.LocalPath; if($path -eq '/' -or $path -eq ''){ $path = '/index.html' }; $file = 'C:\\Users\\oseia\\Downloads\\BCS' + $path.Replace('/','\\'  ); if(Test-Path $file){ $bytes = [System.IO.File]::ReadAllBytes($file); $ctx.Response.ContentLength64 = $bytes.Length; $ctx.Response.OutputStream.Write($bytes,0,$bytes.Length) }; $ctx.Response.Close() }"],
+      "port": 3000
+    }
+  ]
+}
