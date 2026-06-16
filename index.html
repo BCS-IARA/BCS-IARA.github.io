@@ -22859,17 +22859,17 @@ function _invRenderPreview(cols, rows){
   ];
   var mapEl=document.getElementById("imp-col-map");
   if(mapEl){
-    mapEl.innerHTML="";
+    var mapH="";
     cols.forEach(function(col,i){
       var sel="<select id='imp-map-"+i+"' style='background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:4px 6px;border-radius:5px;font-size:10px'>";
       campos.forEach(function(c){
-        var sel2=autoMap[c.key]===i;
-        sel+="<option value='"+c.key+"'"+(sel2?" selected":"")+">"+c.label+"</option>";
+        sel+="<option value='"+c.key+"'"+(autoMap[c.key]===i?" selected":"")+">"+c.label+"</option>";
       });
       sel+="</select>";
-      mapEl.innerHTML+="<div style='background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px'>";
-      mapEl.innerHTML+="<div style='color:#a07c58;font-size:9px;margin-bottom:3px'>Coluna: <b style='color:#D9A53C'>"+esc(col)+"</b></div>"+sel+"</div>";
+      mapH+="<div style='background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:6px 8px'>";
+      mapH+="<div style='color:#a07c58;font-size:9px;margin-bottom:3px'>Coluna: <b style='color:#D9A53C'>"+esc(col)+"</b></div>"+sel+"</div>";
     });
+    mapEl.innerHTML=mapH;
   }
 
   // Tabela prévia (max 5 linhas)
