@@ -19695,6 +19695,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
     // Botões de ação
     h.push("<div style='display:flex;gap:6px;flex-wrap:wrap'>");
     h.push("<button data-oc='"+o.id+"' data-act='editar' style='background:#1a1a2a;border:1px solid #4a5a7a;color:#8a9aba;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer'>✏ Editar</button>");
+    h.push("<button onclick='_dossieByOcId(\""+o.id+"\")' style='background:#1a0e00;border:1px solid #c8860a;color:#e8a020;padding:5px 12px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer'>📄 Dossiê</button>");
     if(!isOperador){
       var _vcmFridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id;});
       var _vcmUltimaFrida=_vcmFridas.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];
