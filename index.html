@@ -12536,7 +12536,7 @@ window._dossieByOcId = function(ocId){
       if(vit) vitimaId = vit.id;
     }
     if(vitimaId){
-      _gerarDossie(vitimaId);
+      _gerarDossie(vitimaId, {ocIdHint: ocId});
     } else {
       _gerarDossieByNome(nomeVitima||"Vítima", ocId);
     }
@@ -12790,10 +12790,12 @@ window._buildDossieCorpo = function(vitimaId, opts) {
     return o.vitima_id===vitimaId||(!o.vitima_id&&o.vitima_nome===vit.nome);
   }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
   var _ocsIds=ocsVit.map(function(o){return o.id;});
+  if(opts.ocIdHint && _ocsIds.indexOf(opts.ocIdHint)<0) _ocsIds.push(opts.ocIdHint);
+  var _nomeVitLower=(vit.nome||"").toLowerCase();
   var encs=(state.encaminhamentos||[]).filter(function(e){
     return e.vitima_id===vitimaId
       || _ocsIds.indexOf(e.ocorrencia_id||e.ocorrenciaId||"")>=0
-      || (vit.nome && (e.vitima_nome||"").toLowerCase()===vit.nome.toLowerCase());
+      || (_nomeVitLower && (e.vitima_nome||"").toLowerCase()===_nomeVitLower);
   }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
   var fridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId&&ocsVit.some(function(o){return o.id===f.ocorrenciaId;});})
     .sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
@@ -12857,10 +12859,10 @@ window._buildDossieCorpo = function(vitimaId, opts) {
   return {html:h, nome:_nomeClean};
 };
 
-window._gerarDossie = function(vitimaId){
+window._gerarDossie = function(vitimaId, opts){
   var vit=(state.vitimas||[]).find(function(v){return v.id===vitimaId;});
   if(!vit){showToast("Vítima não encontrada","error");return;}
-  var corpo=_buildDossieCorpo(vitimaId);
+  var corpo=_buildDossieCorpo(vitimaId, opts);
   if(!corpo){showToast("Erro ao gerar dossiê","error");return;}
   var css="*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;max-width:720px;margin:40px auto;color:#1a0e00;line-height:1.6;padding:0 20px}";
   css+=".campo{display:grid;grid-template-columns:150px 1fr;gap:6px;margin-bottom:6px;font-size:13px}.label{color:#8a6a4a;font-weight:700}.valor{color:#1a0e00}";
