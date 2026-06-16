@@ -12891,9 +12891,58 @@ function renderFilaAuxiliar(main) {
   _renderCentralBar(main,"fila_auxiliar");
 }
 
+function renderFilaDia(main) {
+  if(!state._filaTab) state._filaTab = "triagem";
+  var tab = state._filaTab;
+
+  // Badges para cada aba
+  var _nTri  = (state.db.ocorrencias||[]).filter(_ocNaFila).length;
+  var _nVcm  = (state.db.ocorrencias||[]).filter(function(o){
+    if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;
+    var fs=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id;});
+    var uf=fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];
+    return !uf||uf.nivel==="E";
+  }).length;
+  var _nEnc  = (state.encaminhamentos||[]).filter(function(e){return e.status!=="concluido";}).length;
+  var _nDev  = (state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length;
+
+  var abas = [
+    {k:"triagem",       label:"Triagem",          badge:_nTri,  cor:"var(--verm)"},
+    {k:"agenda",        label:"Fila do Dia",       badge:0,      cor:"var(--ambar)"},
+    {k:"vcm",           label:"VCM",               badge:_nVcm,  cor:"#ff69b4"},
+    {k:"encaminhamentos",label:"Encaminhamentos",  badge:_nEnc,  cor:"var(--ambar)"},
+    {k:"devolutivas",   label:"Devolutivas",       badge:_nDev,  cor:"var(--verde)"}
+  ];
+
+  // Injeta wrapper com barra de abas no topo
+  main.innerHTML = "<div id='fila-dia-tabs-bar' style='display:flex;gap:4px;padding:10px 14px 0;background:var(--madeira);border-bottom:1px solid var(--papel-3);flex-wrap:wrap'></div><div id='fila-dia-content'></div>";
+
+  var bar = document.getElementById("fila-dia-tabs-bar");
+  var barH = "";
+  abas.forEach(function(a) {
+    var ativo = tab === a.k;
+    var badgeH = a.badge > 0 ? "<span style='background:"+(ativo?"#fff":a.cor)+";color:"+(ativo?a.cor:"#fff")+";border-radius:9px;padding:1px 6px;font-size:9px;font-weight:900;margin-left:4px'>"+a.badge+"</span>" : "";
+    barH += "<button onclick='state._filaTab=\""+a.k+"\";renderFilaDia(document.getElementById(\"main\"))' style='padding:7px 12px;border:none;border-bottom:2px solid "+(ativo?a.cor:"transparent")+";background:transparent;color:"+(ativo?a.cor:"var(--tinta-2)")+";font-size:12px;font-weight:"+(ativo?"800":"400")+";cursor:pointer;white-space:nowrap'>"+a.label+badgeH+"</button>";
+  });
+  bar.innerHTML = barH;
+
+  var content = document.getElementById("fila-dia-content");
+  if(tab === "triagem")         renderTriagem(content);
+  else if(tab === "vcm")        renderDashboardVCM(content);
+  else if(tab === "encaminhamentos") renderFilaEncaminhamentos(content);
+  else if(tab === "devolutivas")renderDevolutivas(content);
+  else                          renderFilaAuxiliar(content);
+}
+
 window._avisoAbrirFila = function(indicador) {
-  var mapa = {triagem:"triagem",frida:"dashvcm",visitas:"calendario",encaminhamentos:"encaminhamentos",calendario:"calendario",lancamentos:"ocorrencias"};
-  setTela(mapa[indicador]||"dashboard");
+  var mapa = {triagem:"triagem",frida:"vcm",visitas:"calendario",encaminhamentos:"encaminhamentos",calendario:"calendario",lancamentos:"ocorrencias"};
+  var t = mapa[indicador]||"dashboard";
+  // sub-abas da Fila do Dia
+  if(["triagem","vcm","encaminhamentos","devolutivas"].indexOf(t)>=0){
+    state._filaTab = t; setTela("fila_auxiliar");
+  } else {
+    setTela(t);
+  }
 };
 
 function renderFilaEncaminhamentos(main) {
@@ -14711,24 +14760,18 @@ function renderTela() {
     return;
   }
 
+  // Telas que agora vivem como abas dentro de fila_auxiliar
+  if(tela==="triagem"){ state._filaTab="triagem"; state.tela="fila_auxiliar"; tela="fila_auxiliar"; }
+  if(tela==="encaminhamentos"){ state._filaTab="encaminhamentos"; state.tela="fila_auxiliar"; tela="fila_auxiliar"; }
+  if(tela==="devolutivas"){ state._filaTab="devolutivas"; state.tela="fila_auxiliar"; tela="fila_auxiliar"; }
+  if(tela==="dashvcm"){ state._filaTab="vcm"; state.tela="fila_auxiliar"; tela="fila_auxiliar"; }
+
   if(tela==="fila_auxiliar"){
-    renderFilaAuxiliar(main);
-    return;
-  }
-  if(tela==="triagem"){
-    renderTriagem(main);
+    renderFilaDia(main);
     return;
   }
   if(tela==="vitima"){
     renderFichaVitima(main, state._vitimaAtual||"");
-    return;
-  }
-  if(tela==="encaminhamentos"){
-    renderFilaEncaminhamentos(main);
-    return;
-  }
-  if(tela==="devolutivas"){
-    renderDevolutivas(main);
     return;
   }
 
@@ -15294,8 +15337,17 @@ function render(){
       <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" onclick="setTela('ocorrencias')">Ocorrências</button>
       <button class="nav-btn${state.tela==="calendario"?" active":""}" onclick="setTela('calendario')">Calendário</button>
       <p class="nav-label">Central de Atend.</p>
-      ${(function(){ var _nTriar=(state.db.ocorrencias||[]).filter(_ocNaFila).length; var _ativo=state.tela==="triagem"; var _badge=_nTriar>0?"<span style='background:"+(_ativo?"#fff":"var(--verm)")+";color:"+(_ativo?"var(--verm)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nTriar+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"triagem\")' style='"+(_nTriar>0&&!_ativo?"color:var(--verm);animation:piscar-suave 2s infinite;":"")+"'>Triagem"+_badge+"</button>"; })()}
-      ${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return "<button class='nav-btn"+(state.tela==="dashvcm"?" active":"")+"' onclick='setTela(\"dashvcm\")' style='"+(_n>0&&state.tela!=="dashvcm"?"color:#ff69b4;animation:piscar-rosa 1.4s infinite;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";")+"'>VCM"+(_n>0?"<span style='background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+_n+"</span>":"")+"</button>";})()}
+      ${(function(){
+        var _ativo = state.tela==="fila_auxiliar";
+        var _nTri  = (state.db.ocorrencias||[]).filter(_ocNaFila).length;
+        var _nVcm  = (state.db.ocorrencias||[]).filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];return !_uf||_uf.nivel==="E";}).length;
+        var _nEnc  = (state.encaminhamentos||[]).filter(function(e){return e.status!=="concluido";}).length;
+        var _nDev  = (state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length;
+        var _total = _nTri + _nVcm + _nEnc + _nDev;
+        var _badge = _total>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_total+"</span>":"";
+        var _anim  = !_ativo&&(_nTri>0||_nVcm>0)?"animation:piscar-suave 2s infinite;":"";
+        return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='if(!state._filaTab)state._filaTab=\"triagem\";setTela(\"fila_auxiliar\")' style='"+_anim+"'>Fila do Dia"+_badge+"</button>";
+      })()}
       <p class="nav-label">Gestão Comunitária</p>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" onclick="setTela('projetossociais')">Projetos Sociais</button>
       <button class="nav-btn${state.tela==="conselho"?" active":""}" onclick="setTela('conselho')">Conselho Comunitário</button>
@@ -15307,11 +15359,17 @@ function render(){
       <button class="nav-btn${state.tela==="ocorrencias"?" active":""}" onclick="setTela('ocorrencias')">Ocorrências</button>
       <button class="nav-btn${state.tela==="calendario"?" active":""}" onclick="setTela('calendario')">Calendário</button>
       <p class="nav-label">Central de Atendimento</p>
-      ${(function(){ var _ativo=state.tela==="fila_auxiliar"; var _nPend=(state.db.ocorrencias||[]).filter(_ocNaFila).length + (state.db.agendamentos||[]).filter(function(a){return a.data===hoje()&&(a.status||"Agendado")==="Agendado";}).length; var _badge=_nPend>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nPend+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"fila_auxiliar\")'>Fila do Dia"+_badge+"</button>"; })()}
-      ${(function(){ var _nTriar=(state.db.ocorrencias||[]).filter(_ocNaFila).length; var _ativo=state.tela==="triagem"; var _badge=_nTriar>0?"<span style='background:"+(_ativo?"#fff":"var(--verm)")+";color:"+(_ativo?"var(--verm)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nTriar+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"triagem\")' style='"+(_nTriar>0&&!_ativo?"color:var(--verm);animation:piscar-suave 2s infinite;":"")+"'>Triagem"+_badge+"</button>"; })()}
-      ${(function(){var _ocs=state.db.ocorrencias||[];var _fridas=state.db.frida||[];var _n=_ocs.filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];if(!_uf)return true;if(_uf.nivel==="E")return true;if(_uf.nivel==="M"&&(Date.now()-new Date(_uf.data).getTime())>30*864e5)return true;if(o.medida_protetiva==="Sim"&&(Date.now()-new Date(_uf.data).getTime())>15*864e5)return true;return false;}).length;return "<button class='nav-btn"+(state.tela==="dashvcm"?" active":"")+"' onclick='setTela(\"dashvcm\")' style='"+(_n>0&&state.tela!=="dashvcm"?"color:#ff69b4;animation:piscar-rosa 1.4s infinite;border-color:#ff1493;":"color:#ff69b4;border-color:"+(state.tela==="dashvcm"?"#ff1493":"transparent")+";")+"'>VCM"+(_n>0?"<span style='background:#ff1493;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+_n+"</span>":"")+"</button>";})()}
-      ${(function(){ var _nEnc=(state.encaminhamentos||[]).filter(function(e){return e.status!=="concluido";}).length; var _ativo=state.tela==="encaminhamentos"; var _badge=_nEnc>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nEnc+"</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"encaminhamentos\")'>Encaminhamentos"+_badge+"</button>"; })()}
-      ${(function(){ var _nDev=(state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length; var _ativo=state.tela==="devolutivas"; var _badge=_nDev>0?"<span style='background:"+(_ativo?"#fff":"var(--verde)")+";color:"+(_ativo?"var(--verde)":"#fff")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_nDev+" novo</span>":""; return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='setTela(\"devolutivas\")' style='color:var(--verde);border-color:"+(_ativo?"var(--verde)":"transparent")+(_nDev>0&&!_ativo?";animation:piscar-suave 2s infinite":"")+"'>Devolutivas"+_badge+"</button>"; })()}
+      ${(function(){
+        var _ativo = state.tela==="fila_auxiliar";
+        var _nTri  = (state.db.ocorrencias||[]).filter(_ocNaFila).length;
+        var _nVcm  = (state.db.ocorrencias||[]).filter(function(o){if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;var _fs=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];return !_uf||_uf.nivel==="E";}).length;
+        var _nEnc  = (state.encaminhamentos||[]).filter(function(e){return e.status!=="concluido";}).length;
+        var _nDev  = (state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length;
+        var _total = _nTri + _nVcm + _nEnc + _nDev;
+        var _badge = _total>0?"<span style='background:"+(_ativo?"#fff":"var(--ambar)")+";color:"+(_ativo?"var(--ambar)":"var(--madeira-3)")+";border-radius:10px;padding:1px 7px;font-size:10px;font-weight:900;margin-left:4px'>"+_total+"</span>":"";
+        var _anim  = !_ativo&&(_nTri>0||_nVcm>0)?"animation:piscar-suave 2s infinite;":"";
+        return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='if(!state._filaTab)state._filaTab=\"triagem\";setTela(\"fila_auxiliar\")' style='"+_anim+"'>Fila do Dia"+_badge+"</button>";
+      })()}
       <p class="nav-label">Gestão Comunitária</p>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" onclick="setTela('projetossociais')">Projetos Sociais</button>
       <button class="nav-btn${state.tela==="conselho"?" active":""}" onclick="setTela('conselho')">Conselho Comunitário</button>
