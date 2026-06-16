@@ -12818,6 +12818,7 @@ function renderHistoricoAtendimento(main) {
     if(sit==='nova') return; // ainda nao atendida
     registros.push({
       tipo:'ocorrencia', icone:'\u{1F4CB}',
+      id: o.id||'',
       data:o.data||'',
       titulo:'OC #'+(o.numero||o.id||'')+(o.tipo?' \u2014 '+o.tipo:''),
       subtitulo:o.nome_vitima||o.envolvidos||'',
@@ -12916,7 +12917,9 @@ function renderHistoricoAtendimento(main) {
   } else {
     filtrados.forEach(function(r){
       var dFmt=(r.data||'').substring(0,10);
-      h += "<div class='card' style='margin-bottom:10px;padding:14px 16px;border-left:3px solid "+r.cor+"'>";
+      var _clicavel = r.tipo==='ocorrencia'&&r.id;
+      var _onclick = _clicavel ? "onclick=\"state.popEditarOc='"+r.id+"';state.tela='ocorrencias';renderOcorrenciasGestor(document.getElementById('main'))\"" : "";
+      h += "<div class='card' "+_onclick+" style='margin-bottom:10px;padding:14px 16px;border-left:3px solid "+r.cor+";cursor:"+(_clicavel?'pointer':'default')+"'>";
       h += "<div style='display:flex;align-items:flex-start;gap:10px'>";
       h += "<span style='font-size:18px;flex-shrink:0;margin-top:1px'>"+r.icone+"</span>";
       h += "<div style='flex:1;min-width:0'>";
