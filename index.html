@@ -13543,36 +13543,71 @@ window._diagDevolutivas = function() {
   document.head.appendChild(s);
 };
 
-// Busca devolutivas enviadas via formulário CRAV no Sheets e atualiza state.encaminhamentos
+// Aplica um registro de devolutiva ao encaminhamento correspondente
+function _aplicarDevolutiva(r){
+  var enc = null;
+  if(r.encaminhamentoId) enc = (state.encaminhamentos||[]).find(function(e){ return e.id===r.encaminhamentoId; });
+  if(!enc && r.ocorrenciaId) enc = (state.encaminhamentos||[]).find(function(e){ return e.ocorrencia_id===r.ocorrenciaId; });
+  if(!enc || enc.relato_devolutiva) return false;
+  enc.relato_devolutiva      = r.tiposTexto + (r.observacoes ? "\n\n"+r.observacoes : "");
+  enc.data_devolutiva        = r.data || new Date().toISOString().slice(0,10);
+  enc.responsavel_devolutiva = r.tecnica || "";
+  enc.status = "aguardando_devolutiva";
+  return true;
+}
+
+// Busca devolutivas enviadas via formulário CRAV — tenta via ScriptProperties (salvarDadoApp) e via aba
 window._syncDevolutivas = function(cb) {
+  var pendentes = (state.encaminhamentos||[]).filter(function(e){
+    return (e.status==="enviado"||e.status==="aguardando_devolutiva") && !e.relato_devolutiva;
+  });
+  if(!pendentes.length){ if(cb) cb(0); return; }
+
+  var novos = 0;
+  var restantes = pendentes.length;
+  function _fimUm(r){
+    if(r){ novos++; }
+    restantes--;
+    if(restantes === 0){
+      if(novos > 0){
+        localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
+        salvarLocal();
+      }
+      if(cb) cb(novos);
+    }
+  }
+
+  pendentes.forEach(function(enc){
+    var cbName = "_devProp_"+enc.id.replace(/[^a-z0-9]/gi,"_")+"_"+Date.now();
+    var s = document.createElement("script");
+    var done = false;
+    var t = setTimeout(function(){ done=true; s.remove(); delete window[cbName]; _fimUm(false); }, 8000);
+    window[cbName] = function(resp){
+      if(done) return; done=true; clearTimeout(t); s.remove(); delete window[cbName];
+      var r = null;
+      if(resp && resp.ok && resp.valor){ try{ r=JSON.parse(resp.valor); }catch(ex){} }
+      _fimUm(r ? _aplicarDevolutiva(r) : false);
+    };
+    var chave = "devolutiva__"+enc.id;
+    s.src = SHEETS_URL+"?acao=lerDadoApp&chave="+encodeURIComponent(chave)+"&token="+BCS_TOKEN+"&callback="+cbName;
+    document.head.appendChild(s);
+  });
+
+  // Também tenta via aba (caso script novo seja implantado depois)
   var cbName = "_devSyncCb_"+Date.now();
   var s = document.createElement("script");
   var done = false;
-  var t = setTimeout(function(){ done=true; s.remove(); delete window[cbName]; if(cb) cb(0); }, 12000);
+  var t = setTimeout(function(){ done=true; s.remove(); delete window[cbName]; }, 12000);
   window[cbName] = function(dados){
     done = true; clearTimeout(t); s.remove(); delete window[cbName];
     var registros = (dados && (dados.registros || dados.dados)) || [];
-    if(!registros.length){ if(cb) cb(0); return; }
-    var novos = 0;
-    registros.forEach(function(r){
-      var enc = null;
-      if(r.encaminhamentoId) enc = (state.encaminhamentos||[]).find(function(e){ return e.id===r.encaminhamentoId; });
-      if(!enc && r.ocorrenciaId) enc = (state.encaminhamentos||[]).find(function(e){ return e.ocorrencia_id===r.ocorrenciaId || e.ocorrencia_id===r.ocId; });
-      if(!enc) return;
-      // Só atualiza se ainda não tiver devolutiva registrada
-      if(!enc.relato_devolutiva){
-        enc.relato_devolutiva = r.tiposTexto + (r.observacoes ? "\n\n"+r.observacoes : "");
-        enc.data_devolutiva   = r.data || new Date().toISOString().slice(0,10);
-        enc.responsavel_devolutiva = r.tecnica || "";
-        enc.status = "aguardando_devolutiva";
-        novos++;
-      }
-    });
-    if(novos > 0){
-      localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
-      salvarLocal();
-    }
-    if(cb) cb(novos);
+    registros.forEach(function(r){ if(_aplicarDevolutiva(r)){ novos++; } });
+  };
+  s.src = SHEETS_URL + "?acao=listar&tipo=devolutivas_crav&token="+BCS_TOKEN+"&callback="+cbName;
+  document.head.appendChild(s);
+
+  // cb é chamado pelos pendentes individuais via _fimUm
+  // (o listar via aba é bonus paralelo)
   };
   s.src = SHEETS_URL + "?acao=listar&tipo=devolutivas_crav&token="+BCS_TOKEN+"&callback="+cbName;
   document.head.appendChild(s);
