@@ -362,6 +362,14 @@ function enviar(e){
       return;
     }
     mostrarStatus(true, "✅ Devolutiva enviada!\n\nObrigada, "+reg.tecnica+". O registro de "+reg.nome+" foi atualizado no sistema da 77ª CIPM BCS.");
+    // Tenta também salvar na aba da planilha (se script novo estiver implantado)
+    var s2 = document.createElement("script");
+    s2.src = SHEETS_URL
+      + "?acao=salvar&tipo=devolutivas_crav"
+      + "&dados=" + encodeURIComponent(JSON.stringify(regEnvio))
+      + "&token=" + TOKEN;
+    document.head.appendChild(s2);
+    setTimeout(function(){ s2.remove(); }, 10000);
   };
 
   // Salva via salvarDadoApp (ScriptProperties) — funciona com qualquer versão do script
