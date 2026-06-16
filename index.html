@@ -13321,6 +13321,7 @@ function renderFilaEncaminhamentos(main) {
       h += "</div>";
       h += "<div style='display:flex;flex-direction:column;gap:6px;flex-shrink:0'>";
       if(e.vitima_id) h += "<button onclick='setTela(\"vitima\");state._vitimaAtual=\""+esc(e.vitima_id)+"\";render()' style='background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>Ver ficha</button>";
+      h += "<button onclick='_gerarPdfEncaminhamento(\""+esc(e.id)+"\")' style='background:#1a0e00;border:1px solid #c8860a;color:#e8a020;padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>📄 Ofício</button>";
       if(e.status==="aguardando_devolutiva"){
         h += "<span style='background:#1a3a5a;color:#4a9fd4;border-radius:5px;padding:4px 10px;font-size:10px;font-weight:700'>⏳ Aguard. devolutiva</span>";
         h += "<button onclick='_concluirEncFila(\""+esc(e.id)+"\")' style='background:var(--verde);color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer'>✓ Concluir</button>";
@@ -13371,6 +13372,87 @@ window._concluirEncFila = function(encId) {
   showToast(msg);
   var main = document.getElementById("main");
   if(main) renderFilaEncaminhamentos(main);
+};
+
+window._gerarPdfEncaminhamento = function(encId) {
+  var e = (state.encaminhamentos||[]).find(function(x){ return x.id===encId; });
+  if(!e){ showToast("Encaminhamento não encontrado","error"); return; }
+  var vit = e.vitima_id ? (state.vitimas||[]).find(function(v){ return v.id===e.vitima_id; }) : null;
+  var nomeVit = vit ? (vit.nome||"—") : (e.vitima_nome||"—");
+  // Constrói/recupera token e link do CRAV
+  if(!e.token) e.token = "enc_"+e.id+"_"+Date.now();
+  var _base = window.location.origin + window.location.pathname.replace("index.html","");
+  var _link = _base + "crav-devolutiva.html?token="+e.token+"&enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"");
+  var _qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&ecc=M&data="+encodeURIComponent(_link);
+  // Data formatada
+  var _dtEnv = e.data_envio||e.data||"";
+  var _dtFmt = (function(d){
+    if(!d) return "—";
+    var m=d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[3]+"/"+m[2]+"/"+m[1] : d;
+  })(_dtEnv);
+  var _orgLabels = {crav:"CRAV","delegacia":"Delegacia da Mulher","ministerio":"Ministério Público","assistencia":"Assistência Social","saude":"CAPS / Saúde Mental","conselho":"Conselho Tutelar"};
+  var _orgNome = _orgLabels[e.orgao]||e.orgao||"Órgão não informado";
+  var _unidade = "77ª CIPM — BCS / Barreiras-BA";
+  var _dataHoje = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+  // OC vinculada
+  var oc = e.ocorrencia_id ? (state.db.ocorrencias||[]).find(function(o){ return o.id===e.ocorrencia_id; }) : null;
+  var _boNum = oc ? (oc.numero_bo||oc.num_bo||oc.bo||oc.id||"") : "";
+  var _boData = oc ? (oc.data||"") : "";
+  var _boDataFmt = (function(d){
+    if(!d) return "";
+    var m=d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[3]+"/"+m[2]+"/"+m[1] : d;
+  })(_boData);
+  var html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Ofício de Encaminhamento</title>";
+  html += "<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;padding:20mm 20mm}";
+  html += "h1{font-size:15px;font-weight:700;text-align:center;margin-bottom:4px}";
+  html += ".sub{font-size:11px;text-align:center;color:#444;margin-bottom:20px}";
+  html += ".secao{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;border-bottom:1px solid #ccc;padding-bottom:3px;margin:18px 0 8px}";
+  html += ".linha{display:flex;gap:20px;margin-bottom:6px}";
+  html += ".campo{flex:1}.campo label{font-size:10px;font-weight:700;text-transform:uppercase;color:#777;display:block;margin-bottom:2px}";
+  html += ".campo span{font-size:12px;color:#1a1a1a}";
+  html += ".link-box{background:#f5f5f5;border:1px solid #ccc;border-radius:4px;padding:10px 12px;font-size:10px;font-family:monospace;word-break:break-all;color:#1a1a1a;margin:8px 0}";
+  html += ".qr-section{display:flex;align-items:flex-start;gap:20px;margin-top:10px}";
+  html += ".qr-section img{border:1px solid #ccc;border-radius:4px}";
+  html += ".qr-info{flex:1;font-size:11px;color:#444;line-height:1.6}";
+  html += ".aviso{background:#fff9e6;border:1px solid #f5c518;border-radius:4px;padding:8px 12px;font-size:11px;color:#7a6000;margin-top:8px}";
+  html += ".assinatura{margin-top:40px;text-align:center;border-top:1px solid #ccc;padding-top:12px;font-size:12px;color:#444}";
+  html += "@media print{body{padding:10mm 15mm}button{display:none}}</style></head><body>";
+  html += "<h1>77ª CIPM — POLÍCIA MILITAR DA BAHIA</h1>";
+  html += "<div class='sub'>Ofício de Encaminhamento para Rede de Proteção à Mulher<br>Barreiras — BA · "+_dataHoje+"</div>";
+  html += "<div class='secao'>Dados do Encaminhamento</div>";
+  html += "<div class='linha'>";
+  html += "<div class='campo'><label>Órgão destinatário</label><span>"+esc(_orgNome)+"</span></div>";
+  html += "<div class='campo'><label>Tipo</label><span>"+esc(e.tipo||"Encaminhamento")+"</span></div>";
+  html += "<div class='campo'><label>Data</label><span>"+esc(_dtFmt)+"</span></div>";
+  html += "</div>";
+  html += "<div class='linha'>";
+  html += "<div class='campo'><label>Vítima</label><span>"+esc(nomeVit)+"</span></div>";
+  if(_boNum) html += "<div class='campo'><label>Nº B.O. / OC</label><span>"+esc(_boNum)+(_boDataFmt?" · "+esc(_boDataFmt):"")+"</span></div>";
+  html += "</div>";
+  if(e.descricao) html += "<div style='margin-bottom:8px'><label style='font-size:10px;font-weight:700;text-transform:uppercase;color:#777;display:block;margin-bottom:2px'>Histórico / Contexto</label><p style='font-size:11px;color:#1a1a1a;line-height:1.6'>"+esc(e.descricao)+"</p></div>";
+  html += "<div class='secao'>Link de Devolutiva — Acesso exclusivo para "+esc(_orgNome)+"</div>";
+  html += "<div class='qr-section'>";
+  html += "<img src='"+_qrUrl+"' width='160' height='160' alt='QR Code' />";
+  html += "<div class='qr-info'>";
+  html += "<p style='font-weight:700;margin-bottom:6px'>Como usar este link:</p>";
+  html += "<ol style='padding-left:16px;line-height:2'>";
+  html += "<li>Acesse pelo celular ou computador</li>";
+  html += "<li>Preencha o formulário com a devolutiva</li>";
+  html += "<li>A 77ª CIPM receberá a resposta automaticamente</li>";
+  html += "</ol>";
+  html += "<div class='aviso'>⚠ Este link é pessoal e intransferível. Não compartilhe com terceiros.</div>";
+  html += "</div></div>";
+  html += "<div class='link-box'>"+_link+"</div>";
+  html += "<div class='secao'>Expediente</div>";
+  html += "<p style='font-size:11px;color:#444;line-height:1.7'>Encaminhamos à <strong>"+esc(_orgNome)+"</strong> a situação da vítima <strong>"+esc(nomeVit)+"</strong>, conforme Política Nacional de Enfrentamento à Violência contra as Mulheres (Lei nº 11.340/2006 — Lei Maria da Penha). Solicitamos devolutiva das providências adotadas pelo link acima, imprescindível para acompanhamento do caso pela 77ª CIPM.</p>";
+  html += "<div class='assinatura'><p>______________________________________</p><p style='margin-top:4px'><strong>Comandante — 77ª CIPM / BCS</strong></p><p>Barreiras — BA</p></div>";
+  html += "<div style='text-align:center;margin-top:20px'><button onclick='window.print()' style='background:#1B3A6B;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:13px;cursor:pointer'>🖨 Imprimir / Salvar PDF</button></div>";
+  html += "</body></html>";
+  var w = window.open("","_blank","width=850,height=900");
+  w.document.write(html);
+  w.document.close();
 };
 
 var _CORTE_FILA = "2026-06-15"; // OCs com data até este dia nunca entram na fila
@@ -22159,6 +22241,7 @@ function renderDevolutivas(main){
         h.push("<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px'>");
         h.push("<input readonly value='"+esc(_link)+"' style='flex:1;min-width:200px;background:#36221a;border:1px solid #4a3224;color:#8a6a4a;padding:6px 10px;border-radius:6px;font-size:11px;font-family:monospace' onclick='this.select()'/>");
         h.push("<button onclick=\"navigator.clipboard.writeText('"+esc(_link)+"').then(function(){showToast('Link copiado!','success')})\" style='background:#1a3a1a;border:1px solid #2a6a2a;color:#4a9a4a;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>📋 Copiar</button>");
+        h.push("<button onclick=\"_gerarPdfEncaminhamento('"+e.id+"')\" style='background:#1a0e00;border:1px solid #c8860a;color:#e8a020;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>📄 Ofício</button>");
         h.push("<button onclick=\"_reenviarDevolutiva('"+e.id+"')\" style='background:#1a0e00;border:1px solid #4a3224;color:#d4a87a;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap'>🔄 Reenviar</button>");
         h.push("</div>");
         // Campo para registrar devolutiva manualmente (telefone, presencial, etc.)
