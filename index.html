@@ -13515,6 +13515,34 @@ window._vincularVitimaEnc = function(encId) {
   };
 };
 
+// Diagnóstico: mostra raw response do servidor para devolutivas
+window._diagDevolutivas = function() {
+  showToast("🔍 Consultando servidor...");
+  var cbName = "_diagDevCb_"+Date.now();
+  var s = document.createElement("script");
+  var t = setTimeout(function(){ s.remove(); delete window[cbName]; showToast("⏱ Timeout — servidor não respondeu em 12s","error"); }, 12000);
+  window[cbName] = function(dados){
+    clearTimeout(t); s.remove(); delete window[cbName];
+    var registros = (dados && (dados.registros || dados.dados)) || [];
+    var encs = state.encaminhamentos||[];
+    var linhas = ["Servidor retornou "+registros.length+" registro(s).\n"];
+    registros.forEach(function(r,i){
+      var matchEnc = encs.find(function(e){ return e.id===r.encaminhamentoId; });
+      var matchOc  = !matchEnc && encs.find(function(e){ return e.ocorrencia_id===r.ocorrenciaId; });
+      var match = matchEnc||matchOc;
+      linhas.push((i+1)+". encId="+r.encaminhamentoId+" | ocId="+r.ocorrenciaId+" | nome="+r.nome);
+      linhas.push("   Match local: "+(match?"SIM — "+match.id:"NÃO — encaminhamento não encontrado"));
+    });
+    if(!registros.length){
+      linhas.push("Nenhuma devolutiva salva no Sheets.");
+      linhas.push("Verifique se o Apps Script foi reimplantado corretamente.");
+    }
+    alert(linhas.join("\n"));
+  };
+  s.src = SHEETS_URL + "?acao=listar&tipo=devolutivas_crav&token="+BCS_TOKEN+"&callback="+cbName;
+  document.head.appendChild(s);
+};
+
 // Busca devolutivas enviadas via formulário CRAV no Sheets e atualiza state.encaminhamentos
 window._syncDevolutivas = function(cb) {
   var cbName = "_devSyncCb_"+Date.now();
@@ -22431,7 +22459,10 @@ function renderDevolutivas(main){
   // Header
   h.push("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px'>");
   h.push("<div><h2 style='font-size:20px;font-weight:800;color:#f5ede0;margin:0'>↩ Devolutivas dos Órgãos</h2><p style='color:#5e4636;font-size:11px;margin:2px 0 0'>Respostas dos órgãos parceiros — CRAV, CREAS, Conselho Tutelar, MP</p></div>");
+  h.push("<div style='display:flex;gap:8px;align-items:center'>");
+  h.push("<button onclick=\"_diagDevolutivas()\" style='background:#0a1a0a;border:1px solid #2a4a2a;color:#4ade80;padding:7px 14px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer'>🔍 Diagnóstico</button>");
   h.push("<button onclick=\"state.tela='encaminhamentos';render()\" style='background:#2a1c10;border:1px solid #4a3224;color:#8a6a4a;padding:7px 14px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer'>📤 Ver Fila</button>");
+  h.push("</div>");
   h.push("</div>");
 
   // Abas

@@ -346,8 +346,13 @@ function enviar(e){
     btn.textContent = org.ico + " Tentar novamente";
   }, 12000);
 
-  window[cb] = function(){
+  window[cb] = function(resp){
     ok = true; clearTimeout(t); s.remove(); delete window[cb];
+    if(resp && resp.ok === false){
+      mostrarStatus(false, "❌ Erro ao salvar: "+(resp.erro||"Resposta inválida do servidor."));
+      btn.disabled = false; btn.textContent = org.ico + " Tentar novamente";
+      return;
+    }
     mostrarStatus(true, "✅ Devolutiva enviada!\n\nObrigada, "+reg.tecnica+". O registro de "+reg.nome+" foi atualizado no sistema da 77ª CIPM BCS.");
   };
 
