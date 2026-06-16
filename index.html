@@ -12783,8 +12783,12 @@ window._buildDossieCorpo = function(vitimaId, opts) {
   var ocsVit=(state.db.ocorrencias||[]).filter(function(o){
     return o.vitima_id===vitimaId||(!o.vitima_id&&o.vitima_nome===vit.nome);
   }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  var encs=(state.encaminhamentos||[]).filter(function(e){return e.vitima_id===vitimaId;})
-    .sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var _ocsIds=ocsVit.map(function(o){return o.id;});
+  var encs=(state.encaminhamentos||[]).filter(function(e){
+    return e.vitima_id===vitimaId
+      || _ocsIds.indexOf(e.ocorrencia_id||e.ocorrenciaId||"")>=0
+      || (vit.nome && (e.vitima_nome||"").toLowerCase()===vit.nome.toLowerCase());
+  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
   var fridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId&&ocsVit.some(function(o){return o.id===f.ocorrenciaId;});})
     .sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
   var dataDossie=new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
