@@ -13322,7 +13322,11 @@ function renderFilaEncaminhamentos(main) {
       h += "<p style='font-size:11px;color:var(--tinta-2);margin:0'>"+esc(e.data||"—")+(e.prazo?" · prazo: <b style='color:"+(atrasado?"var(--verm)":"var(--tinta)")+"'>"+esc(e.prazo)+"</b>":"")+"</p>";
       h += "</div>";
       h += "<div style='display:flex;flex-direction:column;gap:6px;flex-shrink:0'>";
-      if(e.vitima_id) h += "<button onclick='setTela(\"vitima\");state._vitimaAtual=\""+esc(e.vitima_id)+"\";render()' style='background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>Ver ficha</button>";
+      if(e.vitima_id){
+        h += "<button onclick='setTela(\"vitima\");state._vitimaAtual=\""+esc(e.vitima_id)+"\";render()' style='background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>Ver ficha</button>";
+      } else {
+        h += "<button onclick='_vincularVitimaEnc(\""+esc(e.id)+"\")' style='background:#1a0e00;border:1px dashed #c8860a;color:#c8860a;padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>🔗 Vincular vítima</button>";
+      }
       h += "<button onclick='_gerarPdfEncaminhamento(\""+esc(e.id)+"\")' style='background:#1a0e00;border:1px solid #c8860a;color:#e8a020;padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>📄 Ofício</button>";
       if(e.status==="aguardando_devolutiva"){
         h += "<span style='background:#1a3a5a;color:#4a9fd4;border-radius:5px;padding:4px 10px;font-size:10px;font-weight:700'>⏳ Aguard. devolutiva</span>";
@@ -13374,6 +13378,47 @@ window._concluirEncFila = function(encId) {
   showToast(msg);
   var main = document.getElementById("main");
   if(main) renderFilaEncaminhamentos(main);
+};
+
+window._vincularVitimaEnc = function(encId) {
+  var vitimas = (state.vitimas||[]).filter(function(v){ return v.nome; });
+  var html = "<div id='_modal-vincular' style='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9900;display:flex;align-items:center;justify-content:center;padding:16px'>";
+  html += "<div style='background:var(--papel);border:1.5px solid var(--ambar);border-radius:12px;width:100%;max-width:440px;padding:20px'>";
+  html += "<p style='font-family:Georgia,serif;font-size:15px;font-weight:700;color:var(--tinta);margin:0 0 14px'>🔗 Vincular vítima ao encaminhamento</p>";
+  html += "<input id='_vinc-busca' type='text' placeholder='Digite o nome da vítima…' oninput='_filtrarVincVitimas()' style='width:100%;padding:9px 12px;border:1.5px solid var(--ambar);border-radius:7px;background:var(--papel-2);color:var(--tinta);font-size:13px;box-sizing:border-box;margin-bottom:10px'>";
+  html += "<div id='_vinc-lista' style='max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px'>";
+  vitimas.slice(0,20).forEach(function(v){
+    var _nomeCl=(v.nome||"").replace(/,?\s*sexo\s+\w+\s*/i,"").replace(/,?\s*idade\s+\d+\s*anos?\s*/i,"").replace(/,\s*$/,"").trim();
+    html += "<button onclick='_confirmarVinculoEnc(\""+esc(encId)+"\",\""+esc(v.id)+"\")' style='text-align:left;background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta);padding:9px 12px;border-radius:7px;font-size:13px;cursor:pointer'>"+esc(_nomeCl)+(v.telefone?"<span style='color:var(--tinta-2);font-size:11px;margin-left:8px'>"+esc(v.telefone)+"</span>":"")+"</button>";
+  });
+  html += "</div>";
+  html += "<button onclick='document.getElementById(\"_modal-vincular\").remove()' style='margin-top:14px;background:transparent;border:none;color:var(--tinta-2);font-size:12px;cursor:pointer'>Cancelar</button>";
+  html += "</div></div>";
+  var d = document.createElement("div"); d.id="_modal-vincular-wrap"; d.innerHTML=html;
+  document.body.appendChild(d);
+  setTimeout(function(){ var i=document.getElementById("_vinc-busca"); if(i) i.focus(); },100);
+  window._filtrarVincVitimas = function(){
+    var q=(document.getElementById("_vinc-busca")||{value:""}).value.toLowerCase().trim();
+    var lista=document.getElementById("_vinc-lista");
+    if(!lista) return;
+    var filtradas=q ? vitimas.filter(function(v){ return (v.nome||"").toLowerCase().includes(q)||(v.telefone||"").includes(q); }) : vitimas.slice(0,20);
+    lista.innerHTML=filtradas.slice(0,20).map(function(v){
+      var _nomeCl=(v.nome||"").replace(/,?\s*sexo\s+\w+\s*/i,"").replace(/,?\s*idade\s+\d+\s*anos?\s*/i,"").replace(/,\s*$/,"").trim();
+      return "<button onclick='_confirmarVinculoEnc(\""+esc(encId)+"\",\""+esc(v.id)+"\")' style='text-align:left;background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta);padding:9px 12px;border-radius:7px;font-size:13px;cursor:pointer;width:100%'>"+esc(_nomeCl)+(v.telefone?"<span style='color:var(--tinta-2);font-size:11px;margin-left:8px'>"+esc(v.telefone)+"</span>":"")+"</button>";
+    }).join("");
+  };
+  window._confirmarVinculoEnc = function(encId, vitimaId){
+    var enc=(state.encaminhamentos||[]).find(function(x){return x.id===encId;});
+    if(!enc) return;
+    enc.vitima_id=vitimaId;
+    localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
+    salvarLocal();
+    _sheetsGet({acao:"atualizarEncaminhamento", id:encId, vitima_id:vitimaId}).catch(function(){});
+    var m=document.getElementById("_modal-vincular-wrap"); if(m) m.remove();
+    showToast("✓ Vítima vinculada ao encaminhamento","success");
+    var main=document.getElementById("main");
+    if(main) renderFilaEncaminhamentos(main);
+  };
 };
 
 // Busca devolutivas enviadas via formulário CRAV no Sheets e atualiza state.encaminhamentos

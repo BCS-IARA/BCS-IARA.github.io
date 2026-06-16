@@ -1391,7 +1391,7 @@ function atualizarEncaminhamento(ss, id, campos) {
   try {
     var aba = ss.getSheetByName("encaminhamentos");
     if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
-    var mapa={orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9};
+    var mapa={vitima_id:2,orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9};
     var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
     for (var i = 0; i < ids.length; i++) {
       if (String(ids[i][0]) === String(id)) {
@@ -1409,7 +1409,7 @@ function atualizarEncaminhamentoPorOcId(ss, ocId, campos) {
   try {
     var aba = ss.getSheetByName("encaminhamentos");
     if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
-    var mapa={orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9};
+    var mapa={vitima_id:2,orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9};
     // Coluna ocorrenciaId — índice 2 (0-based) = coluna 3 (1-based)
     var rows = aba.getRange(2,1,aba.getLastRow()-1,10).getValues();
     var found = false;
