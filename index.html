@@ -395,6 +395,7 @@ function salvarLocal() {
     if(state.ocComplementos) localStorage.setItem("bcs_oc_complementos",JSON.stringify(state.ocComplementos));
     if(state.policiais) localStorage.setItem("bcs_policiais",JSON.stringify(state.policiais));
     if(state.solicitacoes) localStorage.setItem("bcs_solicitacoes",JSON.stringify(state.solicitacoes));
+    if(state.encaminhamentos) localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
     if(state.escolas) localStorage.setItem("bcs_escolas",JSON.stringify(state.escolas));
     if(state.visitasEscolares) localStorage.setItem("bcs_visitas_escolares",JSON.stringify(state.visitasEscolares));
     if(state.atividadesEscolares) localStorage.setItem("bcs_atividades_escolares",JSON.stringify(state.atividadesEscolares));
@@ -12601,6 +12602,7 @@ window._concluirEnc = function(encId, vitimaId) {
   var idx = (state.encaminhamentos||[]).findIndex(function(e){ return e.id===encId; });
   if(idx<0) return;
   state.encaminhamentos[idx].status = "concluido";
+  localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
   salvarLocal();
   _sheetsGet({acao:"atualizarEncaminhamento", id:encId, status:"concluido"}).catch(function(){});
   showToast("✓ Encaminhamento concluído");
@@ -13059,6 +13061,7 @@ window._concluirEncFila = function(encId) {
   var idx = (state.encaminhamentos||[]).findIndex(function(e){ return e.id===encId; });
   if(idx<0) return;
   state.encaminhamentos[idx].status = "concluido";
+  localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
   salvarLocal();
   _sheetsGet({acao:"atualizarEncaminhamento", id:encId, status:"concluido"}).catch(function(){});
   showToast("✓ Encaminhamento concluído");
