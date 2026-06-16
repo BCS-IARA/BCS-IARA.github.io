@@ -226,11 +226,13 @@ var ORGAOS = {
 
 // ── Lê URL params ──────────────────────────────────────
 var params  = new URLSearchParams(location.search);
-var servico = (params.get("servico") || "crav").toLowerCase().replace(/[^a-z_]/g,"");
-var ocId    = params.get("oc")    || "";
+// Suporta tanto ?servico= (link antigo) quanto ?orgao= (link novo gerado pelo IARA)
+var servico = (params.get("servico") || params.get("orgao") || "crav").toLowerCase().replace(/[^a-z_]/g,"");
+var encId   = params.get("enc")   || "";  // ID do encaminhamento no IARA
+var ocId    = params.get("oc")    || encId || "";
 var nomePre = params.get("nome")  || "";
 var bairro  = params.get("bairro")|| "";
-var ref     = params.get("ref")   || "";
+var ref     = params.get("ref")   || params.get("token") || "";
 
 var org = ORGAOS[servico] || ORGAOS.outros;
 
@@ -311,6 +313,7 @@ function enviar(e){
 
   var reg = {
     id:             "dev_"+Date.now()+Math.random().toString(36).slice(2,5),
+    encaminhamentoId: encId,
     ocorrenciaId:   ocId,
     servico:        servico,
     orgao:          org.nome,
