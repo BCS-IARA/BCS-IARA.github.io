@@ -390,7 +390,6 @@ function salvarLocal() {
     if(state.invMovimentacoes) localStorage.setItem("bcs_inv_mov",JSON.stringify(state.invMovimentacoes));
     if(state.invConferencias) localStorage.setItem("bcs_inv_conf",JSON.stringify(state.invConferencias));
     if(state.vcmCasos) localStorage.setItem("bcs_vcm_casos",JSON.stringify(state.vcmCasos));
-    if(state.vcmEncaminhamentos) localStorage.setItem("bcs_vcm_enc",JSON.stringify(state.vcmEncaminhamentos));
     if(state.candidaturas) localStorage.setItem("bcs_candidaturas",JSON.stringify(state.candidaturas));
     if(state.cadastroInstrutores) localStorage.setItem("bcs_instrutores_cad",JSON.stringify(state.cadastroInstrutores));
     if(state.ocComplementos) localStorage.setItem("bcs_oc_complementos",JSON.stringify(state.ocComplementos));
@@ -509,7 +508,6 @@ function exportarDadosBCS(){
     invMovimentacoes: state.invMovimentacoes||[],
     invConferencias: state.invConferencias||[],
     vcmCasos: state.vcmCasos||{},
-    vcmEncaminhamentos: state.vcmEncaminhamentos||[],
     escolas: state.escolas||[],
     visitasEscolares: state.visitasEscolares||[],
     atividadesEscolares: state.atividadesEscolares||[]
@@ -559,7 +557,6 @@ function importarDadosBCS(input){
       if(dados.invMovimentacoes) state.invMovimentacoes=dados.invMovimentacoes;
       if(dados.invConferencias) state.invConferencias=dados.invConferencias;
       if(dados.vcmCasos) state.vcmCasos=dados.vcmCasos;
-      if(dados.vcmEncaminhamentos) state.vcmEncaminhamentos=dados.vcmEncaminhamentos;
       if(dados.escolas) state.escolas=dados.escolas;
       if(dados.visitasEscolares) state.visitasEscolares=dados.visitasEscolares;
       if(dados.atividadesEscolares) state.atividadesEscolares=dados.atividadesEscolares;
@@ -652,7 +649,6 @@ async function sincronizarSheets(){
     await salvarDadoAppSheets("bcs_inscricoes_proj",   state.inscricoesProjetos||[]);
     await salvarDadoAppSheets("bcs_policiais",         state.policiais||[]);
     await salvarDadoAppSheets("bcs_vcm_casos",         state.vcmCasos||{});
-    await salvarDadoAppSheets("bcs_vcm_enc",           state.vcmEncaminhamentos||[]);
     await salvarDadoAppSheets("bcs_agendamentos",     state.db.agendamentos||[]);
     await salvarDadoAppSheets("bcs_visitas",          state.db.visitas||[]);
     await salvarDadoAppSheets("bcs_atendimentos",     state.db.atendimentos||[]);
@@ -743,7 +739,6 @@ function _salvarLocalSemSync(){
     if(state.ocorrenciasEncerradas) localStorage.setItem("bcs_oc_encerradas",     JSON.stringify(state.ocorrenciasEncerradas));
     if(state.alertasGraves)       localStorage.setItem("bcs_alertas_graves",      JSON.stringify(state.alertasGraves));
     if(state.devolutivasCrav)     localStorage.setItem("bcs_devolutivas_crav",    JSON.stringify(state.devolutivasCrav));
-    if(state.vcmEncaminhamentos)  localStorage.setItem("bcs_vcm_enc",             JSON.stringify(state.vcmEncaminhamentos));
     if(state.conselho_atas)       localStorage.setItem("bcs_conselho_atas",       JSON.stringify(state.conselho_atas));
     if(state.conselho_associados) localStorage.setItem("bcs_conselho_associados", JSON.stringify(state.conselho_associados));
     if(state.conselho_diretoria)  localStorage.setItem("bcs_conselho_diretoria",  JSON.stringify(state.conselho_diretoria));
@@ -779,7 +774,6 @@ async function carregarDadosAppDoSheets(){
     var inscricoesSheets  = await lerDadoAppSheets("bcs_inscricoes_proj");
     var policiaisSheets   = await lerDadoAppSheets("bcs_policiais");
     var vcmCasosSheets       = await lerDadoAppSheets("bcs_vcm_casos");
-    var vcmEncsSheets        = await lerDadoAppSheets("bcs_vcm_enc");
     var chamadasSheets       = await lerDadoAppSheets("bcs_chamadas");
     var cargasSheets         = await lerDadoAppSheets("bcs_cargas_armamento");
     var invItensSheets       = await lerDadoAppSheets("bcs_inv_itens");
@@ -873,9 +867,6 @@ async function carregarDadosAppDoSheets(){
       });
     }
 
-    // 📤 Encaminhamentos VCM (merge por id)
-    state.vcmEncaminhamentos = _mergeById(state.vcmEncaminhamentos||[], vcmEncsSheets);
-    localStorage.setItem("bcs_vcm_enc", JSON.stringify(state.vcmEncaminhamentos));
 
     // 📋 Módulos sem sync anterior — merge por id
     state.chamadas            = _mergeById(state.chamadas||[],            chamadasSheets);
@@ -1290,13 +1281,35 @@ let state = {
   devolutivasCrav: JSON.parse(localStorage.getItem("bcs_devolutivas_crav")||"[]"),
   // Fluxo VCM — casos (rede de proteção + contatos por vítima)
   vcmCasos: JSON.parse(localStorage.getItem("bcs_vcm_casos")||"{}"),
-  vcmEncaminhamentos: JSON.parse(localStorage.getItem("bcs_vcm_enc")||"[]"),
   candidaturas: JSON.parse(localStorage.getItem("bcs_candidaturas")||"[]"),
   cadastroInstrutores: JSON.parse(localStorage.getItem("bcs_instrutores_cad")||"[]"),
   ocComplementos: JSON.parse(localStorage.getItem("bcs_oc_complementos")||"[]"),
   // Fase 1 — entidades novas
   vitimas: JSON.parse(localStorage.getItem("bcs_vitimas")||"[]"),
-  encaminhamentos: JSON.parse(localStorage.getItem("bcs_encaminhamentos")||"[]"),
+  encaminhamentos: (function(){
+    var _enc=JSON.parse(localStorage.getItem("bcs_encaminhamentos")||"[]");
+    try{
+      var _vcm=JSON.parse(localStorage.getItem("bcs_vcm_enc")||"[]");
+      if(_vcm.length){
+        var _encIds=new Set(_enc.map(function(e){return e.id;}));
+        _vcm.forEach(function(v){
+          if(_encIds.has(v.id)) return;
+          _enc.push({id:v.id,ocorrenciaId:v.ocorrenciaId,
+            tipo:v.servico||"crav",orgao:v.servico||"crav",
+            vitimaNome:v.vitimaNome||"",vitimaBairro:v.vitimaBairro||"",
+            ocNumero:v.ocNumero||"",
+            data:v.dataRegistro?v.dataRegistro.slice(0,10):"",
+            criadoEm:v.dataRegistro||"",
+            data_envio:v.dataEnvio?v.dataEnvio.slice(0,10):"",
+            status:v.status==="enviado"?"enviado":"pendente",
+            observacoes:v.obs||"",vcm:true});
+        });
+        localStorage.setItem("bcs_encaminhamentos",JSON.stringify(_enc));
+        localStorage.removeItem("bcs_vcm_enc");
+      }
+    }catch(e){}
+    return _enc;
+  })(),
   // Controle de sync
   ultimaSinc: null,
   sincronizando: false,
@@ -3999,19 +4012,11 @@ function _modalVcm(titulo, vitimas){
 }
 
 function _renderVcmEncaminhamentos(main){
-  // Relê localStorage para capturar encaminhamentos adicionados pelo monitor VCM
-  try{
-    var _locEnc=JSON.parse(localStorage.getItem("bcs_vcm_enc")||"[]");
-    if(_locEnc.length>0){
-      // Sempre usa localStorage como fonte de verdade para encaminhamentos
-      state.vcmEncaminhamentos=_locEnc;
-    }
-  }catch(e){}
-  var encs=(state.vcmEncaminhamentos||[]).slice().sort(function(a,b){
+  var encs=(state.encaminhamentos||[]).filter(function(e){return e.vcm;}).slice().sort(function(a,b){
     // pendentes primeiro, depois por data desc
     if(a.status==="pendente"&&b.status!=="pendente") return -1;
     if(a.status!=="pendente"&&b.status==="pendente") return 1;
-    return (b.dataRegistro||"")>(a.dataRegistro||"")?1:-1;
+    return (b.criadoEm||b.data||"")>(a.criadoEm||a.data||"")?1:-1;
   });
   var nPend=encs.filter(function(e){return e.status==="pendente";}).length;
   var nEnv=encs.filter(function(e){return e.status==="enviado";}).length;
@@ -4049,8 +4054,8 @@ function _renderVcmEncaminhamentos(main){
     h+="</div>";
     h+="<div style='display:flex;flex-direction:column;gap:8px'>";
     grupo.forEach(function(enc){
-      var orgLabel=_orgaoLabels[enc.servico]||enc.servico;
-      var dt=enc.dataRegistro?new Date(enc.dataRegistro).toLocaleDateString("pt-BR"):"—";
+      var orgLabel=_orgaoLabels[enc.orgao||enc.tipo||enc.servico]||(enc.orgao||enc.tipo||enc.servico||"—");
+      var dt=(enc.criadoEm||enc.data)?new Date(enc.criadoEm||enc.data+"T12:00").toLocaleDateString("pt-BR"):"—";
       var dtEnv=enc.dataEnvio?new Date(enc.dataEnvio).toLocaleDateString("pt-BR"):"";
       var oc=(state.db.ocorrencias||[]).find(function(o){return o.id===enc.ocorrenciaId;});
       h+="<div style='background:#0e0808;border:1px solid "+(status==="pendente"?"#3a1a1a":"#1a2a1a")+";border-left:4px solid "+(status==="pendente"?"#ef4444":"#22c55e")+";border-radius:8px;padding:14px 16px'>";
@@ -4083,12 +4088,12 @@ function _renderVcmEncaminhamentos(main){
 }
 
 function _vcmMarcarEnviado(encId){
-  if(!state.vcmEncaminhamentos) return;
-  var idx=state.vcmEncaminhamentos.findIndex(function(e){return e.id===encId;});
+  if(!state.encaminhamentos) return;
+  var idx=state.encaminhamentos.findIndex(function(e){return e.id===encId;});
   if(idx<0) return;
-  state.vcmEncaminhamentos[idx].status="enviado";
-  state.vcmEncaminhamentos[idx].dataEnvio=new Date().toISOString();
-  localStorage.setItem("bcs_vcm_enc",JSON.stringify(state.vcmEncaminhamentos));
+  state.encaminhamentos[idx].status="enviado";
+  state.encaminhamentos[idx].data_envio=new Date().toISOString().slice(0,10);
+  localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
   salvarLocal();
   showToast("✓ Marcado como enviado!");
   var main=document.getElementById("main")||document.getElementById("main-content");
@@ -4131,7 +4136,7 @@ function renderDashboardVCM(main){
   if(!state.vcmFiltro) state.vcmFiltro="todas";
   if(!state.vcmTab) state.vcmTab="dashboard";
   var tab=state.vcmTab;
-  var nEnc=(state.vcmEncaminhamentos||[]).filter(function(e){return e.status==="pendente";}).length;
+  var nEnc=(state.encaminhamentos||[]).filter(function(e){return e.vcm&&e.status==="pendente";}).length;
 
   // Roteador de abas
   if(tab==="encaminhamentos"){ _renderVcmEncaminhamentos(main); return; }
@@ -19320,7 +19325,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
   h.push("<div style='max-width:900px;margin:0 auto;padding:16px'>");
   h.push("<div style='display:flex;gap:8px;margin-bottom:10px;align-items:center'>");
   h.push("<input id='oc-busca' type='text' placeholder='🔍 Filtrar por nome, Nº, bairro, tipo, suspeito...' value='"+(state.filtroOcBusca||"")+"' style='flex:1;background:#2a1c10;border:1px solid #2a3818;color:#f2eada;padding:10px 13px;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none'/>");
-  var _nEncPend=(state.vcmEncaminhamentos||[]).filter(function(e){return e.status==="pendente";}).length;
+  var _nEncPend=(state.encaminhamentos||[]).filter(function(e){return e.vcm&&e.status==="pendente";}).length;
   h.push("<button onclick=\"state.vcmTab='encaminhamentos';setTela('dashvcm')\" style='flex-shrink:0;background:linear-gradient(135deg,#3a0a18,#5a1020);border:2px solid #ff1493;color:#ffb3c8;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px'>📤 Encaminhamentos"+(_nEncPend>0?" <span style='background:#ff1493;color:#fff;border-radius:10px;padding:0px 6px;font-size:11px'>"+_nEncPend+"</span>":"")+"</button>");
   h.push("</div>");
 
@@ -19748,10 +19753,10 @@ var _orgaoLabels={
 function _vcmEncaminhar(ocId, servico){
   var oc=(state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
   if(!oc){ showToast("Ocorrência não encontrada","error"); return; }
-  if(!state.vcmEncaminhamentos) state.vcmEncaminhamentos=[];
+  if(!state.encaminhamentos) state.encaminhamentos=[];
   // Evita duplicata pendente para o mesmo órgão
-  var jaPendente=state.vcmEncaminhamentos.some(function(e){
-    return e.ocorrenciaId===ocId && e.servico===servico && e.status==="pendente";
+  var jaPendente=state.encaminhamentos.some(function(e){
+    return e.ocorrenciaId===ocId && (e.orgao===servico||e.tipo===servico) && e.vcm && e.status==="pendente";
   });
   if(jaPendente){
     showToast((_orgaoLabels[servico]||servico)+" já tem encaminhamento pendente para esta vítima","error");
@@ -19760,12 +19765,13 @@ function _vcmEncaminhar(ocId, servico){
   var enc={
     id:"enc_"+Date.now(), ocorrenciaId:ocId,
     vitimaNome:oc.vitima_nome||"", vitimaBairro:oc.bairro||"",
-    ocNumero:oc.numero||oc.id||"", servico:servico||"crav",
-    dataRegistro:new Date().toISOString(), status:"pendente",
-    dataEnvio:"", obs:""
+    ocNumero:oc.numero||oc.id||"", tipo:servico||"crav", orgao:servico||"crav",
+    data:new Date().toISOString().slice(0,10),
+    criadoEm:new Date().toISOString(), status:"pendente",
+    data_envio:"", observacoes:"", vcm:true
   };
-  state.vcmEncaminhamentos.push(enc);
-  localStorage.setItem("bcs_vcm_enc",JSON.stringify(state.vcmEncaminhamentos));
+  state.encaminhamentos.push(enc);
+  localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
   salvarLocal();
   showToast("✓ Encaminhado para "+(_orgaoLabels[servico]||servico)+" — veja a aba Encaminhamentos");
   // Marca também na rede de proteção (checklist do monitor)
