@@ -21903,6 +21903,7 @@ function renderInventario(main){
   h+="<span style='font-size:10px;color:"+_invSincCor+";border:1px solid "+_invSincCor+"44;border-radius:6px;padding:3px 8px'>"+_invSincTxt+"</span>";
   h+="<button onclick='_invAbrirImport()' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📤 Importar Lista</button>";
   h+="<button onclick='_invGerarPDF()' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📄 Exportar PDF</button>";
+  if(state._invFiltLoc) h+="<button onclick='_invGerarPDFSecao(\""+esc(state._invFiltLoc)+"\")' style='background:#1a2a1a;border:1px solid #6E8F52;color:#6E8F52;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📄 PDF da Seção</button>";
   h+="<button onclick='_invAbrirItem(null)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Item</button>";
   h+="</div></div>";
 
@@ -22520,6 +22521,51 @@ function _invGerarPDF(){
     h+="</table>";
   });
   h+="<div class='tot'>Total: "+itens.length+" itens registrados &nbsp;|&nbsp; 77ª CIPM BCS — IARA</div>";
+  h+="</body></html>";
+  var w=window.open("","_blank");
+  if(w){ w.document.write(h); w.document.close(); setTimeout(function(){w.print();},500); }
+}
+
+function _invGerarPDFSecao(secao){
+  var itens=(state.invItens||[]).filter(function(x){return x.ativo!==false && (x.localizacao||"")=== secao;});
+  var dt=new Date().toLocaleString("pt-BR");
+  var h="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Inventário — "+secao+"</title><style>";
+  h+="body{font-family:Arial,sans-serif;font-size:10px;color:#111;margin:0;padding:16px}";
+  h+="h1{font-size:16px;color:#1a3a1a;margin-bottom:2px}";
+  h+=".header{border-bottom:2px solid #1a3a1a;padding-bottom:8px;margin-bottom:14px}";
+  h+=".cat-title{background:#1a3a1a;color:#fff;padding:5px 10px;font-size:12px;font-weight:700;margin:14px 0 5px;border-radius:3px}";
+  h+="table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:9px}";
+  h+="th{background:#e8f0e8;padding:5px 6px;text-align:left;border:1px solid #aaa;font-size:9px;font-weight:700}";
+  h+="td{padding:4px 6px;border:1px solid #ccc;vertical-align:top}";
+  h+=".emp{background:#fff8e8;font-weight:700;color:#6a3a00}";
+  h+=".tot{color:#555;font-size:9px;margin-top:10px;border-top:1px solid #ccc;padding-top:6px}";
+  h+="@media print{body{padding:6px}@page{margin:1cm}}";
+  h+="</style></head><body>";
+  h+="<div class='header'>";
+  h+="<h1>📦 Inventário — Seção: "+esc(secao)+"</h1>";
+  h+="<div style='color:#555;font-size:9px'>77ª CIPM BCS &nbsp;|&nbsp; Gerado em: "+dt+" &nbsp;|&nbsp; Total: <b>"+itens.length+"</b> itens</div>";
+  h+="</div>";
+  // Agrupa por categoria
+  Object.keys(INV_CATS).forEach(function(cat){
+    var ci=itens.filter(function(x){return x.categoria===cat;});
+    if(!ci.length) return;
+    h+="<div class='cat-title'>"+INV_CATS[cat].icon+" "+INV_CATS[cat].label+" ("+ci.length+")</div>";
+    h+="<table><tr><th>#</th><th>Tombamento</th><th>Descrição</th><th>Marca/Modelo</th><th>Estado</th><th class='emp'>Responsável</th></tr>";
+    ci.forEach(function(item,i){
+      var est=INV_ESTADOS[item.estado]||{label:item.estado||"—"};
+      var emprego="—";
+      if(item.tipo_carga==="fixa"||item.tipo_carga==="pessoal"){
+        var grad=item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"";
+        emprego=grad+(item.carga_responsavel_nome||"—");
+        if(item.carga_responsavel_matricula) emprego+=" ("+item.carga_responsavel_matricula+")";
+      }
+      h+="<tr><td>"+(i+1)+"</td><td>"+esc(item.tombamento||"—")+"</td><td><b>"+esc(item.descricao||"—")+"</b>"+(item.numero_serie?"<br><small>Série: "+esc(item.numero_serie)+"</small>":"")+"</td>";
+      h+="<td>"+esc([item.marca,item.modelo].filter(Boolean).join(" ")||"—")+"</td>";
+      h+="<td>"+esc(est.label)+"</td><td class='emp'>"+esc(emprego)+"</td></tr>";
+    });
+    h+="</table>";
+  });
+  h+="<div class='tot'>Total: "+itens.length+" item(ns) na seção <b>"+esc(secao)+"</b></div>";
   h+="</body></html>";
   var w=window.open("","_blank");
   if(w){ w.document.write(h); w.document.close(); setTimeout(function(){w.print();},500); }
