@@ -12521,10 +12521,15 @@ window._salvarEncaminhamento = function(vitimaId) {
 window._dossieByOcId = function(ocId){
   var oc = (state.db.ocorrencias||[]).find(function(o){return o.id===ocId;});
   if(!oc){ showToast("Ocorrência não encontrada","error"); return; }
-  // Tenta vitimaId vinculado; senão busca por nome na lista de vítimas
+  // Extrai nome da vítima — verifica todos os campos possíveis
+  var nomeVitima = oc.vitima_nome || oc.nome_vitima
+    || (oc.vitimas&&oc.vitimas.length?oc.vitimas[0].nome:"")
+    || (oc.solicitante&&oc.solicitante.nome?oc.solicitante.nome:"")
+    || "";
+  // Tenta vitimaId vinculado; senão busca por nome na lista de vítimas cadastradas
   var vitimaId = oc.vitima_id;
-  if(!vitimaId && oc.vitima_nome){
-    var nomeBusca = (oc.vitima_nome||"").trim().toLowerCase();
+  if(!vitimaId && nomeVitima){
+    var nomeBusca = nomeVitima.trim().toLowerCase();
     var vit = (state.vitimas||[]).find(function(v){
       return (v.nome||"").trim().toLowerCase() === nomeBusca;
     });
@@ -12533,18 +12538,24 @@ window._dossieByOcId = function(ocId){
   if(vitimaId){
     _gerarDossie(vitimaId);
   } else {
-    // Não tem cadastro formal de vítima — gera dossiê inline pelo nome
-    _gerarDossieByNome(oc.vitima_nome||oc.nome_vitima||"Vítima", ocId);
+    _gerarDossieByNome(nomeVitima||"Vítima", ocId);
   }
 };
 
 window._gerarDossieByNome = function(nomeVitima, ocIdRef){
   var nome = (nomeVitima||"").trim();
   var nomeLower = nome.toLowerCase();
-  // Coleta todas as OCs que mencionam esse nome
+  function _ocTemNome(o){
+    if(!nomeLower) return false;
+    if((o.vitima_nome||"").toLowerCase().indexOf(nomeLower)>=0) return true;
+    if((o.nome_vitima||"").toLowerCase().indexOf(nomeLower)>=0) return true;
+    if((o.vitimas||[]).some(function(v){return (v.nome||"").toLowerCase().indexOf(nomeLower)>=0;})) return true;
+    return false;
+  }
+  // Sempre inclui a OC de origem; adiciona demais que tenham o nome
+  var ocRef = (state.db.ocorrencias||[]).find(function(o){return o.id===ocIdRef;});
   var ocsVit = (state.db.ocorrencias||[]).filter(function(o){
-    return (o.vitima_nome||o.nome_vitima||"").toLowerCase().indexOf(nomeLower)>=0
-        || (o.vitimas||[]).some(function(v){return (v.nome||"").toLowerCase().indexOf(nomeLower)>=0;});
+    return o.id===ocIdRef || _ocTemNome(o);
   }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
   var ocsIds = ocsVit.map(function(o){return o.id;});
   var fridas = (state.db.frida||[]).filter(function(f){return ocsIds.indexOf(f.ocorrenciaId)>=0;})
@@ -12557,6 +12568,10 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
     return (v.vitima_nome||v.nome||"").toLowerCase().indexOf(nomeLower)>=0
         || ocsIds.indexOf(v.ocorrenciaId||"")>=0;
   }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  // Se o nome ainda é genérico, tenta extrair do ocRef
+  if((!nome||nome==="Vítima") && ocRef){
+    nome = ocRef.vitima_nome||ocRef.nome_vitima||(ocRef.vitimas&&ocRef.vitimas[0]?ocRef.vitimas[0].nome:"")||"Vítima";
+  }
   var dataDossie = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   var html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Dossiê — "+esc(nome)+"</title><style>";
   html += "*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;max-width:720px;margin:40px auto;color:#1a0e00;line-height:1.6;padding:0 20px}";
