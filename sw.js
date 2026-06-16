@@ -1,6 +1,6 @@
 // IARA BCS — Service Worker
 // Atualiza o número de versão a cada novo deploy para forçar refresh nos clientes
-const CACHE_NAME = 'iara-bcs-v65';
+const CACHE_NAME = 'iara-bcs-v66';
 
 // Arquivos essenciais para funcionar offline
 // HTMLs não entram no precache — sempre buscados da rede (nunca ficam presos)

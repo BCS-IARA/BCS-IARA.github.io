@@ -13454,11 +13454,28 @@ window._syncDevolutivas = function(cb) {
   document.head.appendChild(s);
 };
 
+// Resolve o nome limpo da vítima a partir de um encaminhamento
+function _nomeEncLimpo(e){
+  var nome = "";
+  if(e.vitima_id){
+    var vit=(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;});
+    if(vit) nome=vit.nome||"";
+  }
+  if(!nome && e.ocorrencia_id){
+    var oc=(state.db.ocorrencias||[]).find(function(o){return o.id===e.ocorrencia_id;});
+    if(oc) nome=oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||(oc.solicitante?oc.solicitante.nome:"")||"";
+  }
+  if(!nome) nome=e.vitima_nome||"";
+  // Remove sufixos do import antigo: ", sexo Feminino, idade 34 anos,"
+  nome=nome.replace(/,?\s*sexo\s+\w+\s*/i,"").replace(/,?\s*idade\s+\d+\s*anos?\s*/i,"").replace(/,\s*$/,"").trim();
+  return nome||"—";
+}
+
 window._gerarPdfEncaminhamento = function(encId) {
   var e = (state.encaminhamentos||[]).find(function(x){ return x.id===encId; });
   if(!e){ showToast("Encaminhamento não encontrado","error"); return; }
+  var nomeVit = _nomeEncLimpo(e);
   var vit = e.vitima_id ? (state.vitimas||[]).find(function(v){ return v.id===e.vitima_id; }) : null;
-  var nomeVit = vit ? (vit.nome||"—") : (e.vitima_nome||"—");
   // Constrói/recupera token e link do CRAV
   if(!e.token) e.token = "enc_"+e.id+"_"+Date.now();
   var _base = window.location.origin + window.location.pathname.replace("index.html","");
@@ -13877,6 +13894,7 @@ window._salvarTriagem = function(ocId) {
     var encMenor = {
       id:"enc_"+Date.now()+"_ct",
       vitima_id: oc.vitima_id||"",
+      vitima_nome: oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||"",
       ocorrencia_id: ocId,
       tipo:"Conselho Tutelar",
       descricao:"Encaminhamento automático — menor envolvido",
@@ -13895,6 +13913,7 @@ window._salvarTriagem = function(ocId) {
       var enc = {
         id:"enc_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
         vitima_id: oc.vitima_id||"",
+        vitima_nome: oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||"",
         ocorrencia_id: ocId,
         tipo: cb.value,
         descricao:"",
@@ -22345,7 +22364,7 @@ function renderDevolutivas(main){
         h.push("</div>");
         // Link devolutiva
         var _token=e.token||("enc_"+e.id+"_"+Math.random().toString(36).slice(2,8));
-        var _nomeEnc=vit?(vit.nome||""):(e.vitima_nome||"");
+        var _nomeEnc=_nomeEncLimpo(e);
         var _link=window.location.origin+window.location.pathname.replace("index.html","")+"crav-devolutiva.html?enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"")+"&servico="+encodeURIComponent(e.orgao||"crav")+"&nome="+encodeURIComponent(_nomeEnc)+"&token="+_token;
         h.push("<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px'>");
         h.push("<input readonly value='"+esc(_link)+"' style='flex:1;min-width:200px;background:#36221a;border:1px solid #4a3224;color:#8a6a4a;padding:6px 10px;border-radius:6px;font-size:11px;font-family:monospace' onclick='this.select()'/>");
@@ -22435,9 +22454,7 @@ function renderDevolutivas(main){
     e.data_envio = new Date().toISOString().slice(0,10);
     e.status = "aguardando_devolutiva";
     localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
-    var _nomeRenv=(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;});
-    var _nomeRenvStr=_nomeRenv?(_nomeRenv.nome||""):(e.vitima_nome||"");
-    var _link=window.location.origin+window.location.pathname.replace("index.html","")+"crav-devolutiva.html?enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"")+"&servico="+encodeURIComponent(e.orgao||"crav")+"&nome="+encodeURIComponent(_nomeRenvStr)+"&token="+e.token;
+    var _link=window.location.origin+window.location.pathname.replace("index.html","")+"crav-devolutiva.html?enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"")+"&servico="+encodeURIComponent(e.orgao||"crav")+"&nome="+encodeURIComponent(_nomeEncLimpo(e))+"&token="+e.token;
     navigator.clipboard.writeText(_link).then(function(){showToast("Novo link gerado e copiado!","success");}).catch(function(){});
     renderDevolutivas(main);
   };
