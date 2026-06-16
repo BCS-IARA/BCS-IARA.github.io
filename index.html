@@ -13002,10 +13002,11 @@ function renderFilaAuxiliar(main) {
 window._enviarTriagemHist = function(ocId, btn){
   var oc = (state.db.ocorrencias||[]).find(function(o){return o.id===ocId;});
   if(!oc){ showToast("OC não encontrada","error"); return; }
-  oc.situacao = "em_triagem";
+  oc.situacao = "nova";
   oc._autoArquivada = false;
+  oc._reaberta = true; // permite entrar na fila mesmo antes do corte de data
   salvarLocal();
-  _sheetsGet({acao:"atualizarSituacaoOc", id:ocId, situacao:"em_triagem"}).catch(function(){});
+  _sheetsGet({acao:"atualizarSituacaoOc", id:ocId, situacao:"nova"}).catch(function(){});
   showToast("✓ OC enviada para triagem");
   if(btn) btn.closest(".card").style.opacity="0.4";
 };
@@ -13360,12 +13361,12 @@ window._concluirEncFila = function(encId) {
 
 var _CORTE_FILA = "2026-06-15"; // OCs com data até este dia nunca entram na fila
 function _ocNaFila(o){
-  // Só entra na fila se situacao nova E (data ausente/inválida É após o corte)
   if((o.situacao||"nova")!=="nova") return false;
+  if(o._reaberta) return true; // reaberta manualmente → entra sempre
   var s=String(o.data||"").trim();
   var m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   var iso=m?m[3]+"-"+m[2]+"-"+m[1]:(/^\d{4}-\d{2}-\d{2}/.test(s)?s.substring(0,10):null);
-  return iso ? iso > _CORTE_FILA : false; // sem data → não entra
+  return iso ? iso > _CORTE_FILA : false;
 }
 function renderTriagem(main) {
   var ocs = (state.db.ocorrencias||[]);
