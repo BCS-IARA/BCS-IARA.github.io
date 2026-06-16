@@ -12600,11 +12600,12 @@ window._dossieByOcId = function(ocId){
   var oc = (state.db.ocorrencias||[]).find(function(o){return o.id===ocId;});
   if(!oc){ showToast("Ocorrência não encontrada","error"); return; }
   showToast("⏳ Buscando devolutivas...");
+  var nomeVitima = oc.vitima_nome || oc.nome_vitima
+    || (oc.vitimas&&oc.vitimas.length?oc.vitimas[0].nome:"")
+    || (oc.solicitante&&oc.solicitante.nome?oc.solicitante.nome:"")
+    || "";
+
   function _gerarComDados(){
-    var nomeVitima = oc.vitima_nome || oc.nome_vitima
-      || (oc.vitimas&&oc.vitimas.length?oc.vitimas[0].nome:"")
-      || (oc.solicitante&&oc.solicitante.nome?oc.solicitante.nome:"")
-      || "";
     var vitimaId = oc.vitima_id;
     if(!vitimaId && nomeVitima){
       var nomeBusca = nomeVitima.trim().toLowerCase();
@@ -12619,11 +12620,48 @@ window._dossieByOcId = function(ocId){
       _gerarDossieByNome(nomeVitima||"Vítima", ocId);
     }
   }
-  if(typeof _syncDevolutivas === "function"){
-    _syncDevolutivas(function(){ _gerarComDados(); });
-  } else {
-    _gerarComDados();
+
+  // Busca devolutivas_crav por nome da vítima e injeta como encaminhamentos locais
+  function _injetarDevolutivas(cb){
+    var cbN = "_devInj_"+Date.now();
+    var s = document.createElement("script");
+    var done = false;
+    var t = setTimeout(function(){ done=true; s.remove(); delete window[cbN]; cb(); }, 8000);
+    window[cbN] = function(resp){
+      if(done) return; done=true; clearTimeout(t); s.remove(); delete window[cbN];
+      var nomeLower = nomeVitima.trim().toLowerCase();
+      var devs = (resp && resp.registros) || [];
+      var injetados = 0;
+      if(!state.encaminhamentos) state.encaminhamentos = [];
+      var existentes = new Set(state.encaminhamentos.map(function(e){ return e.id; }));
+      devs.forEach(function(dev){
+        if((dev.nome||"").toLowerCase().indexOf(nomeLower)<0) return;
+        var encId = dev.encaminhamentoId || dev.id;
+        if(!encId || existentes.has(encId)) return;
+        state.encaminhamentos.push({
+          id: encId,
+          vitima_nome: dev.nome || nomeVitima,
+          ocorrencia_id: ocId,
+          orgao: dev.orgao || dev.servico || "CRAV",
+          tipo: dev.orgao || dev.servico || "CRAV",
+          descricao: dev.tiposTexto || "",
+          data: dev.data || new Date().toISOString().slice(0,10),
+          status: "concluido",
+          relato_devolutiva: (dev.tiposTexto||"") + (dev.situacao ? " — "+dev.situacao : "") + (dev.observacoes ? "\n\nObs: "+dev.observacoes : ""),
+          data_devolutiva: dev.data || "",
+          responsavel_devolutiva: (dev.tecnica||"") + (dev.funcao ? " ("+dev.funcao+")" : "")
+        });
+        existentes.add(encId);
+        injetados++;
+      });
+      if(injetados) localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
+      cb();
+    };
+    s.src = SHEETS_URL+"?acao=listar&tipo=devolutivas_crav&token="+BCS_TOKEN+"&callback="+cbN;
+    document.head.appendChild(s);
   }
+
+  _injetarDevolutivas(function(){ _gerarComDados(); });
 };
 
 window._gerarDossieByNome = function(nomeVitima, ocIdRef){
