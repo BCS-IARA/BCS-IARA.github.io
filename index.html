@@ -13386,32 +13386,50 @@ function renderFilaEncaminhamentos(main) {
     var hoje_str = hoje();
     pendentes.forEach(function(e){
       var atrasado = e.prazo && e.prazo < hoje_str;
+      var aguardando = e.status === "aguardando_devolutiva";
       var nomeVit = _nomeEncLimpo(e);
-      if(nomeVit==="—") nomeVit="Vítima não vinculada";
-      h += "<div class='card' style='margin-bottom:10px;border-left:4px solid "+(atrasado?"var(--verm)":"var(--ambar)")+";padding:12px 16px'>";
-      h += "<div style='display:flex;align-items:flex-start;gap:12px'>";
-      h += "<div style='flex:1'>";
-      if(atrasado) h += "<span style='background:var(--verm);color:#fff;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:900;margin-bottom:6px;display:inline-block'>ATRASADO</span> ";
-      h += "<p style='font-size:13px;font-weight:700;color:var(--tinta);margin:0 0 3px'>"+esc(e.tipo||"Encaminhamento")+"</p>";
-      h += "<p style='font-size:12px;color:var(--tinta-2);margin:0 0 4px'>👤 "+esc(nomeVit)+"</p>";
-      if(e.descricao) h += "<p style='font-size:12px;color:var(--tinta-2);margin:0 0 4px'>"+esc(e.descricao)+"</p>";
-      h += "<p style='font-size:11px;color:var(--tinta-2);margin:0'>"+esc(e.data||"—")+(e.prazo?" · prazo: <b style='color:"+(atrasado?"var(--verm)":"var(--tinta)")+"'>"+esc(e.prazo)+"</b>":"")+"</p>";
+      var semVitima = nomeVit === "—";
+      var corBorda = atrasado ? "var(--verm)" : aguardando ? "#4a9fd4" : "var(--ambar)";
+
+      h += "<div style='background:var(--papel);border:1px solid var(--papel-3);border-left:4px solid "+corBorda+";border-radius:10px;margin-bottom:10px;padding:14px 16px'>";
+
+      // Linha 1 — tipo + status badge
+      h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap'>";
+      h += "<span style='font-size:13px;font-weight:800;color:var(--tinta)'>"+esc(e.tipo||"Encaminhamento")+"</span>";
+      if(atrasado)    h += "<span style='background:var(--verm);color:#fff;border-radius:4px;padding:1px 8px;font-size:10px;font-weight:900'>ATRASADO</span>";
+      else if(aguardando) h += "<span style='background:#1a3a5a;color:#4a9fd4;border-radius:4px;padding:1px 8px;font-size:10px;font-weight:700'>⏳ Aguardando devolutiva</span>";
+      else h += "<span style='background:#2a1c00;color:var(--ambar);border-radius:4px;padding:1px 8px;font-size:10px;font-weight:700'>Pendente</span>";
       h += "</div>";
-      h += "<div style='display:flex;flex-direction:column;gap:6px;flex-shrink:0'>";
+
+      // Linha 2 — nome da vítima em destaque
+      if(!semVitima){
+        h += "<p style='font-size:14px;font-weight:700;color:#d4a87a;margin:0 0 6px'>👤 "+esc(nomeVit)+"</p>";
+      } else {
+        h += "<p style='font-size:12px;color:var(--tinta-2);margin:0 0 6px;font-style:italic'>Vítima não identificada</p>";
+      }
+
+      // Linha 3 — meta (data · prazo)
+      h += "<p style='font-size:11px;color:var(--tinta-2);margin:0 0 10px'>"+esc(e.data||"—");
+      if(e.prazo) h += " · prazo: <strong style='color:"+(atrasado?"var(--verm)":"var(--tinta)")+"'>"+esc(e.prazo)+"</strong>";
+      if(e.descricao) h += " · "+esc(e.descricao.substring(0,60))+(e.descricao.length>60?"…":"");
+      h += "</p>";
+
+      // Linha 4 — ações
+      h += "<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center'>";
+      h += "<button onclick='_gerarPdfEncaminhamento(\""+esc(e.id)+"\")' style='background:#1a0e00;border:1px solid #c8860a;color:#e8a020;padding:6px 14px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer'>📄 Ofício + Dossiê</button>";
+      if(aguardando){
+        h += "<button onclick='_concluirEncFila(\""+esc(e.id)+"\")' style='background:var(--verde);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer'>✓ Concluir</button>";
+      } else {
+        h += "<button onclick='_concluirEncFila(\""+esc(e.id)+"\")' style='background:var(--ambar);color:var(--madeira-3);border:none;border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer'>📤 Marcar enviado</button>";
+      }
       if(e.vitima_id){
-        h += "<button onclick='setTela(\"vitima\");state._vitimaAtual=\""+esc(e.vitima_id)+"\";render()' style='background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>Ver ficha</button>";
+        h += "<button onclick='setTela(\"vitima\");state._vitimaAtual=\""+esc(e.vitima_id)+"\";render()' style='background:var(--papel-2);border:1px solid var(--papel-3);color:var(--tinta-2);padding:6px 12px;border-radius:7px;font-size:11px;cursor:pointer'>Ver ficha</button>";
       } else {
-        h += "<button onclick='_vincularVitimaEnc(\""+esc(e.id)+"\")' style='background:#1a0e00;border:1px dashed #c8860a;color:#c8860a;padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>🔗 Vincular vítima</button>";
-      }
-      h += "<button onclick='_gerarPdfEncaminhamento(\""+esc(e.id)+"\")' style='background:#1a0e00;border:1px solid #c8860a;color:#e8a020;padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer'>📄 Ofício</button>";
-      if(e.status==="aguardando_devolutiva"){
-        h += "<span style='background:#1a3a5a;color:#4a9fd4;border-radius:5px;padding:4px 10px;font-size:10px;font-weight:700'>⏳ Aguard. devolutiva</span>";
-        h += "<button onclick='_concluirEncFila(\""+esc(e.id)+"\")' style='background:var(--verde);color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer'>✓ Concluir</button>";
-      } else {
-        h += "<button onclick='_concluirEncFila(\""+esc(e.id)+"\")' style='background:var(--ambar);color:var(--madeira-3);border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer'>📤 Marcar enviado</button>";
+        h += "<button onclick='_vincularVitimaEnc(\""+esc(e.id)+"\")' style='background:transparent;border:1px dashed var(--tinta-2);color:var(--tinta-2);padding:6px 12px;border-radius:7px;font-size:10px;cursor:pointer'>🔗 Vincular vítima</button>";
       }
       h += "</div>";
-      h += "</div></div>";
+
+      h += "</div>";
     });
   }
 
