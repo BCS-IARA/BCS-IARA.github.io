@@ -1211,7 +1211,7 @@ async function carregarDoSheets() {
     await carregarDadosAppDoSheets();
     // Re-renderizar telas que dependem dos dados carregados
     var mRe=document.getElementById("main");
-    if(mRe&&(state.tela==="projetos"||state.tela==="dashprojetos"||state.tela==="calendario"||state.tela==="escolas"||state.tela==="dashvcm")) renderTela();
+    if(mRe&&(state.tela==="projetos"||state.tela==="dashprojetos"||state.tela==="calendario"||state.tela==="escolas")) renderTela();
     // Atualizar calendário diretamente se estiver visível
     if(state.tela==="calendario" && document.getElementById("cal-container")) renderCalendar();
 
@@ -4105,7 +4105,6 @@ function _renderCentralBar(main, abaAtiva){
   var _nTriar=(state.db.ocorrencias||[]).filter(_ocNaFila).length;
   var _fridas=state.db.frida||[];
   var _hoje=hoje();
-  var _nVcmUrg=(state.db.ocorrencias||[]).filter(function(o){
     if(!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")))return false;
     var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;}).sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;});
     var _uf=_fs[0];
@@ -4115,8 +4114,6 @@ function _renderCentralBar(main, abaAtiva){
   var abas=[
     {k:"fila_auxiliar",icon:"📋",label:"Fila do Dia",badge:0,fn:function(){setTela("fila_auxiliar");}},
     {k:"triagem",icon:"🔍",label:"Triagem",badge:_nTriar,cor:"#ef4444",fn:function(){setTela("triagem");}},
-    {k:"dashvcm",icon:"🛡",label:"VCM",badge:_nVcmUrg,cor:"#a03050",fn:function(){setTela("dashvcm");}},
-    {k:"cadastrosvcm",icon:"💜",label:"Atendimentos",badge:0,fn:function(){setTela("cadastrosvcm");}},
     {k:"devolutivas",icon:"↩",label:"Devolutivas",badge:_nDev,cor:"#22c55e",fn:function(){setTela("devolutivas");}}
   ];
   var bar=document.createElement("div");
@@ -4353,7 +4350,7 @@ function renderDashboardVCM(main){
   h+="</tbody></table></div></div></div>";
 
   main.innerHTML=h;
-  _renderCentralBar(main,"dashvcm");
+  _renderCentralBar(main,"vcm");
 
   // Base: todas as VCM dos bairros BCS
   var ocsBase=(state.db.ocorrencias||[]).filter(function(o){
@@ -5107,7 +5104,6 @@ function renderDashComandante(main){
     h.push("</div>");
     h.push("<div style='display:flex;gap:8px;flex-wrap:wrap'>");
     h.push(_badge("Para Triar",_triNum,_triTxt,_novas===0?"todas triadas":"novas — aguardam triagem",5,"triagem"));
-    h.push(_badge("FRIDA Nível E",_fridaE,_fridaE,_fridaE===0?"sem casos urgentes":"casos urgentes",3,"dashvcm"));
     h.push(_badge("Proj. Críticos",_projCrit,_projCrit,_projCrit===0?"todos em dia":"requerem atenção",1,"projetos"));
     h.push(_badge("Calendário",_calVenc,_calVenc,_calVenc===0?"tudo em dia":"eventos vencidos",3,"calendario"));
     h.push("</div>");
@@ -5260,7 +5256,7 @@ function renderDashComandante(main){
       _fridaECasos.slice(0,5).forEach(function(f){
         var oc=ocs.find(function(o){return o.id===f.ocorrenciaId||o.id===f.oc_id;});
         var diasAtras=f.data?Math.floor((Date.now()-new Date(f.data).getTime())/864e5):null;
-        h.push("<div onclick=\"state.tela='dashvcm';render()\" style='background:#1a0000;border:1px solid #ef444444;border-left:3px solid #ef4444;border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:12px'>");
+        h.push("<div onclick=\"\" style='background:#1a0000;border:1px solid #ef444444;border-left:3px solid #ef4444;border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:12px'>");
         h.push("<span style='font-size:16px'>🔴</span>");
         h.push("<div style='flex:1'>");
         h.push("<p style='color:#f5ede0;font-size:12px;font-weight:700;margin:0'>"+esc(f.vitimaNome||(oc&&oc.vitima_nome)||"—")+"</p>");
@@ -5269,7 +5265,6 @@ function renderDashComandante(main){
         h.push("<span style='background:#ef444422;color:#ef4444;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;white-space:nowrap'>Nível E</span>");
         h.push("</div>");
       });
-      if(_fridaECasos.length>5) h.push("<p style='color:#5e4636;font-size:11px;text-align:center;margin:4px 0 0'>+"+(_fridaECasos.length-5)+" mais — <button onclick=\"state.tela='dashvcm';render()\" style='background:none;border:none;color:#d4a87a;cursor:pointer;font-size:11px;font-weight:700;padding:0'>ver todos ↗</button></p>");
       h.push("</div>");
     }
     h.push("</div>");
@@ -12235,7 +12230,7 @@ async function gerarBriefingDiario(forcar){
   var _bairros={};ocs.filter(function(o){var d=o.data||"";return d.slice(0,7)===hoje().slice(0,7);}).forEach(function(o){if(o.bairro)_bairros[o.bairro]=(_bairros[o.bairro]||0)+1;});
   var _topBairro=Object.entries(_bairros).sort(function(a,b){return b[1]-a[1];}).slice(0,2).map(function(e){return e[0]+"("+e[1]+")";}).join(", ")||"sem dados";
 
-  var prompt="Você é assessor de segurança pública. Analise os dados e responda com um JSON com exatamente 4 cards, cada um com: semaforo ('vermelho','ambar','verde'), pergunta (string curta), dados (frase de 1-2 linhas com os dados), acao (ação específica, 1 linha), link (string: 'triagem','dashvcm','projetos', ou null).\n\nDados:\n- Sem triagem: "+_novas+"\n- FRIDA nível E: "+_vdE+"\n- Projetos críticos: "+_projCrit+"\n- Top bairros este mês: "+_topBairro+"\n\nCards esperados: 1) Onde concentrar patrulhamento? 2) O que está em risco imediato (VCM)? 3) O que está fora da meta? 4) O que está evoluindo bem?\n\nResponda APENAS o JSON, sem markdown.";
+  var prompt="Você é assessor de segurança pública. Analise os dados e responda com um JSON com exatamente 4 cards, cada um com: semaforo ('vermelho','ambar','verde'), pergunta (string curta), dados (frase de 1-2 linhas com os dados), acao (ação específica, 1 linha), link (string: 'triagem','encaminhamentos','projetos', ou null).\n\nDados:\n- Sem triagem: "+_novas+"\n- FRIDA nível E: "+_vdE+"\n- Projetos críticos: "+_projCrit+"\n- Top bairros este mês: "+_topBairro+"\n\nCards esperados: 1) Onde concentrar patrulhamento? 2) O que está em risco imediato (VCM)? 3) O que está fora da meta? 4) O que está evoluindo bem?\n\nResponda APENAS o JSON, sem markdown.";
 
   try{
     var r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,messages:[{role:"user",content:prompt}]})});
@@ -12875,7 +12870,6 @@ function renderFilaAuxiliar(main) {
     h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px'>";
     h += "<p style='font-size:10px;font-weight:700;color:#c04080;text-transform:uppercase;letter-spacing:.8px;margin:0'>🌸 FRIDAs Incompletos</p>";
     h += "<span style='background:#ff69b4;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:900'>"+fridaInc.length+"</span>";
-    h += "<button onclick='setTela(\"dashvcm\")' style='margin-left:auto;background:transparent;border:1px solid #ff69b4;color:#c04080;border-radius:5px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer'>Ver VCM →</button>";
     h += "</div>";
     h += "<p style='font-size:12px;color:var(--tinta-2);margin:0'>"+fridaInc.length+" avaliação(ões) sem nível registrado — abrir Monitor VCM para completar.</p>";
     h += "</div>";
@@ -12904,7 +12898,6 @@ function renderFilaDia(main) {
   var abas = [
     {k:"triagem",       label:"Triagem",          badge:_nTri,  cor:"var(--verm)"},
     {k:"agenda",        label:"Fila do Dia",       badge:0,      cor:"var(--ambar)"},
-    {k:"vcm",           label:"VCM",               badge:_nVcm,  cor:"#a03050"},
     {k:"encaminhamentos",label:"Encaminhamentos",  badge:_nEnc,  cor:"var(--ambar)"},
     {k:"devolutivas",   label:"Devolutivas",       badge:_nDev,  cor:"var(--verde)"}
   ];
@@ -14764,7 +14757,6 @@ function renderTela() {
   if(tela==="triagem"){ state._filaTab="triagem"; state.tela="fila_auxiliar"; tela="fila_auxiliar"; }
   if(tela==="encaminhamentos"){ state._filaTab="encaminhamentos"; state.tela="fila_auxiliar"; tela="fila_auxiliar"; }
   if(tela==="devolutivas"){ state._filaTab="devolutivas"; state.tela="fila_auxiliar"; tela="fila_auxiliar"; }
-  if(tela==="dashvcm"){ state._filaTab="vcm"; state.tela="fila_auxiliar"; tela="fila_auxiliar"; }
 
   if(tela==="fila_auxiliar"){
     renderFilaDia(main);
@@ -14933,21 +14925,8 @@ function renderTela() {
   }
 
   // DASHBOARD VCM
-  if(tela==="dashvcm"){
-    renderDashboardVCM(main);
-    return;
-  }
 
-  // CADASTROS VCM
-  if(tela==="cadastrosvcm"){
-    renderCadastrosVCM(main);
-    return;
-  }
 
-  // ASSISTENTE IA
-  if(tela==="assistente"){
-    renderAssistenteIA(main);
-    return;
   }
 
   // ══════════════════════════════════════════════════
@@ -15174,39 +15153,11 @@ function abrirPrioridades(){
   // VCM sem monitoramento
   if(ocsVCM.length){
     h.push("<div style='border:1px solid #ff149344;border-radius:10px;overflow:hidden'>");
-    h.push("<div style='background:#1a0810;padding:9px 14px;display:flex;align-items:center;justify-content:space-between'><span style='color:#ff69b4;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px'>💜 VCM Sem Monitoramento Adequado ("+ocsVCM.length+")</span><button onclick=\"this.closest('div[style*=fixed]').remove();setTela('dashvcm')\" style='background:none;border:none;color:#ff69b4;font-size:10px;cursor:pointer;font-weight:600'>Dashboard VCM →</button></div>");
-    ocsVCM.slice(0,5).forEach(function(o){var _fs=_fridas.filter(function(f){return f.ocorrenciaId===o.id;});var _uf=_fs.sort(function(a,b){return(b.data||"")>(a.data||"")?1:-1;})[0];var _status=!_uf?"Sem avaliação FRIDA":_uf.nivel==="E"?"FRIDA Elevado":"FRIDA Médio +30d";h.push("<div style='padding:9px 14px;border-top:1px solid #2a1020;display:flex;align-items:center;gap:8px'><div style='flex:1;min-width:0'><p style='color:#f5ede0;font-size:12px;font-weight:600;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+esc(o.vitima_nome||"—")+"</p><p style='color:#7a3a60;font-size:10px;margin:2px 0 0'>"+esc(o.tipo||"")+" · "+fmtData(o.data)+"</p></div><span style='background:#ff149322;color:#ff69b4;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap'>"+_status+"</span></div>");});
-    h.push("</div>");
-  }
 
-  if(!ocsGraves.length&&!pends.length&&!ocsVisita.length&&!ocsVCM.length){
-    h.push("<div style='text-align:center;padding:30px;color:#5e4636'><div style='font-size:32px;margin-bottom:10px'>✅</div><p style='font-size:14px;font-weight:600;color:#8a6a4a;margin:0'>Nenhuma prioridade no momento</p></div>");
-  }
 
-  h.push("</div></div>");
-  m.innerHTML=h.join("");
-  document.body.appendChild(m);
-}
 
-function abrirFormAgend(){ document.getElementById("form-agend")?.classList.remove("hidden"); setTimeout(renderConceito,50); }
-function abrirFormVisita(){ document.getElementById("form-visita")?.classList.remove("hidden"); }
 
-function renderConceito(){
-  const t=document.getElementById("ag-tipo")?.value;
-  const d=document.getElementById("ag-conceito");
-  if(d&&t) d.innerHTML=CONCEITO_VISITA[t]||"";
-}
 
-function salvarAtend(){
-  const nome=document.getElementById("at-nome")?.value?.trim();
-  if(!nome){showToast("Informe o nome","error");return;}
-  const reg={id:id("AT"),criadoEm:new Date().toISOString(),data:document.getElementById("at-data").value,hora:document.getElementById("at-hora").value,nome,telefone:document.getElementById("at-tel").value,tipo:document.getElementById("at-tipo").value,descricao:document.getElementById("at-desc").value,encaminhamento:document.getElementById("at-encam").value};
-  state.db.atendimentos.unshift(reg);
-  enviarSheets("atendimentos",reg);
-  salvarLocal();
-  showToast("Atendimento registrado!");
-  render();
-}
 
 function salvarAgend(){
   const nome=document.getElementById("ag-nome")?.value?.trim();
@@ -19321,7 +19272,6 @@ function renderOcorrenciasGestor(el, perfil_atual){
   h.push("<div style='display:flex;gap:8px;margin-bottom:10px;align-items:center'>");
   h.push("<input id='oc-busca' type='text' placeholder='🔍 Filtrar por nome, Nº, bairro, tipo, suspeito...' value='"+(state.filtroOcBusca||"")+"' style='flex:1;background:#2a1c10;border:1px solid #2a3818;color:#f2eada;padding:10px 13px;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none'/>");
   var _nEncPend=(state.encaminhamentos||[]).filter(function(e){return e.vcm&&e.status==="pendente";}).length;
-  h.push("<button onclick=\"state.vcmTab='encaminhamentos';setTela('dashvcm')\" style='flex-shrink:0;background:linear-gradient(135deg,#3a0a18,#5a1020);border:2px solid #ff1493;color:#ffb3c8;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px'>📤 Encaminhamentos"+(_nEncPend>0?" <span style='background:#ff1493;color:#fff;border-radius:10px;padding:0px 6px;font-size:11px'>"+_nEncPend+"</span>":"")+"</button>");
   h.push("</div>");
 
   // Filtrar por período
@@ -19781,7 +19731,6 @@ function _vcmEncaminhar(ocId, servico){
   // Re-renderiza a tela atual para atualizar badges e contadores
   var _mainEl=document.getElementById("main-content")||document.getElementById("main");
   if(_mainEl){
-    if(state.tela==="dashvcm") renderDashboardVCM(_mainEl);
     else if(state.tela==="ocorrencias") renderOcorrenciasGestor(_mainEl, state._ocPerfil);
   }
 }
