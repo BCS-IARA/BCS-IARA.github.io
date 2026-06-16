@@ -12641,16 +12641,20 @@ window._dossieByOcId = function(ocId){
         if(!devNomeLower||(!devNomeLower.includes(nomeLower)&&!nomeLower.includes(devNomeLower))) return;
         var encId = dev.encaminhamentoId || dev.id;
         if(!encId || existentes.has(encId)) return;
+        var _nomeEnc = dev.nome || nomeVitima;
+        var _relatoEnc = (dev.tiposTexto||"") + (dev.situacao ? " — "+dev.situacao : "") + (dev.observacoes ? "\n\nObs: "+dev.observacoes : "");
         state.encaminhamentos.push({
           id: encId,
-          vitima_nome: dev.nome || nomeVitima,
+          nome: _nomeEnc,
+          vitima_nome: _nomeEnc,
           ocorrencia_id: ocId,
+          ocorrenciaId: ocId,
           orgao: dev.orgao || dev.servico || "CRAV",
           tipo: dev.orgao || dev.servico || "CRAV",
           descricao: dev.tiposTexto || "",
           data: dev.data || new Date().toISOString().slice(0,10),
           status: "concluido",
-          relato_devolutiva: (dev.tiposTexto||"") + (dev.situacao ? " — "+dev.situacao : "") + (dev.observacoes ? "\n\nObs: "+dev.observacoes : ""),
+          relato_devolutiva: _relatoEnc,
           data_devolutiva: dev.data || "",
           responsavel_devolutiva: (dev.tecnica||"") + (dev.funcao ? " ("+dev.funcao+")" : "")
         });
