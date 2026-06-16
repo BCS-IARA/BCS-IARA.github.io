@@ -12827,7 +12827,8 @@ function renderHistoricoAtendimento(main) {
       descricao:o.narrativa||o.descricao||'',
       bairro:o.bairro||'',
       status:_sitLabel[sit]||sit,
-      cor:_sitCor[sit]||'var(--tinta-2)'
+      cor:_sitCor[sit]||'var(--tinta-2)',
+      _raw: o
     });
   });
 
@@ -12903,7 +12904,29 @@ function renderHistoricoAtendimento(main) {
 
   var filtrados = registros.filter(function(r){
     if(!busca) return true;
-    return (r.titulo+' '+(r.tipoOc||'')+' '+(r.nome||'')+' '+(r.subtitulo||'')+' '+(r.descricao||'')+' '+(r.bairro||'')+' '+(r.data||'')+' '+(r.hora||'')+' '+(r.status||'')).toLowerCase().indexOf(busca)>=0;
+    // Para ocorrências: mesma lógica completa do módulo Ocorrências
+    if(r.tipo==='ocorrencia' && r._raw){
+      var o=r._raw;
+      if((o.tipo||'').toLowerCase().includes(busca)) return true;
+      if((o.bairro||'').toLowerCase().includes(busca)) return true;
+      if((o.local||'').toLowerCase().includes(busca)) return true;
+      if((o.numero||'').toLowerCase().includes(busca)) return true;
+      if((o.relatorio||'').toLowerCase().includes(busca)) return true;
+      if((o.vitima_nome||'').toLowerCase().includes(busca)) return true;
+      if((o.suspeito_nome||'').toLowerCase().includes(busca)) return true;
+      if((o.suspeito_apelido||'').toLowerCase().includes(busca)) return true;
+      if((o.veiculo||'').toLowerCase().includes(busca)) return true;
+      if((o.policiais||'').toLowerCase().includes(busca)) return true;
+      if((o.descricao||'').toLowerCase().includes(busca)) return true;
+      if((o.descricao_dinamica||'').toLowerCase().includes(busca)) return true;
+      if((o.narrativa||'').toLowerCase().includes(busca)) return true;
+      if((o.texto_original||'').slice(0,600).toLowerCase().includes(busca)) return true;
+      if((o.vitimas||[]).some(function(v){return (v.nome||'').toLowerCase().includes(busca);})) return true;
+      if((o.autores||[]).some(function(a){return (a.nome||'').toLowerCase().includes(busca);})) return true;
+      return false;
+    }
+    // Demais tipos: busca nos campos do card
+    return (r.titulo+' '+(r.tipoOc||'')+' '+(r.nome||'')+' '+(r.descricao||'')+' '+(r.bairro||'')+' '+(r.data||'')+' '+(r.hora||'')+' '+(r.status||'')).toLowerCase().indexOf(busca)>=0;
   });
 
   if(tipoFiltro) filtrados = filtrados.filter(function(r){return r.tipo===tipoFiltro;});
