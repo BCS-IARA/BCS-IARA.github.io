@@ -12810,16 +12810,21 @@ function renderHistoricoAtendimento(main) {
 
   var registros = [];
 
-  // Ocorrencias encerradas
+  // Todas as ocorrencias que ja foram atendidas (situacao != "nova")
+  var _sitLabel = {em_triagem:'Em triagem', em_acompanhamento:'Acompanhamento', encerrada:'Encerrada', historico:'Hist\u00f3rico'};
+  var _sitCor   = {em_triagem:'var(--ambar)', em_acompanhamento:'var(--azul)', encerrada:'var(--tinta-2)', historico:'var(--verde)'};
   (state.db.ocorrencias||[]).forEach(function(o){
-    if(!(o.status==='encerrada'||o.status==='encerrado'||o.encerrada)) return;
+    var sit = o.situacao||o.status||'nova';
+    if(sit==='nova') return; // ainda nao atendida
     registros.push({
       tipo:'ocorrencia', icone:'\u{1F4CB}',
       data:o.data||'',
       titulo:'OC #'+(o.numero||o.id||'')+(o.tipo?' \u2014 '+o.tipo:''),
       subtitulo:o.nome_vitima||o.envolvidos||'',
       descricao:o.narrativa||o.descricao||'',
-      bairro:o.bairro||'', status:o.status||'encerrada', cor:'var(--tinta-2)'
+      bairro:o.bairro||'',
+      status:_sitLabel[sit]||sit,
+      cor:_sitCor[sit]||'var(--tinta-2)'
     });
   });
 
