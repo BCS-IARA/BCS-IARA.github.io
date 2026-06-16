@@ -12972,29 +12972,33 @@ function renderHistoricoAtendimento(main) {
   } else {
     filtrados.forEach(function(r){
       var dFmt=(r.data||'').substring(0,10);
+      // Formatar data DD/MM/AAAA
+      var dMostrar = dFmt;
+      if(/^\d{4}-\d{2}-\d{2}$/.test(dFmt)) dMostrar = dFmt.substring(8,10)+'/'+dFmt.substring(5,7)+'/'+dFmt.substring(0,4);
       var _clicavel = r.tipo==='ocorrencia'&&r.id;
       var _onclick = _clicavel ? "onclick=\"state.popEditarOc='"+r.id+"';state.tela='ocorrencias';renderOcorrenciasGestor(document.getElementById('main'))\"" : "";
-      h += "<div class='card' "+_onclick+" style='margin-bottom:10px;padding:14px 16px;border-left:3px solid "+r.cor+";cursor:"+(_clicavel?'pointer':'default')+"'>";
+      h += "<div class='card' "+_onclick+" style='margin-bottom:8px;padding:12px 16px;border-left:4px solid "+r.cor+";cursor:"+(_clicavel?'pointer':'default')+"'>";
       h += "<div style='display:flex;align-items:flex-start;gap:10px'>";
-      h += "<span style='font-size:18px;flex-shrink:0;margin-top:2px'>"+r.icone+"</span>";
+      h += "<span style='font-size:16px;flex-shrink:0;margin-top:2px'>"+r.icone+"</span>";
       h += "<div style='flex:1;min-width:0'>";
 
-      // Linha 1: n\u00famero/t\u00edtulo + tipo de ocorr\u00eancia
-      h += "<div style='display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px'>";
-      h += "<span style='font-size:13px;font-weight:800;color:var(--tinta)'>"+esc(r.titulo)+"</span>";
-      if(r.tipoOc) h += "<span style='font-size:11px;font-weight:600;color:var(--tinta-2);text-transform:uppercase;letter-spacing:0.3px'>"+esc(r.tipoOc)+"</span>";
+      // Linha 1: tipo em destaque (o que importa) + status badge \u00e0 direita
+      h += "<div style='display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px'>";
+      h += "<span style='font-size:13px;font-weight:800;color:var(--tinta);text-transform:uppercase;letter-spacing:0.3px'>"+esc(r.tipoOc||r.titulo)+"</span>";
+      h += "<span style='font-size:10px;background:var(--papel-3);color:var(--tinta-2);border-radius:10px;padding:2px 9px;white-space:nowrap;flex-shrink:0'>"+esc(r.status)+"</span>";
       h += "</div>";
 
-      // Linha 2: nome da pessoa em destaque
-      var nomePessoa = r.nome || r.subtitulo || '';
-      if(nomePessoa) h += "<div style='font-size:13px;font-weight:700;color:var(--ambar);margin-bottom:5px'>\ud83d\udc64 "+esc(nomePessoa)+"</div>";
+      // Linha 2: nome da pessoa
+      var nomePessoa = r.nome||'';
+      if(nomePessoa) h += "<div style='font-size:12px;font-weight:700;color:var(--ambar);margin-bottom:5px'>\ud83d\udc64 "+esc(nomePessoa)+"</div>";
 
-      // Linha 3: data, hora, bairro, status
-      h += "<div style='display:flex;gap:10px;flex-wrap:wrap;align-items:center'>";
-      if(dFmt) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udcc5 "+esc(dFmt)+"</span>";
+      // Linha 3: n\u00famero (secund\u00e1rio) + data + hora + bairro
+      h += "<div style='display:flex;gap:12px;flex-wrap:wrap;align-items:center'>";
+      if(r._raw&&r._raw.numero) h += "<span style='font-size:11px;color:var(--tinta-3);font-weight:600'>N\u00ba "+esc(r._raw.numero)+"</span>";
+      else if(r.titulo&&r.tipo==='ocorrencia') h += "<span style='font-size:11px;color:var(--tinta-3)'>"+esc(r.titulo)+"</span>";
+      if(dMostrar) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udcc5 "+esc(dMostrar)+"</span>";
       if(r.hora) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udd50 "+esc(r.hora)+"</span>";
       if(r.bairro) h += "<span style='font-size:11px;color:var(--tinta-3)'>\ud83d\udccd "+esc(r.bairro)+"</span>";
-      h += "<span style='font-size:10px;background:var(--papel-3);color:var(--tinta-2);border-radius:10px;padding:1px 7px'>"+esc(r.status)+"</span>";
       h += "</div>";
 
       h += "</div></div></div>";
