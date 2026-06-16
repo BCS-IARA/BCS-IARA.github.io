@@ -21972,11 +21972,21 @@ function renderInventario(main){
     h+="<option value=''>Todos estados</option>";
     Object.keys(INV_ESTADOS).forEach(function(k){h+="<option value='"+k+"'"+(filtEst===k?" selected":"")+">"+INV_ESTADOS[k].label+"</option>";});
     h+="</select>";
+    var filtLoc=state._invFiltLoc||"";
+    var _locsUsadas=[];var _locsSet={};
+    (itens).forEach(function(x){var l=x.localizacao||"";if(l&&!_locsSet[l]){_locsSet[l]=1;_locsUsadas.push(l);}});
+    _locsUsadas.sort();
+    h+="<select onchange='state._invFiltLoc=this.value;_invAplicarFiltros()' style='background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:7px;font-size:13px'>";
+    h+="<option value=''>Todas as seções</option>";
+    _locsUsadas.forEach(function(l){h+="<option value='"+esc(l)+"'"+(filtLoc===l?" selected":"")+">"+esc(l)+"</option>";});
+    h+="</select>";
     h+="</div>";
 
+    var filtLoc=state._invFiltLoc||"";
     var filtered=itens.filter(function(x){
       if(filtCat && x.categoria!==filtCat) return false;
       if(filtEst && x.estado!==filtEst) return false;
+      if(filtLoc && (x.localizacao||"")!==filtLoc) return false;
       if(filtBusca){
         var hay=(x.descricao||"")+" "+(x.tombamento||"")+" "+(x.marca||"")+" "+(x.modelo||"")+" "+(x.localizacao||"");
         if(hay.toLowerCase().indexOf(filtBusca)<0) return false;
