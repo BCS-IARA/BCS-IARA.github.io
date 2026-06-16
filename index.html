@@ -12999,6 +12999,17 @@ function renderFilaAuxiliar(main) {
   _renderCentralBar(main,"fila_auxiliar");
 }
 
+window._enviarTriagemHist = function(ocId, btn){
+  var oc = (state.db.ocorrencias||[]).find(function(o){return o.id===ocId;});
+  if(!oc){ showToast("OC não encontrada","error"); return; }
+  oc.situacao = "em_triagem";
+  oc._autoArquivada = false;
+  salvarLocal();
+  _sheetsGet({acao:"atualizarSituacaoOc", id:ocId, situacao:"em_triagem"}).catch(function(){});
+  showToast("✓ OC enviada para triagem");
+  if(btn) btn.closest(".card").style.opacity="0.4";
+};
+
 function renderHistoricoAtendimento(main) {
   var busca = (state._histBusca||'').toLowerCase().trim();
   var filtroPeriodo = state._histPeriodo||'';
@@ -13198,9 +13209,10 @@ function renderHistoricoAtendimento(main) {
 
       // Botões Editar e Dossiê (apenas para OCs)
       if(r.tipo==='ocorrencia'&&r.id){
-        h += "<div style='display:flex;gap:6px;margin-top:8px'>";
+        h += "<div style='display:flex;gap:6px;margin-top:8px;flex-wrap:wrap'>";
         h += "<button onclick='event.stopPropagation();state.popEditarOc=\""+r.id+"\";state.tela=\"ocorrencias\";renderOcorrenciasGestor(document.getElementById(\"main\"))' style='background:#1a1a2a;border:1px solid #4a5a7a;color:#8a9aba;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>✏ Editar</button>";
         h += "<button onclick='event.stopPropagation();_dossieByOcId(\""+r.id+"\")' style='background:#1a0e00;border:1px solid #c8860a;color:#e8a020;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>📄 Dossiê</button>";
+        h += "<button onclick='event.stopPropagation();_enviarTriagemHist(\""+r.id+"\",this)' style='background:#0a1a0a;border:1px solid #22c55e;color:#4ade80;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer'>↩ Enviar à Triagem</button>";
         h += "</div>";
       }
 
