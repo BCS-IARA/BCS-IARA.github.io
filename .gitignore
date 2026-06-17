@@ -1,0 +1,7 @@
+.claude/worktrees/
+BCS_inventario.csv
+BCS_inventario_importacao.json
+*.pdf
+adicionar_armas.py
+gerar_csv_inventario.py
+gerar_inventario.py
