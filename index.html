@@ -11077,6 +11077,43 @@ function _migrarTrilhoAparaB() {
   setTela("config");
 }
 
+window._reenviarInventarioSheets = function(){
+  var itens = state.invItens||[];
+  if(!itens.length){ showToast("Nenhum item no inventário local"); return; }
+  showToast("⏳ Enviando "+itens.length+" item(s) ao Sheets...");
+  var i=0;
+  function _next(){
+    if(i>=itens.length){ showToast("✅ "+itens.length+" item(s) enviado(s) ao Sheets"); return; }
+    _invEnviarSheets("inv_item", itens[i]);
+    i++;
+    setTimeout(_next, 300);
+  }
+  _next();
+};
+
+window._restaurarInventarioDoSheets = function(){
+  showToast("⏳ Buscando inventário na planilha...");
+  var cb="_restInv_"+Date.now();
+  var s=document.createElement("script");
+  var done=false;
+  var t=setTimeout(function(){ done=true;s.remove();delete window[cb];showToast("⚠️ Tempo esgotado","error"); },15000);
+  window[cb]=function(resp){
+    if(done)return;done=true;clearTimeout(t);s.remove();delete window[cb];
+    var lista=(resp&&(resp.dados||resp.registros))||[];
+    if(!lista.length){ showToast("Nenhum item encontrado na planilha"); return; }
+    if(!state.invItens) state.invItens=[];
+    var ex=new Set(state.invItens.map(function(x){return x.id;}));
+    var novos=0;
+    lista.forEach(function(item){
+      if(item.id&&!ex.has(item.id)){ state.invItens.push(item); ex.add(item.id); novos++; }
+    });
+    localStorage.setItem("bcs_inv_itens",JSON.stringify(state.invItens));
+    showToast("✅ "+novos+" item(s) restaurado(s) do Sheets");
+  };
+  s.src=SHEETS_URL+"?acao=listar&tipo=inv_itens&token="+BCS_TOKEN+"&callback="+cb;
+  document.head.appendChild(s);
+};
+
 window._restaurarEncaminhamentosDoSheets = function(){
   showToast("⏳ Buscando encaminhamentos na planilha...");
   if(!state.encaminhamentos) state.encaminhamentos = [];
@@ -11217,6 +11254,8 @@ function renderConfiguracoes(main){
   h.push("<button onclick='testarConexaoSheets()' style='"+btnS+"'>🔌 <span>Testar conexão com o Sheets</span></button>");
   h.push("<button onclick='reimportarParaSheets()' style='"+btnS+"'>📤 <span>Reenviar ocorrências ao Sheets</span></button>");
   h.push("<button onclick='_restaurarEncaminhamentosDoSheets()' style='"+btnS+"'>📥 <span>Restaurar Encaminhamentos do Sheets</span></button>");
+  h.push("<button onclick='_reenviarInventarioSheets()' style='"+btnS+"'>📦 <span>Reenviar Inventário ao Sheets</span></button>");
+  h.push("<button onclick='_restaurarInventarioDoSheets()' style='"+btnS+"'>📥 <span>Restaurar Inventário do Sheets</span></button>");
   h.push("</div>");
 
   // ── Seção: Dados Locais ──────────────────────────
