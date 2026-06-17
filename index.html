@@ -23313,7 +23313,7 @@ function renderInventario(main){
   if(tab==="itens"){
     // Filtros
     h+="<div style='display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center'>";
-    h+="<input oninput='state._invFiltBusca=this.value;_invAplicarFiltros()' value='"+esc(state._invFiltBusca||"")+"' placeholder='🔍 Buscar...' style='flex:1;min-width:140px;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px 10px;border-radius:7px;font-size:13px'>";
+    h+="<input oninput='state._invFiltBusca=this.value;clearTimeout(window._invBuscaT);window._invBuscaT=setTimeout(_invAplicarFiltros,350)' value='"+esc(state._invFiltBusca||"")+"' placeholder='🔍 Buscar...' style='flex:1;min-width:140px;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px 10px;border-radius:7px;font-size:13px'>";
     h+="<select onchange='state._invFiltCat=this.value;_invAplicarFiltros()' style='background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:7px;font-size:13px'>";
     h+="<option value=''>Todas categorias</option>";
     Object.keys(INV_CATS).forEach(function(k){h+="<option value='"+k+"'"+(filtCat===k?" selected":"")+">"+INV_CATS[k].label+"</option>";});
