@@ -23338,7 +23338,7 @@ function renderInventario(main){
       if(filtEst && x.estado!==filtEst) return false;
       if(filtLoc && (x.localizacao||"")!==filtLoc) return false;
       if(filtBusca){
-        var hay=(x.descricao||"")+" "+(x.tombamento||"")+" "+(x.marca||"")+" "+(x.modelo||"")+" "+(x.localizacao||"");
+        var hay=(x.descricao||"")+" "+(x.tombamento||"")+" "+(x.marca||"")+" "+(x.modelo||"")+" "+(x.localizacao||"")+" "+(x.numero_serie||"");
         if(hay.toLowerCase().indexOf(filtBusca)<0) return false;
       }
       return true;
