@@ -22588,6 +22588,36 @@ function _invAbrirConferencia(confId){
   _invAbrirConferencia2(conf);
 }
 function _invAbrirConferencia2(conf){
+  // Sempre pede quem está conferindo (não persiste — sempre pergunta ao abrir)
+  var polOpts=(state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";})
+    .sort(function(a,b){return (a.nome||"").localeCompare(b.nome||"");});
+  var IS="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px;border-radius:6px;font-size:13px;box-sizing:border-box;min-height:42px";
+  var mc=document.createElement("div");
+  mc.id="modal-inv-conferente";
+  mc.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9450;display:flex;align-items:center;justify-content:center;padding:20px";
+  mc.innerHTML="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;padding:28px 32px;max-width:400px;width:100%'>" +
+    "<h3 style='color:#3D2B1A;font-size:16px;font-weight:700;margin:0 0 6px;text-align:center'>👤 Quem está conferindo?</h3>" +
+    "<p style='color:#6B5236;font-size:12px;margin:0 0 14px;text-align:center'>Selecione seu nome para registrar quem verificou cada item.</p>" +
+    "<select id='sel-conferente' style='"+IS+"'>" +
+    "<option value=''>— selecione —</option>" +
+    polOpts.map(function(p){return "<option value='"+esc(p.matricula)+"'>"+esc((p.posto?p.posto+" ":"")+p.nome+" ("+p.matricula+")")+"</option>";}).join("") +
+    "</select>" +
+    "<div style='margin-top:14px;display:flex;gap:10px;justify-content:center'>" +
+    "<button onclick='document.getElementById(\"modal-inv-conferente\").remove()' style='background:transparent;border:1px solid #DBC79E;color:#6B5236;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>" +
+    "<button onclick='_invConfirmarConferente()' style='background:#1a3a1a;border:2px solid #3a7a4a;color:#a0d0a0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;min-height:42px'>Confirmar</button>" +
+    "</div></div>";
+  document.body.appendChild(mc);
+  var _confRef=conf;
+  window._invConfirmarConferente=function(){
+    var mat=document.getElementById("sel-conferente").value;
+    var pol=polOpts.find(function(p){return p.matricula===mat;});
+    if(!pol){showToast("Selecione o conferente","error");return;}
+    window._invConferenteAtual={nome:pol.nome,matricula:pol.matricula,posto:pol.posto||""};
+    mc.remove();
+    _invRenderConferencia(_confRef);
+  };
+}
+function _invRenderConferencia(conf){
   var tipoBem = conf.tipoBem || "movel";
   var _belicoCats = ["material_belico"];
   var itensAtivos=(state.invItens||[]).filter(function(x){
@@ -22711,6 +22741,13 @@ function _invAbrirConferencia2(conf){
   html+="</div></div></div>";
   document.body.insertAdjacentHTML("beforeend", html);
   window._invConfAtual=conf;
+  // Exibir quem está conferindo
+  var _confLabel=window._invConferenteAtual?(window._invConferenteAtual.posto?" "+window._invConferenteAtual.posto+" ":"")+window._invConferenteAtual.nome+" ("+window._invConferenteAtual.matricula+")":"—";
+  var _confBadge=document.createElement("div");
+  _confBadge.style.cssText="background:#1a3a1a;border:1px solid #3a7a4a;border-radius:7px;padding:7px 14px;font-size:12px;color:#a0d0a0;margin-bottom:4px";
+  _confBadge.innerHTML="<span style='opacity:0.8'>👤 Conferente:</span> <b>"+esc(_confLabel)+"</b>";
+  var _confModalBody=document.querySelector("#modal-inv-conf > div > div");
+  if(_confModalBody) _confModalBody.insertBefore(_confBadge,_confModalBody.firstChild);
   ["1","2"].forEach(function(n){
     var pc=document.getElementById("conf-pad"+n);
     if(pc){
@@ -22729,6 +22766,7 @@ function _invConfItens(itemId, status){
     var cur = conf.itens[itemId]||{};
     cur.status = "ok"; cur.categoria = ""; cur.obs = cur.obs||""; cur.categoriaExtra = null;
     if(!cur.conferido_em) cur.conferido_em = new Date().toISOString();
+    if(window._invConferenteAtual) cur.conferente = window._invConferenteAtual;
     conf.itens[itemId] = cur;
     _invConfAtualizarBotoes(itemId, "ok");
     _invConfAtualizarBarra();
@@ -22743,6 +22781,7 @@ function _invConfItens(itemId, status){
   var cur2 = conf.itens[itemId]||{};
   cur2.status = status;
   if(!cur2.conferido_em) cur2.conferido_em = new Date().toISOString();
+  if(window._invConferenteAtual) cur2.conferente = window._invConferenteAtual;
   conf.itens[itemId] = cur2;
   _invConfAtualizarBotoes(itemId, status);
   _invConfAtualizarBarra();
@@ -24486,7 +24525,7 @@ function _invGerarPDFConferencia(confId){
     if(conf.parecer_obs) h+="<p style='margin:6px 0 0;font-size:11px;color:#333'>"+esc(conf.parecer_obs)+"</p>";
     h+="</div>";
   }
-  h+="<table><tr><th>#</th><th>Tombamento</th><th>S/N</th><th>Descrição</th><th>Localização</th><th>Conservação</th><th>Resultado</th><th>Observações</th></tr>";
+  h+="<table><tr><th>#</th><th>Tombamento</th><th>S/N</th><th>Descrição</th><th>Localização</th><th>Conservação</th><th>Resultado</th><th>Observações</th><th>Conferente</th></tr>";
   itens.forEach(function(item,i){
     var raw=conf.itens[item.id];
     var det=(raw&&typeof raw==="object")?raw:{status:raw||"pendente"};
@@ -24497,7 +24536,8 @@ function _invGerarPDFConferencia(confId){
     var loc=det.localizacao||item.localizacao||"—";
     var est={bom:"Bom",regular:"Regular",danificado:"Danificado"}[det.estado]||"—";
     var obs=det.obs||det.observacoes||"";
-    h+="<tr><td>"+(i+1)+"</td><td>"+esc(item.tombamento||"—")+"</td><td>"+esc(item.numero_serie||"—")+"</td><td>"+esc(item.descricao)+"</td><td>"+esc(loc)+"</td><td>"+esc(est)+"</td><td class='"+resCls+"'>"+resLabel+"</td><td>"+esc(obs)+"</td></tr>";
+    var conf_nome=det.conferente?(det.conferente.posto?det.conferente.posto+" ":"")+det.conferente.nome:"—";
+    h+="<tr><td>"+(i+1)+"</td><td>"+esc(item.tombamento||"—")+"</td><td>"+esc(item.numero_serie||"—")+"</td><td>"+esc(item.descricao)+"</td><td>"+esc(loc)+"</td><td>"+esc(est)+"</td><td class='"+resCls+"'>"+resLabel+"</td><td>"+esc(obs)+"</td><td>"+esc(conf_nome)+"</td></tr>";
   });
   h+="</table>";
   // Assinaturas
