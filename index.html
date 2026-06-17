@@ -263,6 +263,7 @@ h1,h2,h3,.titulo-serif{font-family:Georgia,'Times New Roman',serif;}
 .marcador-crime .ponto{border-radius:50%;animation:pulsar 1.5s infinite;}
 .marcador-crime .anel{position:absolute;border-radius:50%;animation:pulsarAnel 1.5s infinite;}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -15019,6 +15020,55 @@ function renderTela() {
       window._remPolicial=function(i){ if(_nPoliciais>1){ _nPoliciais--; _renderPoliciais(); } };
       _renderVitimas(); _renderAutores(); _renderPoliciais();
 
+      // ── Restaurar rascunho se saiu sem salvar ──
+      (function(){
+        var r=state._rascOcForm;
+        if(!r) return;
+        var ids=["oc-numero","oc-relatorio","oc-posto","oc-tipo","oc-data","oc-hora","oc-zona",
+                 "oc-local","oc-referencia","oc-bairro","oc-municipio",
+                 "oc-sol-nome","oc-sol-tel","oc-sol-end","oc-objetos","oc-texto","oc-classificacao"];
+        ids.forEach(function(id){ var el=document.getElementById(id); if(el&&r[id]!==undefined) el.value=r[id]; });
+        // Restaura vítimas
+        if(r._vits&&r._vits.length){
+          _nVitimas=r._vits.length; _renderVitimas();
+          r._vits.forEach(function(v,i){
+            var fn=document.getElementById("vit-nome-"+i); if(fn) fn.value=v.nome||"";
+            var fs=document.getElementById("vit-sexo-"+i); if(fs) fs.value=v.sexo||"F";
+            var fi=document.getElementById("vit-idade-"+i); if(fi) fi.value=v.idade||"";
+            var ft=document.getElementById("vit-tel-"+i); if(ft) ft.value=v.telefone||"";
+            var fe=document.getElementById("vit-end-"+i); if(fe) fe.value=v.endereco||"";
+          });
+        }
+        // Restaura autores
+        if(r._auts&&r._auts.length){
+          _nAutores=r._auts.length; _renderAutores();
+          r._auts.forEach(function(a,i){
+            var fn=document.getElementById("aut-nome-"+i); if(fn) fn.value=a.nome||"";
+            var fa=document.getElementById("aut-apel-"+i); if(fa) fa.value=a.apelido||"";
+            var fs=document.getElementById("aut-sexo-"+i); if(fs) fs.value=a.sexo||"M";
+            var fi=document.getElementById("aut-idade-"+i); if(fi) fi.value=a.idade||"";
+            var fe=document.getElementById("aut-end-"+i); if(fe) fe.value=a.endereco||"";
+            var fc=document.getElementById("aut-carac-"+i); if(fc) fc.value=a.caracteristicas||"";
+          });
+        }
+        // Restaura policiais
+        if(r._pols&&r._pols.length){
+          _nPoliciais=r._pols.length; _renderPoliciais();
+          r._pols.forEach(function(p,i){
+            var fg=document.getElementById("pol-grad-"+i); if(fg) fg.value=p.grad||"Sd";
+            var fn=document.getElementById("pol-nome-"+i); if(fn) fn.value=p.nome||"";
+            var fm=document.getElementById("pol-mat-"+i); if(fm) fm.value=p.mat||"";
+          });
+        }
+        // Restaura classificação selecionada
+        if(r["oc-classificacao"]){
+          document.querySelectorAll("#classif-btns button").forEach(function(b){
+            if(b.dataset.classif===r["oc-classificacao"]) window._selecionarClassif&&setTimeout(function(){ window._selecionarClassif(b); },0);
+          });
+        }
+        showToast("📋 Rascunho restaurado — seus dados não foram perdidos","info");
+      })();
+
       // Seletor de classificação
       window._selecionarClassif=function(btn){
         document.querySelectorAll("#classif-btns button").forEach(function(b){
@@ -15036,6 +15086,7 @@ function renderTela() {
 
       // Botões
       document.getElementById("btn-cancelar-lancar").onclick=function(){
+        state._rascOcForm = null;
         var retorno = state._lancarRetornoGestor;
         state._lancarRetornoGestor = false;
         state.tela = retorno ? "ocorrencias" : "dashboard";
@@ -15111,6 +15162,7 @@ function renderTela() {
           enviarSheets("ocorrencias",oc);
           salvarLocal();
           window._vitimaIdSelecionada = null;
+          state._rascOcForm = null;
           showToast("✓ Ocorrência lançada com sucesso!");
           var retorno = state._lancarRetornoGestor;
           state._lancarRetornoGestor = false;
@@ -16128,7 +16180,59 @@ function _matchBairro(o){
   return (o.bairro||"").toLowerCase().includes(b)||(o.local||"").toLowerCase().includes(b);
 }
 
-function setTela(t){ state.tela=t; closeSidebar(); render(); }
+function _salvarRascOcForm(){
+  var r={};
+  var ids=["oc-numero","oc-relatorio","oc-posto","oc-tipo","oc-data","oc-hora","oc-zona",
+           "oc-local","oc-referencia","oc-bairro","oc-municipio",
+           "oc-sol-nome","oc-sol-tel","oc-sol-end","oc-objetos","oc-texto","oc-classificacao"];
+  ids.forEach(function(id){ var el=document.getElementById(id); if(el) r[id]=el.value; });
+  // Captura vítimas, autores e policiais renderizados no DOM
+  var vitDivs=document.querySelectorAll("#lista-vitimas [id^='vit-nome-']");
+  var vits=[];
+  vitDivs.forEach(function(el){
+    var i=el.id.replace("vit-nome-","");
+    vits.push({
+      nome:el.value||"",
+      sexo:(document.getElementById("vit-sexo-"+i)||{value:"F"}).value,
+      idade:(document.getElementById("vit-idade-"+i)||{value:""}).value,
+      telefone:(document.getElementById("vit-tel-"+i)||{value:""}).value,
+      endereco:(document.getElementById("vit-end-"+i)||{value:""}).value
+    });
+  });
+  r._vits=vits;
+  var autDivs=document.querySelectorAll("#lista-autores [id^='aut-nome-']");
+  var auts=[];
+  autDivs.forEach(function(el){
+    var i=el.id.replace("aut-nome-","");
+    auts.push({
+      nome:el.value||"",
+      apelido:(document.getElementById("aut-apel-"+i)||{value:""}).value,
+      sexo:(document.getElementById("aut-sexo-"+i)||{value:"M"}).value,
+      idade:(document.getElementById("aut-idade-"+i)||{value:""}).value,
+      endereco:(document.getElementById("aut-end-"+i)||{value:""}).value,
+      caracteristicas:(document.getElementById("aut-carac-"+i)||{value:""}).value
+    });
+  });
+  r._auts=auts;
+  var polDivs=document.querySelectorAll("#lista-policiais [id^='pol-nome-']");
+  var pols=[];
+  polDivs.forEach(function(el){
+    var i=el.id.replace("pol-nome-","");
+    pols.push({
+      nome:el.value||"",
+      grad:(document.getElementById("pol-grad-"+i)||{value:""}).value,
+      mat:(document.getElementById("pol-mat-"+i)||{value:""}).value
+    });
+  });
+  r._pols=pols;
+  if(Object.keys(r).some(function(k){ return k!=="oc-data"&&k!=="oc-hora"&&k!=="oc-posto"&&k!=="oc-municipio"&&k!=="oc-zona"&&r[k]; })){
+    state._rascOcForm=r;
+  }
+}
+function setTela(t){
+  if(state.tela==="lancar") _salvarRascOcForm();
+  state.tela=t; closeSidebar(); render();
+}
 
 function updateNavBtns(){
   document.querySelectorAll(".nav-btn").forEach(b=>{
@@ -21613,6 +21717,27 @@ var INV_SUBS = {
   material_permanente: ["Mobiliário","Veículo","Equipamento eletrônico","Computador/Impressora","Armário/Cofre","Climatização","Outro"],
   material_consumo:    ["Papelaria","Limpeza","Higiene","Primeiros socorros","Combustível","Outro"]
 };
+const INV_CATEGORIAS_DIVERGENCIA_MOVEL = [
+  "Bem sem tombamento",
+  "Bem com plaqueta extraviada",
+  "Bem não localizado, incluindo os extraviados",
+  "Bem inservível, carente de baixa",
+  "Bem com descrição incorreta",
+  "Bem recebido de outro órgão, carente de transferência de carga",
+  "Bem cedido para outro órgão, carente de transferência de carga",
+  "Bem de terceiro com alteração (empréstimo, cessão provisória de uso etc.)",
+  "Bem oriundo de Convênio com alteração",
+  "Bem inservível vinculado a Convênio"
+];
+const INV_CATEGORIAS_DIVERGENCIA_BELICO = [
+  "Bélico não localizado, incluindo os extraviados",
+  "Bélico inservível",
+  "Bélico com descrição incorreta",
+  "Bélico recebido de outra OPM, carente de transferência de carga",
+  "Bélico cedido para outra OPM, carente de transferência de carga",
+  "Bélico danificado",
+  "Bélico – outras ocorrências não categorizadas"
+];
 var INV_LOCAIS_FIXOS = [
   "Almoxarifado","SPO","SSO","CORSET","STM",
   "Sala de Meios","BCS","Sala do Comando","Sala do Subcomando",
@@ -22443,14 +22568,42 @@ function _invAbrirConferencia(confId){
   var conf = confId?(state.invConferencias||[]).find(function(x){return x.id===confId;}):null;
   var isNew = !conf;
   if(isNew){
-    conf={id:_invId("conf"),criadoEm:new Date().toISOString(),itens:{},responsavel1:"",responsavel2:"",assin1:"",assin2:"",concluida:false};
+    var mTipo = document.createElement("div");
+    mTipo.id = "modal-inv-tipo-bem";
+    mTipo.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9400;display:flex;align-items:center;justify-content:center;padding:20px";
+    mTipo.innerHTML = "<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;padding:28px 32px;max-width:360px;width:100%;text-align:center'>" +
+      "<h3 style='color:#3D2B1A;font-size:16px;font-weight:700;margin:0 0 8px'>Nova Conferência</h3>" +
+      "<p style='color:#6B5236;font-size:13px;margin:0 0 20px'>Selecione o tipo de bem a conferir:</p>" +
+      "<div style='display:flex;flex-direction:column;gap:10px'>" +
+      "<button onclick='_invIniciarConf(\"movel\")' style='background:#1a3a1a;border:2px solid #3a7a4a;color:#a0d0a0;padding:14px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;min-height:44px'>🏛️ Bem Permanente Móvel</button>" +
+      "<button onclick='_invIniciarConf(\"belico\")' style='background:#3a1a1a;border:2px solid #7a3a3a;color:#d0a0a0;padding:14px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;min-height:44px'>🔫 Material Bélico</button>" +
+      "</div>" +
+      "<button onclick='document.getElementById(\"modal-inv-tipo-bem\").remove()' style='margin-top:16px;background:transparent;border:none;color:#6B5236;font-size:12px;cursor:pointer'>Cancelar</button>" +
+      "</div>";
+    document.body.appendChild(mTipo);
+    window._invIniciarConf = function(tipoBem) {
+      document.getElementById("modal-inv-tipo-bem").remove();
+      var novaConf = {id:_invId("conf"),criadoEm:new Date().toISOString(),tipoBem:tipoBem,itens:{},responsavel1:"",responsavel2:"",assin1:"",assin2:"",concluida:false};
+      _invAbrirConferencia2(novaConf);
+    };
+    return;
   }
-  var itensAtivos=(state.invItens||[]).filter(function(x){return x.ativo!==false;});
+  _invAbrirConferencia2(conf);
+}
+function _invAbrirConferencia2(conf){
+  var tipoBem = conf.tipoBem || "movel";
+  var _belicoCats = ["material_belico"];
+  var itensAtivos=(state.invItens||[]).filter(function(x){
+    if(x.ativo===false) return false;
+    var isBelico=_belicoCats.some(function(c){return x.categoria===c;});
+    return tipoBem==="belico"?isBelico:!isBelico;
+  });
   var cats=Object.keys(INV_CATS);
+  var tipoLabel = tipoBem==="belico"?"🔫 Material Bélico":"🏛️ Bem Permanente Móvel";
   var html="<div id='modal-inv-conf' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9300;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto'>";
   html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:720px;padding:0;overflow:hidden;margin-bottom:40px'>";
   html+="<div style='background:#2a1c10;padding:14px 18px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center'>";
-  html+="<span style='color:#D9A53C;font-size:14px;font-weight:700'>📋 Conferência de Inventário "+(isNew?"— Nova":"— Continuar")+"</span>";
+  html+="<span style='color:#D9A53C;font-size:14px;font-weight:700'>📋 Conferência de Inventário · "+tipoLabel+"</span>";
   html+="<button onclick=\"document.getElementById('modal-inv-conf').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html+="</div><div style='padding:18px;display:flex;flex-direction:column;gap:14px'>";
   // Data + responsáveis
@@ -22497,10 +22650,10 @@ function _invAbrirConferencia(confId){
       html+="<div style='display:flex;align-items:center;gap:8px;width:100%'>";
       html+="<span style='flex:1;color:#3D2B1A;font-size:12px'>"+esc(item.descricao)+(item.tombamento?" <span style='color:#a07c58;font-size:10px'>#"+esc(item.tombamento)+"</span>":"")+(item.numero_serie?" <span style='color:#a07c58;font-size:10px'>S/N:"+esc(item.numero_serie)+"</span>":"")+"</span>";
       html+="<div style='display:flex;gap:3px'>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ok\")' style='padding:2px 7px;border-radius:4px;font-size:11px;border:1px solid #3a7a4a;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer'>✓ OK</button>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"divergencia\")' style='padding:2px 7px;border-radius:4px;font-size:11px;border:1px solid #f59e0b;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer'>⚠</button>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ausente\")' style='padding:2px 7px;border-radius:4px;font-size:11px;border:1px solid #ef4444;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer'>✗</button>";
-      html+="<button type='button' onclick='_invConfExpandir(\""+iid+"\")' style='padding:2px 7px;border-radius:4px;font-size:11px;border:1px solid #5e4636;color:#a07c58;background:transparent;cursor:pointer'>⋯</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ok\")' style='padding:2px 7px;border-radius:4px;font-size:11px;min-height:36px;border:1px solid #3a7a4a;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer'>✓ OK</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"divergencia\")' style='padding:2px 7px;border-radius:4px;font-size:11px;min-height:36px;border:1px solid #f59e0b;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer'>⚠</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ausente\")' style='padding:2px 7px;border-radius:4px;font-size:11px;min-height:36px;border:1px solid #ef4444;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer'>✗</button>";
+      html+="<button type='button' onclick='_invConfExpandir(\""+iid+"\")' style='padding:2px 7px;border-radius:4px;font-size:11px;min-height:36px;border:1px solid #5e4636;color:#a07c58;background:transparent;cursor:pointer'>⋯</button>";
       html+="</div></div>";
       // painel de detalhes (colapsado por padrão)
       var ISci="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:5px 8px;border-radius:5px;font-size:12px;box-sizing:border-box";
@@ -22531,6 +22684,27 @@ function _invAbrirConferencia(confId){
     html+="</div></div>";
   });
   html+="</div>";
+  // Botões XLSX condicionais
+  var _temDivMovel = Object.values(conf.itens||{}).some(function(v){
+    var s=(v&&typeof v==="object")?v.status:v;
+    var c=(v&&typeof v==="object")?v.categoria:"";
+    return (s==="divergencia"||s==="ausente") && INV_CATEGORIAS_DIVERGENCIA_MOVEL.indexOf(c)>=0;
+  });
+  var _temDivBelico = Object.values(conf.itens||{}).some(function(v){
+    var s=(v&&typeof v==="object")?v.status:v;
+    var c=(v&&typeof v==="object")?v.categoria:"";
+    return (s==="divergencia"||s==="ausente") && INV_CATEGORIAS_DIVERGENCIA_BELICO.indexOf(c)>=0;
+  });
+  var _temPlaqueta = Object.values(conf.itens||{}).some(function(v){
+    return (v&&typeof v==="object") && v.categoria==="Bem com plaqueta extraviada";
+  });
+  if(_temDivMovel||_temDivBelico||_temPlaqueta){
+    html+="<div style='display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:6px'>";
+    if(_temDivMovel) html+="<button onclick='_invGerarFIBM(\""+esc(conf.id)+"\")' style='background:#1a3a1a;border:1px solid #3a7a4a;color:#a0d0a0;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;min-height:36px'>📋 Gerar FIBM</button>";
+    if(_temDivBelico) html+="<button onclick='_invGerarFIMB(\""+esc(conf.id)+"\")' style='background:#3a1a1a;border:1px solid #7a3a3a;color:#d0a0a0;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;min-height:36px'>📋 Gerar FIMB</button>";
+    if(_temPlaqueta) html+="<button onclick='_invGerarPlanilhaPlaquetas(\""+esc(conf.id)+"\")' style='background:#3a2a1a;border:1px solid #7a6a3a;color:#d0c0a0;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;min-height:36px'>📋 Plaquetas Extraviadas</button>";
+    html+="</div>";
+  }
   // Botões
   html+="<div style='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap'>";
   html+="<button onclick=\"document.getElementById('modal-inv-conf').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Fechar</button>";
@@ -22552,12 +22726,71 @@ function _invAbrirConferencia(confId){
 
 function _invConfItens(itemId, status){
   if(!window._invConfAtual) return;
-  var cur=window._invConfAtual.itens[itemId];
-  var det=(cur&&typeof cur==="object")?cur:{};
-  det.status=status;
-  if(!det.conferido_em) det.conferido_em=new Date().toISOString();
-  window._invConfAtual.itens[itemId]=det;
-  // Update buttons
+  var conf = window._invConfAtual;
+
+  if(status === "ok"){
+    var cur = conf.itens[itemId]||{};
+    cur.status = "ok"; cur.categoria = ""; cur.obs = cur.obs||""; cur.categoriaExtra = null;
+    if(!cur.conferido_em) cur.conferido_em = new Date().toISOString();
+    conf.itens[itemId] = cur;
+    _invConfAtualizarBotoes(itemId, "ok");
+    _invConfAtualizarBarra();
+    var pan = document.getElementById("inv-ci-cat-"+itemId);
+    if(pan) pan.style.display = "none";
+    return;
+  }
+
+  // divergencia ou ausente — abrir painel inline de categoria
+  var tipoBem = conf.tipoBem || "movel";
+  var listaCat = tipoBem === "belico" ? INV_CATEGORIAS_DIVERGENCIA_BELICO : INV_CATEGORIAS_DIVERGENCIA_MOVEL;
+  var cur2 = conf.itens[itemId]||{};
+  cur2.status = status;
+  if(!cur2.conferido_em) cur2.conferido_em = new Date().toISOString();
+  conf.itens[itemId] = cur2;
+  _invConfAtualizarBotoes(itemId, status);
+  _invConfAtualizarBarra();
+
+  // Mostrar painel inline
+  var pan2 = document.getElementById("inv-ci-cat-"+itemId);
+  if(!pan2){
+    var itemDiv = document.getElementById("inv-ci-"+itemId);
+    if(!itemDiv) return;
+    pan2 = document.createElement("div");
+    pan2.id = "inv-ci-cat-"+itemId;
+    pan2.style.cssText = "margin:4px 0 8px;padding:10px;background:#EAD9B8;border:1px solid #A87B22;border-radius:7px;display:flex;flex-direction:column;gap:8px";
+    itemDiv.appendChild(pan2);
+  }
+
+  var catAtual = cur2.categoria||"";
+  var extraHtml = "";
+  if(tipoBem==="belico" && catAtual==="Bélico danificado"){
+    var ex = cur2.categoriaExtra||{};
+    extraHtml = "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:4px'>" +
+      "<div><label style='color:#6B5236;font-size:10px;font-weight:700'>Nº Portaria de Apuração*</label>" +
+      "<input id='inv-ci-portaria-"+itemId+"' value='"+esc(ex.portaria||"")+"' placeholder='Nº portaria' style='width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;color:#3D2B1A;padding:6px 8px;border-radius:5px;font-size:12px' oninput='_invConfCatExtra(\""+itemId+"\",\"portaria\",this.value)'></div>" +
+      "<div><label style='color:#6B5236;font-size:10px;font-weight:700'>Data*</label>" +
+      "<input id='inv-ci-datebir-"+itemId+"' type='date' value='"+esc(ex.data||"")+"' style='width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;color:#3D2B1A;padding:6px 8px;border-radius:5px;font-size:12px' oninput='_invConfCatExtra(\""+itemId+"\",\"data\",this.value)'></div>" +
+      "<div><label style='color:#6B5236;font-size:10px;font-weight:700'>Nº BIR*</label>" +
+      "<input id='inv-ci-bir-"+itemId+"' value='"+esc(ex.bir||"")+"' placeholder='Nº BIR' style='width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;color:#3D2B1A;padding:6px 8px;border-radius:5px;font-size:12px' oninput='_invConfCatExtra(\""+itemId+"\",\"bir\",this.value)'></div>" +
+      "</div>";
+  }
+
+  var IScat = "width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;color:#3D2B1A;padding:7px 9px;border-radius:5px;font-size:13px;min-height:36px";
+  pan2.innerHTML =
+    "<div><label style='color:#6B5236;font-size:11px;font-weight:700'>Categoria da divergência *</label>" +
+    "<select id='inv-ci-catsel-"+itemId+"' onchange='_invConfSelecionarCat(\""+itemId+"\",this.value)' style='"+IScat+"'>" +
+    "<option value=''>— selecione —</option>" +
+    listaCat.map(function(c){ return "<option value='"+esc(c)+"'"+(catAtual===c?" selected":"")+">"+esc(c)+"</option>"; }).join("") +
+    "</select></div>" +
+    "<div id='inv-ci-extra-"+itemId+"'>"+extraHtml+"</div>" +
+    "<div><label style='color:#6B5236;font-size:11px'>Observação</label>" +
+    "<textarea id='inv-ci-obscat-"+itemId+"' placeholder='Detalhe a situação…' rows='2' style='"+IScat+";resize:vertical;font-family:inherit' oninput='_invConfCatObs(\""+itemId+"\",this.value)'>"+esc(cur2.obs||"")+"</textarea></div>" +
+    "<button type='button' onclick='_invConfConfirmarCat(\""+itemId+"\")' style='align-self:flex-end;background:#3a7a4a;border:none;color:#fff;padding:8px 20px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;min-height:36px'>Confirmar</button>";
+
+  pan2.style.display = "flex";
+}
+
+function _invConfAtualizarBotoes(itemId, status){
   var cores={ok:"#3a7a4a",divergencia:"#f59e0b",ausente:"#ef4444"};
   ["ok","divergencia","ausente"].forEach(function(s){
     try{
@@ -22565,15 +22798,77 @@ function _invConfItens(itemId, status){
       if(btn){btn.style.background=status===s?cores[s]:"transparent";btn.style.color=status===s?"#fff":cores[s];}
     }catch(e){}
   });
-  // Update progress bar
+}
+
+function _invConfAtualizarBarra(){
   var conf=window._invConfAtual;
-  var total=(state.invItens||[]).filter(function(x){return x.ativo!==false;}).length;
+  if(!conf) return;
+  var tipoBem=conf.tipoBem||"movel";
+  var _belicoCats=["material_belico"];
+  var total=(state.invItens||[]).filter(function(x){
+    if(x.ativo===false) return false;
+    var isBelico=_belicoCats.some(function(c){return x.categoria===c;});
+    return tipoBem==="belico"?isBelico:!isBelico;
+  }).length;
   var done=Object.values(conf.itens||{}).filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok"||s==="divergencia"||s==="ausente";}).length;
   var pct=total?Math.round(done/total*100):0;
   var bar=document.querySelector("#modal-inv-conf .inv-conf-bar");
   if(bar){bar.style.width=pct+"%";bar.style.background=pct===100?"#3a7a4a":pct>50?"#d4a87a":"#4a9fd4";}
   var barLbl=document.querySelector("#modal-inv-conf .inv-conf-bar-lbl");
   if(barLbl) barLbl.textContent=done+"/"+total+" itens · "+pct+"%";
+}
+
+function _invConfSelecionarCat(itemId, cat){
+  var conf=window._invConfAtual; if(!conf) return;
+  var cur=conf.itens[itemId]||{};
+  cur.categoria=cat; cur.categoriaExtra=null;
+  conf.itens[itemId]=cur;
+  var extraDiv=document.getElementById("inv-ci-extra-"+itemId);
+  if(!extraDiv) return;
+  var tipoBem=conf.tipoBem||"movel";
+  if(tipoBem==="belico" && cat==="Bélico danificado"){
+    extraDiv.innerHTML="<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:4px'>" +
+      "<div><label style='color:#6B5236;font-size:10px;font-weight:700'>Nº Portaria de Apuração*</label><input id='inv-ci-portaria-"+itemId+"' placeholder='Nº portaria' style='width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;color:#3D2B1A;padding:6px 8px;border-radius:5px;font-size:12px' oninput='_invConfCatExtra(\""+itemId+"\",\"portaria\",this.value)'></div>" +
+      "<div><label style='color:#6B5236;font-size:10px;font-weight:700'>Data*</label><input type='date' id='inv-ci-datebir-"+itemId+"' style='width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;color:#3D2B1A;padding:6px 8px;border-radius:5px;font-size:12px' oninput='_invConfCatExtra(\""+itemId+"\",\"data\",this.value)'></div>" +
+      "<div><label style='color:#6B5236;font-size:10px;font-weight:700'>Nº BIR*</label><input id='inv-ci-bir-"+itemId+"' placeholder='Nº BIR' style='width:100%;box-sizing:border-box;background:#fff;border:1px solid #A87B22;color:#3D2B1A;padding:6px 8px;border-radius:5px;font-size:12px' oninput='_invConfCatExtra(\""+itemId+"\",\"bir\",this.value)'></div>" +
+      "</div>";
+  } else {
+    extraDiv.innerHTML="";
+  }
+}
+
+function _invConfCatExtra(itemId, field, value){
+  var conf=window._invConfAtual; if(!conf) return;
+  var cur=conf.itens[itemId]||{};
+  if(!cur.categoriaExtra) cur.categoriaExtra={};
+  cur.categoriaExtra[field]=value;
+  conf.itens[itemId]=cur;
+}
+
+function _invConfCatObs(itemId, value){
+  var conf=window._invConfAtual; if(!conf) return;
+  var cur=conf.itens[itemId]||{status:"pendente"};
+  cur.obs=value;
+  conf.itens[itemId]=cur;
+}
+
+function _invConfConfirmarCat(itemId){
+  var conf=window._invConfAtual; if(!conf) return;
+  var cur=conf.itens[itemId]||{};
+  var cat=(document.getElementById("inv-ci-catsel-"+itemId)||{value:""}).value;
+  if(!cat){ showToast("Selecione a categoria da divergência","error"); return; }
+  cur.categoria=cat;
+  if(cat==="Bélico danificado"){
+    var portaria=(document.getElementById("inv-ci-portaria-"+itemId)||{value:""}).value.trim();
+    var datab=(document.getElementById("inv-ci-datebir-"+itemId)||{value:""}).value.trim();
+    var bir=(document.getElementById("inv-ci-bir-"+itemId)||{value:""}).value.trim();
+    if(!portaria||!datab||!bir){ showToast("Preencha Portaria, Data e BIR para bélico danificado","error"); return; }
+    cur.categoriaExtra={portaria:portaria,data:datab,bir:bir};
+  }
+  conf.itens[itemId]=cur;
+  var pan=document.getElementById("inv-ci-cat-"+itemId);
+  if(pan) pan.style.display="none";
+  showToast("✓ Registrado!");
 }
 
 function _invConfDetalhe(itemId, field, value){
@@ -22605,6 +22900,71 @@ function _invConfFoto(itemId, input){
       showToast("✓ Foto anexada!");
     });
   });
+}
+
+function _invGerarFIBM(confId){
+  var conf=(state.invConferencias||[]).find(function(x){return x.id===confId;});
+  if(!conf) return;
+  var wb=XLSX.utils.book_new();
+  INV_CATEGORIAS_DIVERGENCIA_MOVEL.forEach(function(cat){
+    var itens=Object.entries(conf.itens||{}).filter(function(e){
+      var v=e[1]; var s=(v&&typeof v==="object")?v.status:v;
+      return (s==="divergencia"||s==="ausente") && (v&&typeof v==="object"?v.categoria:"")=== cat;
+    }).map(function(e){
+      var itemId=e[0]; var det=e[1];
+      var item=(state.invItens||[]).find(function(x){return x.id===itemId;})||{};
+      return {Tombamento:item.tombamento||"",Descrição:item.descricao||"",Localização:item.localizacao||"",Estado:item.estado||"",Observação:det.obs||""};
+    });
+    var ws=XLSX.utils.json_to_sheet(itens.length?itens:[{Tombamento:"",Descrição:"",Localização:"",Estado:"",Observação:""}]);
+    XLSX.utils.book_append_sheet(wb, ws, cat.substring(0,31));
+  });
+  var dt=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,"FIBM_"+dt+".xlsx");
+}
+
+function _invGerarFIMB(confId){
+  var conf=(state.invConferencias||[]).find(function(x){return x.id===confId;});
+  if(!conf) return;
+  var wb=XLSX.utils.book_new();
+  INV_CATEGORIAS_DIVERGENCIA_BELICO.forEach(function(cat){
+    var itens=Object.entries(conf.itens||{}).filter(function(e){
+      var v=e[1]; var s=(v&&typeof v==="object")?v.status:v;
+      return (s==="divergencia"||s==="ausente") && (v&&typeof v==="object"?v.categoria:"")=== cat;
+    }).map(function(e){
+      var itemId=e[0]; var det=e[1];
+      var item=(state.invItens||[]).find(function(x){return x.id===itemId;})||{};
+      var row={Tombamento:item.tombamento||"","Nº Série":item.numero_serie||"",Descrição:item.descricao||"",Localização:item.localizacao||"",Estado:item.estado||"",Observação:det.obs||""};
+      if(cat==="Bélico danificado" && det.categoriaExtra){
+        row.Portaria=det.categoriaExtra.portaria||"";
+        row.Data=det.categoriaExtra.data||"";
+        row.BIR=det.categoriaExtra.bir||"";
+      }
+      return row;
+    });
+    var ws=XLSX.utils.json_to_sheet(itens.length?itens:[{Tombamento:"","Nº Série":"",Descrição:"",Localização:"",Estado:"",Observação:""}]);
+    XLSX.utils.book_append_sheet(wb, ws, cat.substring(0,31));
+  });
+  var dt=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,"FIMB_"+dt+".xlsx");
+}
+
+function _invGerarPlanilhaPlaquetas(confId){
+  var conf=(state.invConferencias||[]).find(function(x){return x.id===confId;});
+  if(!conf) return;
+  var cat="Bem com plaqueta extraviada";
+  var itens=Object.entries(conf.itens||{}).filter(function(e){
+    var v=e[1]; return (v&&typeof v==="object"?v.categoria:"")=== cat;
+  }).map(function(e){
+    var itemId=e[0]; var det=e[1];
+    var item=(state.invItens||[]).find(function(x){return x.id===itemId;})||{};
+    return {Tombamento:item.tombamento||"",Descrição:item.descricao||"",Localização:item.localizacao||"",Observação:det.obs||""};
+  });
+  if(!itens.length){ showToast("Nenhum item com plaqueta extraviada","error"); return; }
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.json_to_sheet(itens);
+  XLSX.utils.book_append_sheet(wb,ws,"Plaquetas Extraviadas");
+  var dt=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,"Plaquetas_Extraviadas_"+dt+".xlsx");
 }
 
 function _invSalvarConferencia(confId, concluir){
@@ -24134,11 +24494,12 @@ function _invGerarPDFConferencia(confId){
     var raw=conf.itens[item.id];
     var det=(raw&&typeof raw==="object")?raw:{status:raw||"pendente"};
     var res=det.status||"pendente";
-    var resLabel={ok:"✓ OK",divergencia:"⚠ Divergência",ausente:"✗ Ausente",pendente:"— Pendente"}[res]||res;
+    var _resCat = det.categoria?(det.categoria.substring(0,30)):"";
+    var resLabel={ok:"✓ OK",divergencia:"⚠ Divergência"+(_resCat?" ("+_resCat+")":""),ausente:"✗ Ausente"+(_resCat?" ("+_resCat+")":""),pendente:"— Pendente"}[res]||res;
     var resCls={ok:"ok",divergencia:"div",ausente:"aus",pendente:"pend"}[res]||"";
     var loc=det.localizacao||item.localizacao||"—";
     var est={bom:"Bom",regular:"Regular",danificado:"Danificado"}[det.estado]||"—";
-    var obs=det.observacoes||"";
+    var obs=det.obs||det.observacoes||"";
     h+="<tr><td>"+(i+1)+"</td><td>"+esc(item.tombamento||"—")+"</td><td>"+esc(item.numero_serie||"—")+"</td><td>"+esc(item.descricao)+"</td><td>"+esc(loc)+"</td><td>"+esc(est)+"</td><td class='"+resCls+"'>"+resLabel+"</td><td>"+esc(obs)+"</td></tr>";
   });
   h+="</table>";
