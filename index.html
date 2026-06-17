@@ -23008,6 +23008,14 @@ function _invGerarPlanilhaPlaquetas(confId){
   XLSX.writeFile(wb,"Plaquetas_Extraviadas_"+dt+".xlsx");
 }
 
+function _invExcluirConferencia(confId){
+  if(!confirm("Excluir esta conferência? Esta ação não pode ser desfeita.")) return;
+  state.invConferencias=(state.invConferencias||[]).filter(function(x){return x.id!==confId;});
+  _invSalvarLocal();
+  showToast("Conferência excluída");
+  var main=document.getElementById("main-content")||document.getElementById("main");
+  if(main) renderInventario(main);
+}
 function _invFecharConferencia(){
   // Auto-salva progresso ao fechar (sem exigir Responsável)
   if(window._invConfAtual){
@@ -23549,6 +23557,7 @@ function renderInventario(main){
         if(!conf.concluida) h+="<button onclick='_invAbrirConferencia(\""+conf.id+"\")' style='background:#EAD9B8;border:1px solid #A87B22;color:#6B5236;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>▶ Continuar</button>";
         h+="<button onclick='_invGerarPDFConferencia(\""+conf.id+"\")' style='background:#1a1a2a;border:1px solid #4a9fd433;color:#4a9fd4;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>📄 PDF</button>";
         if(conf.concluida) h+="<button onclick='_invAbrirParecerModal(\""+conf.id+"\")' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>📋 Parecer</button>";
+        h+="<button onclick='_invExcluirConferencia(\""+conf.id+"\")' style='background:#1a0808;border:1px solid #ef444466;color:#ef4444;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>🗑 Excluir</button>";
         h+="</div></div>";
         h+="<div style='display:flex;gap:8px;flex-wrap:wrap'>";
         if(nOk) h+="<span style='background:#22c55e22;color:#22c55e;padding:3px 10px;border-radius:8px;font-size:12px'>✓ "+nOk+" OK</span>";
