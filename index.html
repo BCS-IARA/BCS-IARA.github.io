@@ -22618,6 +22618,11 @@ function _invAbrirConferencia2(conf){
   };
 }
 function _invRenderConferencia(conf){
+  // Salvar imediatamente ao abrir (garante persistência mesmo se fechar sem clicar Salvar)
+  if(!state.invConferencias) state.invConferencias=[];
+  var _existeIdx=(state.invConferencias).findIndex(function(x){return x.id===conf.id;});
+  if(_existeIdx<0){state.invConferencias.push(conf);} else {state.invConferencias[_existeIdx]=conf;}
+  _invSalvarLocal();
   var tipoBem = conf.tipoBem || "movel";
   var _belicoCats = ["material_belico"];
   var itensAtivos=(state.invItens||[]).filter(function(x){
@@ -22631,7 +22636,7 @@ function _invRenderConferencia(conf){
   html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:900px;padding:0;overflow:visible;margin-bottom:40px'>";
   html+="<div style='background:#2a1c10;padding:14px 18px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center'>";
   html+="<span style='color:#D9A53C;font-size:14px;font-weight:700'>📋 Conferência de Inventário · "+tipoLabel+"</span>";
-  html+="<button onclick=\"document.getElementById('modal-inv-conf').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
+  html+="<button onclick='_invFecharConferencia()' style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
   html+="</div><div style='padding:18px;display:flex;flex-direction:column;gap:14px'>";
   // Data + responsáveis
   var ISc="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
@@ -22734,7 +22739,7 @@ function _invRenderConferencia(conf){
   }
   // Botões
   html+="<div style='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap'>";
-  html+="<button onclick=\"document.getElementById('modal-inv-conf').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Fechar</button>";
+  html+="<button onclick='_invFecharConferencia()' style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Fechar</button>";
   html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",false)' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>💾 Salvar Progresso</button>";
   html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",true)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✅ Concluir e Gerar PDF</button>";
   html+="</div>";
@@ -23003,9 +23008,27 @@ function _invGerarPlanilhaPlaquetas(confId){
   XLSX.writeFile(wb,"Plaquetas_Extraviadas_"+dt+".xlsx");
 }
 
+function _invFecharConferencia(){
+  // Auto-salva progresso ao fechar (sem exigir Responsável)
+  if(window._invConfAtual){
+    var conf=window._invConfAtual;
+    conf.responsavel1=(document.getElementById("conf-resp1")||{value:""}).value||conf.responsavel1||"";
+    conf.responsavel2=(document.getElementById("conf-resp2")||{value:""}).value||conf.responsavel2||"";
+    conf.resultado=(document.getElementById("conf-resultado")||{value:""}).value||conf.resultado||"";
+    conf.parecer_obs=(document.getElementById("conf-parecer-obs")||{value:""}).value||conf.parecer_obs||"";
+    if(!state.invConferencias) state.invConferencias=[];
+    var idx=(state.invConferencias).findIndex(function(x){return x.id===conf.id;});
+    if(idx>=0) state.invConferencias[idx]=conf; else state.invConferencias.push(conf);
+    _invSalvarLocal();
+  }
+  var m=document.getElementById("modal-inv-conf");
+  if(m) m.remove();
+  var main=document.getElementById("main-content")||document.getElementById("main");
+  if(main) renderInventario(main);
+}
 function _invSalvarConferencia(confId, concluir){
   var resp1=(document.getElementById("conf-resp1")||{}).value||"";
-  if(!resp1.trim()){showToast("Informe o Responsável 1","error");return;}
+  if(concluir && !resp1.trim()){showToast("Informe o Responsável 1 para concluir","error");return;}
   var resp2=(document.getElementById("conf-resp2")||{}).value||"";
   if(!window._invConfAtual) return;
   var conf=window._invConfAtual;
