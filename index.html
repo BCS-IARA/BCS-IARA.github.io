@@ -12632,6 +12632,12 @@ window._dossieByOcId = function(ocId){
     window[cbN] = function(resp){
       if(done) return; done=true; clearTimeout(t); s.remove(); delete window[cbN];
       var nomeLower = nomeVitima.trim().toLowerCase();
+      // Descobre vitimaId para setar no enc injetado
+      var _vitimaId = oc.vitima_id;
+      if(!_vitimaId && nomeLower){
+        var _vit = (state.vitimas||[]).find(function(v){ return (v.nome||"").replace(/,\s*(sexo|idade).*/i,"").trim().toLowerCase()===nomeLower; });
+        if(_vit) _vitimaId = _vit.id;
+      }
       var devs = (resp && resp.registros) || [];
       var injetados = 0;
       if(!state.encaminhamentos) state.encaminhamentos = [];
@@ -12640,13 +12646,27 @@ window._dossieByOcId = function(ocId){
         var devNomeLower=(dev.nome||"").toLowerCase();
         if(!devNomeLower||(!devNomeLower.includes(nomeLower)&&!nomeLower.includes(devNomeLower))) return;
         var encId = dev.encaminhamentoId || dev.id;
-        if(!encId || existentes.has(encId)) return;
+        if(!encId) return;
         var _nomeEnc = dev.nome || nomeVitima;
         var _relatoEnc = (dev.tiposTexto||"") + (dev.situacao ? " — "+dev.situacao : "") + (dev.observacoes ? "\n\nObs: "+dev.observacoes : "");
+        if(existentes.has(encId)){
+          // Atualiza enc existente com devolutiva e campos de compatibilidade
+          var idx = state.encaminhamentos.findIndex(function(e){ return e.id===encId; });
+          if(idx>=0){
+            if(!state.encaminhamentos[idx].relato_devolutiva) state.encaminhamentos[idx].relato_devolutiva = _relatoEnc;
+            state.encaminhamentos[idx].nome = _nomeEnc;
+            state.encaminhamentos[idx].vitima_nome = _nomeEnc;
+            state.encaminhamentos[idx].ocorrenciaId = ocId;
+            if(_vitimaId) state.encaminhamentos[idx].vitima_id = _vitimaId;
+            injetados++;
+          }
+          return;
+        }
         state.encaminhamentos.push({
           id: encId,
           nome: _nomeEnc,
           vitima_nome: _nomeEnc,
+          vitima_id: _vitimaId || "",
           ocorrencia_id: ocId,
           ocorrenciaId: ocId,
           orgao: dev.orgao || dev.servico || "CRAV",
