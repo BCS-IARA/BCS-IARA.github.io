@@ -22236,6 +22236,15 @@ function _invSalvarItem(idExistente){
   showToast("✓ Item salvo! Enviando foto para o Drive...");
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
+  // Se houver conferência aberta por trás, recarregar ela sem perguntar o conferente de novo
+  var modalConfAberto=document.getElementById("modal-inv-conf");
+  if(modalConfAberto&&window._invConfAtual){
+    modalConfAberto.remove();
+    _invRenderConferencia(window._invConfAtual);
+  }
+}
+function _invConfEditarItem(itemId){
+  _invAbrirItem(itemId);
 }
 
 function _invPadBranco(id){
@@ -22745,6 +22754,7 @@ function _invRenderConferencia(conf){
       }
       if(det.foto_link){html+="<a href='"+esc(det.foto_link)+"' target='_blank' style='color:#D9A53C;font-size:11px'>📷 Ver foto da conferência</a>";}
       html+="<label style='cursor:pointer;padding:3px 10px;background:transparent;border:1px solid #5e4636;border-radius:5px;color:#a07c58;font-size:11px'>📷 Anexar foto de divergência<input type='file' accept='image/*' capture='environment' style='display:none' onchange='_invConfFoto(\""+iid+"\",this)'></label>";
+      html+="<button type='button' onclick='_invConfEditarItem(\""+iid+"\")' style='align-self:flex-start;background:transparent;border:1px solid #A87B22;color:#6B5236;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>✏️ Editar item completo</button>";
       html+="</div>";
       html+="</div>";
       html+="</div>";
@@ -23098,6 +23108,21 @@ function _invSalvarConferencia(confId, concluir){
     }
   });
   if(concluir){conf.concluida=true;conf.concluidaEm=new Date().toISOString();}
+  // Propaga Localização/Estado/Observações do "+" para o cadastro geral do item
+  var _itensAtualizadosConf=[];
+  Object.keys(conf.itens||{}).forEach(function(iid){
+    var det=conf.itens[iid];
+    if(!det||typeof det!=="object") return;
+    var idxIt=(state.invItens||[]).findIndex(function(x){return x.id===iid;});
+    if(idxIt<0) return;
+    var it=state.invItens[idxIt];
+    var mudou=false;
+    if(det.localizacao&&det.localizacao!==it.localizacao){it.localizacao=det.localizacao;mudou=true;}
+    if(det.estado&&det.estado!==it.estado){it.estado=det.estado;mudou=true;}
+    if(det.observacoes&&det.observacoes!==it.observacoes){it.observacoes=det.observacoes;mudou=true;}
+    if(mudou){it.atualizadoEm=new Date().toISOString();_itensAtualizadosConf.push(it);}
+  });
+  _itensAtualizadosConf.forEach(function(it){_invEnviarSheets("inv_item",it);});
   if(!state.invConferencias) state.invConferencias=[];
   var cidx=(state.invConferencias||[]).findIndex(function(x){return x.id===confId;});
   if(cidx>=0) state.invConferencias[cidx]=conf; else state.invConferencias.push(conf);
@@ -23354,9 +23379,8 @@ function renderInventario(main){
       if(m&&state.tela==="inventario") renderInventario(m);
       var modalAberto=document.getElementById("modal-inv-conf");
       if(modalAberto&&window._invConfAtual){
-        var idAtual=window._invConfAtual.id;
         modalAberto.remove();
-        _invAbrirConferencia(idAtual);
+        _invRenderConferencia(window._invConfAtual);
       }
     });
   },30000);
@@ -23376,11 +23400,11 @@ function renderInventario(main){
   // Header
   h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px'>";
   h+="<div><h2 style='color:#D9A53C;font-size:20px;font-weight:800;margin:0;font-family:Georgia,serif'>📦 Inventário</h2><p style='color:#a07c58;font-size:12px;margin:2px 0 0'>Gestão de patrimônio — 77ª CIPM BCS</p></div>";
-  h+="<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center'>";
   var _invSincTxt=state.sincErro?"⚠ Sem conexão":state.sincronizando?"⟳ Sincronizando...":state._invLastSync?"✓ "+new Date(state._invLastSync).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"—";
   var _invSincCor=state.sincErro?"#A8492E":state.sincronizando?"#C8A84B":state._invLastSync?"#6E8F52":"#6B5236";
+  h+="<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center'>";
   h+="<span style='font-size:10px;color:"+_invSincCor+";border:1px solid "+_invSincCor+"44;border-radius:6px;padding:3px 8px'>"+_invSincTxt+"</span>";
-  h+="<button onclick='state._invLastSync=0;_invSincronizarDoSheets().then(function(){var m=document.getElementById(\"main-content\")||document.getElementById(\"main\");if(m&&state.tela===\"inventario\")renderInventario(m);showToast(\"✓ Sincronizado\");})' style='background:#1a2a1a;border:1px solid #10b98166;color:#10b981;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>🔄 Sincronizar"+(state._invLastSync?" <span style=\"opacity:.6\">"+new Date(state._invLastSync).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</span>":"")+"</button>";
+  h+="<button onclick='state._invLastSync=0;_invSincronizarDoSheets().then(function(){var m=document.getElementById(\"main-content\")||document.getElementById(\"main\");if(m&&state.tela===\"inventario\")renderInventario(m);showToast(\"✓ Sincronizado\");})' style='background:#1a2a1a;border:1px solid #10b981;color:#10b981;padding:8px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>🔄 Sincronizar"+(state._invLastSync?" <span style=\"opacity:.6\">"+new Date(state._invLastSync).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</span>":"")+"</button>";
   h+="<button onclick='_invAbrirImport()' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📤 Importar Lista</button>";
   if((state.invItens||[]).length) h+="<button onclick='_invLimparTodos()' style='background:#2a0800;border:1px solid #ef444466;color:#ef4444;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>🗑 Limpar Tudo</button>";
   h+="<button onclick='_invGerarPDF()' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📄 Exportar PDF</button>";
