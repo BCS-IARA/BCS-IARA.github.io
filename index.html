@@ -21870,7 +21870,32 @@ async function _invSincronizarDoSheets(){
     }
     if(rItens&&rItens.ok) state.invItens=_mergeInvTs(state.invItens, rItens);
     if(rMovs &&rMovs.ok)  state.invMovimentacoes=_mergeInv(state.invMovimentacoes, rMovs);
-    if(rConfs&&rConfs.ok) state.invConferencias=_mergeInvTs(state.invConferencias, rConfs);
+    if(rConfs&&rConfs.ok){
+      // Merge de conferências: desempate por número de itens conferidos (evita versão vazia local ganhar)
+      var _confLocal=state.invConferencias||[];
+      var _confRemoto=rConfs.dados||[];
+      var _confMap={};
+      _confLocal.forEach(function(c){
+        if(c&&c.id){
+          if(typeof c.itens==="string"){try{c.itens=JSON.parse(c.itens);}catch(e){c.itens={};}}
+          _confMap[String(c.id)]=c;
+        }
+      });
+      _confRemoto.forEach(function(r){
+        if(!r||!r.id) return;
+        if(typeof r.itens==="string"){try{r.itens=JSON.parse(r.itens);}catch(e){r.itens={};}}
+        var k=String(r.id);
+        var loc=_confMap[k];
+        if(!loc){_confMap[k]=r; return;}
+        var locTs=loc.atualizadoEm||loc.concluidaEm||loc.criadoEm||"";
+        var remTs=r.atualizadoEm||r.concluidaEm||r.criadoEm||"";
+        var locItens=Object.keys(loc.itens||{}).length;
+        var remItens=Object.keys(r.itens||{}).length;
+        // Remoto ganha se tiver timestamp maior OU mesmo timestamp mas mais itens conferidos
+        if(remTs>locTs||(remTs===locTs&&remItens>locItens)) _confMap[k]=r;
+      });
+      state.invConferencias=Object.keys(_confMap).map(function(k){return _confMap[k];});
+    }
     _invSalvarLocal();
   }catch(e){ console.warn("[INV] Sync falhou:",e); }
   finally{ state._invSincronizando=false; }
@@ -22841,6 +22866,7 @@ function _invConfItens(itemId, status){
     if(!cur.conferido_em) cur.conferido_em = new Date().toISOString();
     if(window._invConferenteAtual) cur.conferente = window._invConferenteAtual;
     conf.itens[itemId] = cur;
+    conf.atualizadoEm = new Date().toISOString();
     _invConfAtualizarBotoes(itemId, "ok");
     _invConfAtualizarBarra();
     var pan = document.getElementById("inv-ci-cat-"+itemId);
@@ -22856,6 +22882,7 @@ function _invConfItens(itemId, status){
   if(!cur2.conferido_em) cur2.conferido_em = new Date().toISOString();
   if(window._invConferenteAtual) cur2.conferente = window._invConferenteAtual;
   conf.itens[itemId] = cur2;
+  conf.atualizadoEm = new Date().toISOString();
   _invConfAtualizarBotoes(itemId, status);
   _invConfAtualizarBarra();
 
@@ -23088,6 +23115,7 @@ function _invFecharConferencia(){
   // Auto-salva progresso ao fechar (sem exigir Responsável)
   if(window._invConfAtual){
     var conf=window._invConfAtual;
+    conf.atualizadoEm=new Date().toISOString();
     conf.responsavel1=(document.getElementById("conf-resp1")||{value:""}).value||conf.responsavel1||"";
     conf.responsavel2=(document.getElementById("conf-resp2")||{value:""}).value||conf.responsavel2||"";
     conf.resultado=(document.getElementById("conf-resultado")||{value:""}).value||conf.resultado||"";
@@ -23120,6 +23148,7 @@ function _invSalvarConferencia(confId, concluir){
       if(has3) conf["assin"+n]=pc.toDataURL("image/jpeg",0.8);
     }
   });
+  conf.atualizadoEm=new Date().toISOString();
   if(concluir){conf.concluida=true;conf.concluidaEm=new Date().toISOString();}
   // Propaga Localização/Estado/Observações do "+" para o cadastro geral do item
   var _itensAtualizadosConf=[];
