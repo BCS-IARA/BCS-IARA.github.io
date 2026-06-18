@@ -225,18 +225,16 @@ h1,h2,h3,.titulo-serif{font-family:Georgia,'Times New Roman',serif;}
   .grid2{grid-template-columns:1fr!important;}
   .grid3{grid-template-columns:1fr!important;}
   /* Tabelas e cards */
-  table{font-size:11px;}
+  table{font-size:11px;display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;}
   .kpi-grid{grid-template-columns:1fr 1fr!important;}
   /* Modais full-screen no mobile */
   [id^="modal-"]{padding:8px!important;}
   /* Textos e inputs */
   input,textarea,select{font-size:16px!important;} /* evita zoom no iOS */
-  /* Grids internos */
-  div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important;}
-  div[style*="grid-template-columns:repeat(2"]{grid-template-columns:1fr!important;}
-  div[style*="grid-template-columns:repeat(3"]{grid-template-columns:1fr!important;}
-  div[style*="grid-template-columns:repeat(4"]{grid-template-columns:1fr 1fr!important;}
-  div[style*="grid-template-columns:repeat(auto-fit"]{grid-template-columns:1fr!important;}
+  /* Grids internos — colapsa qualquer grid inline para coluna única */
+  [style*="grid-template-columns"]{grid-template-columns:1fr!important;}
+  /* Área de toque mínima para botões */
+  button{min-height:38px;}
   /* Kanban horizontal → scroll */
   .kanban-board{display:flex;overflow-x:auto;gap:10px;padding-bottom:8px;scroll-snap-type:x mandatory;}
   .kanban-col{min-width:80vw;scroll-snap-align:start;}
@@ -640,6 +638,21 @@ function _mergeById(local, remoto){
   return merged;
 }
 
+// Merge por ID com timestamp: vence o registro com atualizadoEm mais recente
+function _mergeByIdTimestamp(local, remoto, campo){
+  campo = campo || "atualizadoEm";
+  if(!remoto || !Array.isArray(remoto) || !remoto.length) return local||[];
+  var map = {};
+  (local||[]).forEach(function(x){ if(x&&x.id) map[String(x.id)] = x; });
+  remoto.forEach(function(r){
+    if(!r || !r.id) return;
+    var k = String(r.id);
+    var loc = map[k];
+    if(!loc || (r[campo]||r.criadoEm||"") > (loc[campo]||loc.criadoEm||"")) map[k] = r;
+  });
+  return Object.keys(map).map(function(k){ return map[k]; });
+}
+
 async function sincronizarSheets(){
   if(!SHEETS_URL) return;
   try{
@@ -858,7 +871,7 @@ async function carregarDadosAppDoSheets(){
     // 🌱 Projetos Sociais + Policiais
     state.projetosSociais  = _mergeById(state.projetosSociais||[],  projSociaisSheets);
     state.inscricoesProjetos = _mergeById(state.inscricoesProjetos||[], inscricoesSheets);
-    state.policiais        = _mergeById(state.policiais||[],         policiaisSheets);
+    state.policiais        = _mergeByIdTimestamp(state.policiais||[], policiaisSheets);
     // 🌸 Casos VCM (objeto keyed por vítima — mantém o mais recente por atualizadoEm)
     if(vcmCasosSheets && typeof vcmCasosSheets==="object" && !Array.isArray(vcmCasosSheets)){
       if(!state.vcmCasos) state.vcmCasos={};
@@ -873,9 +886,9 @@ async function carregarDadosAppDoSheets(){
     // 📋 Módulos sem sync anterior — merge por id
     state.chamadas            = _mergeById(state.chamadas||[],            chamadasSheets);
     state.cargasArmamento     = _mergeById(state.cargasArmamento||[],     cargasSheets);
-    state.invItens            = _mergeById(state.invItens||[],            invItensSheets);
+    state.invItens            = _mergeByIdTimestamp(state.invItens||[],            invItensSheets);
     state.invMovimentacoes    = _mergeById(state.invMovimentacoes||[],    invMovSheets);
-    state.invConferencias     = _mergeById(state.invConferencias||[],     invConfSheets);
+    state.invConferencias     = _mergeByIdTimestamp(state.invConferencias||[],     invConfSheets);
     state.visitasEscolares    = _mergeById(state.visitasEscolares||[],    visEscSheets);
     state.candidaturas        = _mergeById(state.candidaturas||[],        candidaturasSheets);
     state.cadastroInstrutores = _mergeById(state.cadastroInstrutores||[], instrutoresSheets);
@@ -1213,7 +1226,7 @@ async function carregarDoSheets() {
     await carregarDadosAppDoSheets();
     // Re-renderizar telas que dependem dos dados carregados
     var mRe=document.getElementById("main");
-    if(mRe&&(state.tela==="projetos"||state.tela==="dashprojetos"||state.tela==="calendario"||state.tela==="escolas")) renderTela();
+    if(mRe&&(state.tela==="projetos"||state.tela==="dashprojetos"||state.tela==="calendario"||state.tela==="escolas"||state.tela==="inventario")) renderTela();
     // Atualizar calendário diretamente se estiver visível
     if(state.tela==="calendario" && document.getElementById("cal-container")) renderCalendar();
 
@@ -21848,9 +21861,13 @@ async function _invSincronizarDoSheets(){
       remoto.dados.forEach(function(x){ if(x&&x.id&&!ids.has(String(x.id))) merged.push(x); });
       return merged;
     }
-    if(rItens&&rItens.ok) state.invItens=_mergeInv(state.invItens, rItens);
+    function _mergeInvTs(local, remoto){
+      if(!remoto||!remoto.ok||!Array.isArray(remoto.dados)||!remoto.dados.length) return local||[];
+      return _mergeByIdTimestamp(local||[], remoto.dados);
+    }
+    if(rItens&&rItens.ok) state.invItens=_mergeInvTs(state.invItens, rItens);
     if(rMovs &&rMovs.ok)  state.invMovimentacoes=_mergeInv(state.invMovimentacoes, rMovs);
-    if(rConfs&&rConfs.ok) state.invConferencias=_mergeInv(state.invConferencias, rConfs);
+    if(rConfs&&rConfs.ok) state.invConferencias=_mergeInvTs(state.invConferencias, rConfs);
     _invSalvarLocal();
   }catch(e){ console.warn("[INV] Sync falhou:",e); }
   finally{ state._invSincronizando=false; }
@@ -22193,7 +22210,8 @@ function _invSalvarItem(idExistente){
     carga_liberador_assinatura:   assinLib,
     carga_localizacao: "",
     carga_data: tipoCarga==="fixa"?new Date().toISOString():"",
-    ativo: true
+    ativo: true,
+    atualizadoEm: new Date().toISOString()
   };
   if(!state.invItens) state.invItens=[];
   if(idExistente){
@@ -22589,8 +22607,11 @@ function _invAbrirConferencia(confId){
 }
 function _invAbrirConferencia2(conf){
   // Sempre pede quem está conferindo (não persiste — sempre pergunta ao abrir)
-  var polOpts=(state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";})
-    .sort(function(a,b){return (a.nome||"").localeCompare(b.nome||"");});
+  function _polAtivos(){
+    return (state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";})
+      .sort(function(a,b){return (a.nome||"").localeCompare(b.nome||"");});
+  }
+  var polOpts=_polAtivos();
   var IS="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px;border-radius:6px;font-size:13px;box-sizing:border-box;min-height:42px";
   var mc=document.createElement("div");
   mc.id="modal-inv-conferente";
@@ -22602,11 +22623,29 @@ function _invAbrirConferencia2(conf){
     "<option value=''>— selecione —</option>" +
     polOpts.map(function(p){return "<option value='"+esc(p.matricula)+"'>"+esc((p.posto?p.posto+" ":"")+p.nome+" ("+p.matricula+")")+"</option>";}).join("") +
     "</select>" +
+    "<p id='conf-pol-status' style='color:#a07c58;font-size:10px;margin:6px 0 0;text-align:center'>Atualizando lista…</p>" +
     "<div style='margin-top:14px;display:flex;gap:10px;justify-content:center'>" +
     "<button onclick='document.getElementById(\"modal-inv-conferente\").remove()' style='background:transparent;border:1px solid #DBC79E;color:#6B5236;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>" +
     "<button onclick='_invConfirmarConferente()' style='background:#1a3a1a;border:2px solid #3a7a4a;color:#a0d0a0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;min-height:42px'>Confirmar</button>" +
     "</div></div>";
   document.body.appendChild(mc);
+
+  // Busca a lista de policiais direto do Sheets — 1 chamada, sem esperar a fila do boot
+  _sheetsGet({acao:"listar",tipo:"policiais"}).then(function(r){
+    var statusEl=document.getElementById("conf-pol-status");
+    if(r&&r.ok&&Array.isArray(r.dados)&&r.dados.length){
+      state.policiais=_mergeByIdTimestamp(state.policiais||[], r.dados);
+      _invSalvarLocal();
+      var selEl=document.getElementById("sel-conferente");
+      if(selEl){
+        var valorAtual=selEl.value;
+        polOpts=_polAtivos();
+        selEl.innerHTML="<option value=''>— selecione —</option>"+polOpts.map(function(p){return "<option value='"+esc(p.matricula)+"'"+(p.matricula===valorAtual?" selected":"")+">"+esc((p.posto?p.posto+" ":"")+p.nome+" ("+p.matricula+")")+"</option>";}).join("");
+      }
+    }
+    if(statusEl) statusEl.remove();
+  });
+
   var _confRef=conf;
   window._invConfirmarConferente=function(){
     var mat=document.getElementById("sel-conferente").value;
@@ -22697,9 +22736,15 @@ function _invRenderConferencia(conf){
       html+="</select></div></div>";
       html+="<div><label style='color:#6B5236;font-size:10px'>Observações</label><input id='inv-ci-obs-"+iid+"' value='"+esc(det.observacoes||"")+"' placeholder='Observações, desgastes, irregularidades…' oninput='_invConfDetalhe(\""+iid+"\",\"observacoes\",this.value)' style='"+ISci+"'></div>";
       // foto
-      html+="<div style='display:flex;align-items:center;gap:8px'>";
-      if(det.foto_link){html+="<a href='"+esc(det.foto_link)+"' target='_blank' style='color:#D9A53C;font-size:11px'>📷 Ver foto</a>";}
-      html+="<label style='cursor:pointer;padding:3px 10px;background:transparent;border:1px solid #5e4636;border-radius:5px;color:#a07c58;font-size:11px'>📷 Anexar foto<input type='file' accept='image/*' capture='environment' style='display:none' onchange='_invConfFoto(\""+iid+"\",this)'></label>";
+      var _fotoItemSrc=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
+      html+="<div style='display:flex;align-items:center;gap:10px;flex-wrap:wrap'>";
+      if(_fotoItemSrc){
+        html+="<img src='"+_fotoItemSrc+"' title='Foto cadastrada do item' onclick=\"window.open('"+_fotoItemSrc+"','_blank')\" style='width:54px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #A87B22;cursor:pointer;flex-shrink:0'>";
+      } else {
+        html+="<span style='color:#a07c58;font-size:10px'>Item sem foto cadastrada</span>";
+      }
+      if(det.foto_link){html+="<a href='"+esc(det.foto_link)+"' target='_blank' style='color:#D9A53C;font-size:11px'>📷 Ver foto da conferência</a>";}
+      html+="<label style='cursor:pointer;padding:3px 10px;background:transparent;border:1px solid #5e4636;border-radius:5px;color:#a07c58;font-size:11px'>📷 Anexar foto de divergência<input type='file' accept='image/*' capture='environment' style='display:none' onchange='_invConfFoto(\""+iid+"\",this)'></label>";
       html+="</div>";
       html+="</div>";
       html+="</div>";
@@ -23040,7 +23085,7 @@ function _invSalvarConferencia(confId, concluir){
   var resp2=(document.getElementById("conf-resp2")||{}).value||"";
   if(!window._invConfAtual) return;
   var conf=window._invConfAtual;
-  conf.responsavel1=resp1; conf.responsavel2=resp2;
+  conf.responsavel1=resp1; conf.responsavel2=resp2; conf.atualizadoEm=new Date().toISOString();
   conf.resultado = (document.getElementById("conf-resultado")||{value:""}).value||"";
   conf.parecer_obs = (document.getElementById("conf-parecer-obs")||{value:""}).value.trim();
   ["1","2"].forEach(function(n){
@@ -23290,15 +23335,31 @@ function renderInventario(main){
   if(!state.invItens) state.invItens=[];
   if(!state.invMovimentacoes) state.invMovimentacoes=[];
   if(!state.invConferencias) state.invConferencias=[];
-  // Sync silencioso ao abrir (primeira vez ou após 5 min)
+  // Sync silencioso ao abrir (primeira vez ou após 1 min)
   var _agInv=state._invLastSync||0;
-  if(Date.now()-_agInv > 300000){
+  if(Date.now()-_agInv > 60000){
     state._invLastSync=Date.now();
     _invSincronizarDoSheets().then(function(){
       var m=document.getElementById("main-content")||document.getElementById("main");
       if(m&&state.tela==="inventario") renderInventario(m);
     });
   }
+  // Polling a cada 30s enquanto a tela inventário estiver aberta
+  if(state._invPollTimer) clearInterval(state._invPollTimer);
+  state._invPollTimer=setInterval(function(){
+    if(state.tela!=="inventario"){ clearInterval(state._invPollTimer); return; }
+    state._invLastSync=0;
+    _invSincronizarDoSheets().then(function(){
+      var m=document.getElementById("main-content")||document.getElementById("main");
+      if(m&&state.tela==="inventario") renderInventario(m);
+      var modalAberto=document.getElementById("modal-inv-conf");
+      if(modalAberto&&window._invConfAtual){
+        var idAtual=window._invConfAtual.id;
+        modalAberto.remove();
+        _invAbrirConferencia(idAtual);
+      }
+    });
+  },30000);
 
   var tab=state._invTab||"itens";
   var filtCat=state._invFiltCat||"";
@@ -23319,6 +23380,7 @@ function renderInventario(main){
   var _invSincTxt=state.sincErro?"⚠ Sem conexão":state.sincronizando?"⟳ Sincronizando...":state._invLastSync?"✓ "+new Date(state._invLastSync).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"—";
   var _invSincCor=state.sincErro?"#A8492E":state.sincronizando?"#C8A84B":state._invLastSync?"#6E8F52":"#6B5236";
   h+="<span style='font-size:10px;color:"+_invSincCor+";border:1px solid "+_invSincCor+"44;border-radius:6px;padding:3px 8px'>"+_invSincTxt+"</span>";
+  h+="<button onclick='state._invLastSync=0;_invSincronizarDoSheets().then(function(){var m=document.getElementById(\"main-content\")||document.getElementById(\"main\");if(m&&state.tela===\"inventario\")renderInventario(m);showToast(\"✓ Sincronizado\");})' style='background:#1a2a1a;border:1px solid #10b98166;color:#10b981;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>🔄 Sincronizar"+(state._invLastSync?" <span style=\"opacity:.6\">"+new Date(state._invLastSync).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+"</span>":"")+"</button>";
   h+="<button onclick='_invAbrirImport()' style='background:#2a1c10;border:1px solid #C8A84B66;color:#C8A84B;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📤 Importar Lista</button>";
   if((state.invItens||[]).length) h+="<button onclick='_invLimparTodos()' style='background:#2a0800;border:1px solid #ef444466;color:#ef4444;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>🗑 Limpar Tudo</button>";
   h+="<button onclick='_invGerarPDF()' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 14px;border-radius:7px;font-size:12px;cursor:pointer'>📄 Exportar PDF</button>";
@@ -24645,29 +24707,53 @@ function _invAbrirParecerModal(confId){
     h+="</div>";
   });
   h+="</div>";
-  // Categorias normativas a-j
+  // Categorias normativas a-j — mapear das categorias reais da conferência
   var catDefs=[
-    {k:"a",label:"Sem tombamento"},
-    {k:"b",label:"Plaqueta extraviada"},
-    {k:"c",label:"Não localizado / extraviado"},
-    {k:"d",label:"Obsoleto para desativação"},
-    {k:"e",label:"Descrição incorreta"},
-    {k:"f",label:"Recebido de outro órgão (carente de transferência)"},
-    {k:"g",label:"Cedido a outro órgão"},
-    {k:"h",label:"De terceiro (empréstimo/cessão)"},
-    {k:"i",label:"Oriundo de convênio"},
-    {k:"j",label:"Inservível vinculado a convênio"}
+    {k:"a",label:"Sem tombamento",           cat:"Bem sem tombamento"},
+    {k:"b",label:"Plaqueta extraviada",       cat:"Bem com plaqueta extraviada"},
+    {k:"c",label:"Não localizado / extraviado",cat:"Bem não localizado, incluindo os extraviados"},
+    {k:"d",label:"Obsoleto para desativação", cat:"Bem inservível, carente de baixa"},
+    {k:"e",label:"Descrição incorreta",       cat:"Bem com descrição incorreta"},
+    {k:"f",label:"Recebido de outro órgão (carente de transferência)", cat:"Bem recebido de outro órgão, carente de transferência de carga"},
+    {k:"g",label:"Cedido a outro órgão",      cat:"Bem cedido para outro órgão, carente de transferência de carga"},
+    {k:"h",label:"De terceiro (empréstimo/cessão)", cat:"Bem de terceiro com alteração (empréstimo, cessão provisória de uso etc.)"},
+    {k:"i",label:"Oriundo de convênio",       cat:"Bem oriundo de Convênio com alteração"},
+    {k:"j",label:"Inservível vinculado a convênio", cat:"Bem inservível vinculado a Convênio"}
   ];
+  // Contar itens por categoria da conferência (para pré-preencher)
+  var _confItensArr=Object.values(conf.itens||{});
+  var _catCount={};
+  var _catItens={};
+  _confItensArr.forEach(function(v){
+    var s=(v&&typeof v==="object")?v.status:v;
+    var c=(v&&typeof v==="object")?v.categoria:"";
+    if((s==="divergencia"||s==="ausente")&&c){
+      _catCount[c]=(_catCount[c]||0)+1;
+      if(!_catItens[c]) _catItens[c]=[];
+      // buscar descrição do item para obs automática
+      var itemId=null;
+      Object.keys(conf.itens||{}).forEach(function(id){if(conf.itens[id]===v)itemId=id;});
+      if(itemId){var it=(state.invItens||[]).find(function(x){return x.id===itemId;});if(it)_catItens[c].push(it.tombamento?it.tombamento:it.descricao);}
+    }
+  });
   h+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:12px;margin-bottom:12px'>";
-  h+="<div style='color:#C8A84B;font-size:11px;font-weight:700;margin-bottom:8px'>CATEGORIAS NORMATIVAS (Bens Permanentes)</div>";
+  h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
+  h+="<span style='color:#C8A84B;font-size:11px;font-weight:700'>CATEGORIAS NORMATIVAS (Bens Permanentes)</span>";
+  h+="<span style='color:#6B5236;font-size:10px'>Qtd pré-preenchida automaticamente da conferência</span>";
+  h+="</div>";
   var cats=cm.categorias||{};
   catDefs.forEach(function(cat){
-    h+="<div style='margin-bottom:8px'>";
-    h+="<label style='color:#6B5236;font-size:10px'>"+cat.k+") "+cat.label+" <span style='color:#888'>(qtd)</span></label>";
-    h+="<div style='display:grid;grid-template-columns:80px 1fr;gap:6px;margin-top:3px'>";
+    var autoQtd=_catCount[cat.cat]||0;
+    var autoObs=(_catItens[cat.cat]||[]).slice(0,5).join(", ");
     var cv=cats[cat.k]||{};
-    h+="<input id='pc-cat-"+cat.k+"-qtd' type='number' min='0' value='"+(cv.qtd||0)+"' style='"+IS+"'>";
-    h+="<input id='pc-cat-"+cat.k+"-obs' value='"+esc(cv.obs||"")+"' placeholder='Sem alterações' style='"+IS+"'>";
+    var qtd=cv.qtd!==undefined?cv.qtd:autoQtd;
+    var obs=cv.obs!==undefined?cv.obs:autoObs;
+    var temAuto=autoQtd>0;
+    h+="<div style='margin-bottom:8px"+(temAuto?";background:#fff8ee;border-radius:5px;padding:4px 6px":"")+"'>";
+    h+="<label style='color:"+(temAuto?"#b45700":"#6B5236")+";font-size:10px'>"+cat.k+") "+cat.label+(temAuto?" ▲":"")+" <span style='color:#888'>(qtd)</span></label>";
+    h+="<div style='display:grid;grid-template-columns:80px 1fr;gap:6px;margin-top:3px'>";
+    h+="<input id='pc-cat-"+cat.k+"-qtd' type='number' min='0' value='"+qtd+"' style='"+IS+(temAuto?";border-color:#f59e0b":"")+"'>";
+    h+="<input id='pc-cat-"+cat.k+"-obs' value='"+esc(obs)+"' placeholder='Sem alterações' style='"+IS+"'>";
     h+="</div></div>";
   });
   h+="<div style='margin-top:8px'><label style='color:#6B5236;font-size:10px'>Outras dignas de registro</label><textarea id='pc-cat-outras' rows='2' style='"+IS+"resize:vertical'>"+esc(cats.outras||"")+"</textarea></div>";
