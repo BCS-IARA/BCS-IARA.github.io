@@ -21868,7 +21868,27 @@ async function _invSincronizarDoSheets(){
       if(!remoto||!remoto.ok||!Array.isArray(remoto.dados)||!remoto.dados.length) return local||[];
       return _mergeByIdTimestamp(local||[], remoto.dados);
     }
-    if(rItens&&rItens.ok) state.invItens=_mergeInvTs(state.invItens, rItens);
+    if(rItens&&rItens.ok){
+      state.invItens=_mergeInvTs(state.invItens, rItens);
+      // Remover itens com tombamento duplicado: manter apenas o mais recente por tombamento
+      var _tombVisto={}, _serieVisto={};
+      state.invItens=state.invItens.filter(function(x){
+        if(x.ativo===false) return true; // mantém deletados para não voltarem
+        var t=String(x.tombamento||"").trim().toUpperCase();
+        var s=String(x.numero_serie||"").trim().toUpperCase();
+        var key=t||(s?"S:"+s:"");
+        if(!key) return true; // sem identificador: mantém sempre
+        if(_tombVisto[key]){
+          // Manter o mais recente
+          var prev=_tombVisto[key];
+          if((x.atualizadoEm||x.criadoEm||"")>=(prev.atualizadoEm||prev.criadoEm||"")){
+            prev._dup=true; _tombVisto[key]=x; return true;
+          }
+          return false;
+        }
+        _tombVisto[key]=x; return true;
+      }).filter(function(x){return !x._dup;});
+    }
     if(rMovs &&rMovs.ok)  state.invMovimentacoes=_mergeInv(state.invMovimentacoes, rMovs);
     if(rConfs&&rConfs.ok){
       // Merge de conferências: desempate por número de itens conferidos (evita versão vazia local ganhar)
@@ -22168,7 +22188,13 @@ function _invLimparPad(id){
 
 function _invExcluirItem(id){
   if(!confirm("Excluir este item do inventário? Esta ação não pode ser desfeita.")) return;
-  state.invItens=(state.invItens||[]).filter(function(x){return x.id!==id;});
+  // Soft delete: marca ativo:false em vez de remover — evita voltar do Sheets no sync
+  var idx=(state.invItens||[]).findIndex(function(x){return x.id===id;});
+  if(idx>=0){
+    state.invItens[idx].ativo=false;
+    state.invItens[idx].atualizadoEm=new Date().toISOString();
+    _invEnviarSheets("inv_item", state.invItens[idx]); // propaga ativo:false ao Sheets
+  }
   _invSalvarLocal();
   var m=document.getElementById("modal-inv-item"); if(m) m.remove();
   var main=document.getElementById("main-content")||document.getElementById("main");
