@@ -22245,6 +22245,11 @@ function _invSalvarItem(idExistente){
 }
 function _invConfEditarItem(itemId){
   _invAbrirItem(itemId);
+  // Garantir que o modal de item fica na frente da conferência
+  setTimeout(function(){
+    var m=document.getElementById("modal-inv-item");
+    if(m) m.style.zIndex="9500";
+  },50);
 }
 
 function _invPadBranco(id){
@@ -22666,6 +22671,11 @@ function _invAbrirConferencia2(conf){
   };
 }
 function _invRenderConferencia(conf){
+  // Normalizar conf.itens: pode chegar como string JSON quando vindo do Sheets
+  if(typeof conf.itens === "string"){
+    try{ conf.itens=JSON.parse(conf.itens); }catch(e){ conf.itens={}; }
+  }
+  if(!conf.itens || typeof conf.itens !== "object" || Array.isArray(conf.itens)) conf.itens={};
   // Salvar imediatamente ao abrir (garante persistência mesmo se fechar sem clicar Salvar)
   if(!state.invConferencias) state.invConferencias=[];
   var _existeIdx=(state.invConferencias).findIndex(function(x){return x.id===conf.id;});
@@ -23630,6 +23640,9 @@ function renderInventario(main){
     } else {
       h+="<div style='display:flex;flex-direction:column;gap:10px'>";
       confs.forEach(function(conf){
+        // Normalizar conf.itens se vier como string do Sheets
+        if(typeof conf.itens==="string"){try{conf.itens=JSON.parse(conf.itens);}catch(e){conf.itens={};}}
+        if(!conf.itens||typeof conf.itens!=="object"||Array.isArray(conf.itens)) conf.itens={};
         var dt=conf.criadoEm?new Date(conf.criadoEm).toLocaleString("pt-BR"):"—";
         var vals=Object.values(conf.itens||{});
         var nOk=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok";}).length;
