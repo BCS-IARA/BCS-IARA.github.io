@@ -1279,6 +1279,7 @@ let state = {
   invItens: JSON.parse(localStorage.getItem("bcs_inv_itens")||"[]"),
   invMovimentacoes: JSON.parse(localStorage.getItem("bcs_inv_mov")||"[]"),
   invConferencias: JSON.parse(localStorage.getItem("bcs_inv_conf")||"[]"),
+  invLocais: JSON.parse(localStorage.getItem("bcs_inv_locais")||"null"),
   policiais: JSON.parse(localStorage.getItem("bcs_policiais")||"[]"),
   solicitacoes: JSON.parse(localStorage.getItem("bcs_solicitacoes")||"[]"),
   instrutorNome: "",  // preenchido no login, não persistido
@@ -21780,9 +21781,25 @@ var INV_ESTADOS = {
 };
 
 function _invSalvarLocal(){
-  localStorage.setItem("bcs_inv_itens", JSON.stringify(state.invItens||[]));
-  localStorage.setItem("bcs_inv_mov",   JSON.stringify(state.invMovimentacoes||[]));
-  localStorage.setItem("bcs_inv_conf",  JSON.stringify(state.invConferencias||[]));
+  localStorage.setItem("bcs_inv_itens",  JSON.stringify(state.invItens||[]));
+  localStorage.setItem("bcs_inv_mov",    JSON.stringify(state.invMovimentacoes||[]));
+  localStorage.setItem("bcs_inv_conf",   JSON.stringify(state.invConferencias||[]));
+  localStorage.setItem("bcs_inv_locais", JSON.stringify(_invGetLocaisObj()));
+}
+function _invGetLocaisObj(){
+  if(!state.invLocais){
+    // Migração única: INV_LOCAIS_FIXOS + extras do localStorage → state.invLocais
+    var extras=JSON.parse(localStorage.getItem("bcs_inv_locais_extra")||"[]");
+    var todos=INV_LOCAIS_FIXOS.concat(extras.filter(function(l){return INV_LOCAIS_FIXOS.indexOf(l)<0;}));
+    // Incluir também qualquer localização já em uso pelos itens que não esteja na lista
+    (state.invItens||[]).forEach(function(x){
+      if(x.localizacao&&todos.indexOf(x.localizacao)<0) todos.push(x.localizacao);
+    });
+    state.invLocais=todos.map(function(nome){
+      return {id:"loc_"+nome.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,""),nome:nome,sublocais:[]};
+    });
+  }
+  return state.invLocais;
 }
 
 // ── Upload de foto do item para Google Drive ───────────────────
@@ -21981,6 +21998,20 @@ function _invAtualizarSubs(){
   var subs=INV_SUBS[cat.value]||[];
   sub.innerHTML=subs.map(function(s){return "<option>"+s+"</option>";}).join("");
 }
+function _invAtualizarSublocais(){
+  var loc=document.getElementById("inv-local");
+  var sl=document.getElementById("inv-sublocal");
+  if(!loc||!sl) return;
+  var locObj=(_invGetLocaisObj()).find(function(o){return o.nome===loc.value;})||{sublocais:[]};
+  var subs=locObj.sublocais||[];
+  if(subs.length===0){
+    sl.innerHTML="<option value=''>— Nenhuma sublocalização —</option>";
+    sl.disabled=true; sl.style.opacity="0.5";
+  } else {
+    sl.innerHTML="<option value=''>— Nenhuma —</option>"+subs.map(function(s){return "<option value='"+esc(s)+"'>"+esc(s)+"</option>";}).join("");
+    sl.disabled=false; sl.style.opacity="1";
+  }
+}
 
 function _invSetTipoCarga(tipo){
   // Só dois estados: none ou fixa
@@ -22003,7 +22034,21 @@ function _invAbrirItem(id){
   var cats = Object.keys(INV_CATS);
   var catSel = item?item.categoria:cats[0];
   var subs = INV_SUBS[catSel]||[];
-  var locOpts = INV_LOCAIS.map(function(l){return "<option"+(item&&item.localizacao===l?" selected":"")+((!item)&&l==="Sala de Plantão"?" selected":"")+">"+l+"</option>";}).join("");
+  var _locaisObj=_invGetLocaisObj();
+  var locOpts=_locaisObj.map(function(lo){
+    var sel=(item&&item.localizacao===lo.nome)||(!item&&lo.nome==="Sala de Plantão")?" selected":"";
+    return "<option value='"+esc(lo.nome)+"'"+sel+">"+esc(lo.nome)+"</option>";
+  }).join("");
+  var _locSelNome=item?(item.localizacao||(_locaisObj[0]&&_locaisObj[0].nome)||""):"Sala de Plantão";
+  var _locSelObj=_locaisObj.find(function(lo){return lo.nome===_locSelNome;})||{sublocais:[]};
+  var _subAtual=item?(item.sublocalizacao||""):"";
+  var sublocOpts=(_locSelObj.sublocais||[]).map(function(s){
+    return "<option value='"+esc(s)+"'"+(_subAtual===s?" selected":"")+">"+esc(s)+"</option>";
+  }).join("");
+  if(_subAtual&&!(_locSelObj.sublocais||[]).includes(_subAtual)){
+    sublocOpts="<option value='"+esc(_subAtual)+"' selected style='color:#e87c23'>"+esc(_subAtual)+" ⚠</option>"+sublocOpts;
+  }
+  var sublocDisabled=(_locSelObj.sublocais||[]).length===0&&!_subAtual?"disabled":"";
   var stOpts = Object.keys(INV_ESTADOS).map(function(k){return "<option value='"+k+"'"+(item&&item.estado===k?" selected":"")+((!item)&&k==="bom"?" selected":"")+">"+INV_ESTADOS[k].label+"</option>";}).join("");
   var subOpts = subs.map(function(s){return "<option"+(item&&item.subcategoria===s?" selected":"")+">"+s+"</option>";}).join("");
   var tipoCarga = item?(item.tipo_carga||"none"):"none";
@@ -22040,10 +22085,13 @@ function _invAbrirItem(id){
   html += "<div><label style='color:#6B5236;font-size:11px'>Nº Série</label><input id='inv-serie' value='"+(item?esc(item.numero_serie||""):"")+"' style='"+ISm+"'></div>";
   html += "</div>";
 
-  // Estado + localização + data aquisição
-  html += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px'>";
+  // Estado + localização + sublocalização + data aquisição
+  html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
   html += "<div><label style='color:#6B5236;font-size:11px'>Estado*</label><select id='inv-estado' style='"+ISm+"'>"+stOpts+"</select></div>";
-  html += "<div><label style='color:#6B5236;font-size:11px'>Localização*</label><select id='inv-local' style='"+ISm+"'>"+locOpts+"</select></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Localização*</label><select id='inv-local' onchange='_invAtualizarSublocais()' style='"+ISm+"'>"+locOpts+"</select></div>";
+  html += "</div>";
+  html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Sublocalização</label><select id='inv-sublocal' "+sublocDisabled+" style='"+ISm+(sublocDisabled?" opacity:0.5":"")+"'><option value=''>— Nenhuma —</option>"+sublocOpts+"</select></div>";
   html += "<div><label style='color:#6B5236;font-size:11px'>Data Aquisição</label><input id='inv-dtaq' type='date' value='"+(item?item.data_aquisicao||"":"")+"' style='"+ISm+"'></div>";
   html += "</div>";
 
@@ -22252,6 +22300,7 @@ function _invSalvarItem(idExistente){
     numero_serie: (document.getElementById("inv-serie")||{}).value||"",
     estado: (document.getElementById("inv-estado")||{}).value||"bom",
     localizacao: (document.getElementById("inv-local")||{}).value||"",
+    sublocalizacao: (document.getElementById("inv-sublocal")||{}).value||"",
     data_aquisicao: (document.getElementById("inv-dtaq")||{}).value||"",
     tamanho:       (document.getElementById("inv-tamanho")||{}).value||"",
     genero:        (document.getElementById("inv-genero")||{}).value||"",
@@ -23536,7 +23585,7 @@ function renderInventario(main){
 
   // Tabs
   h+="<div style='display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid #5e4636;overflow-x:auto'>";
-  [["itens","📋 Itens"],["movimentacoes","🚛 Movimentações"],["conferencias","📊 Conferências"],["policiais","👮 Por Policial"]].forEach(function(pair){
+  [["itens","📋 Itens"],["movimentacoes","🚛 Movimentações"],["conferencias","📊 Conferências"],["policiais","👮 Por Policial"],["locais","📍 Localizações"]].forEach(function(pair){
     var active=tab===pair[0];
     h+="<button onclick='state._invTab=\""+pair[0]+"\";_invAplicarFiltros()' style='padding:8px 16px;border:none;border-bottom:3px solid "+(active?"#D9A53C":"transparent")+";background:transparent;color:"+(active?"#D9A53C":"#a07c58")+";font-size:12px;cursor:pointer;font-weight:"+(active?"700":"400")+";white-space:nowrap'>"+pair[1]+"</button>";
   });
@@ -23570,7 +23619,7 @@ function renderInventario(main){
       if(filtEst && x.estado!==filtEst) return false;
       if(filtLoc && (x.localizacao||"")!==filtLoc) return false;
       if(filtBusca){
-        var hay=(x.descricao||"")+" "+(x.tombamento||"")+" "+(x.marca||"")+" "+(x.modelo||"")+" "+(x.localizacao||"")+" "+(x.numero_serie||"");
+        var hay=(x.descricao||"")+" "+(x.tombamento||"")+" "+(x.marca||"")+" "+(x.modelo||"")+" "+(x.localizacao||"")+" "+(x.sublocalizacao||"")+" "+(x.numero_serie||"");
         if(hay.toLowerCase().indexOf(filtBusca)<0) return false;
       }
       return true;
@@ -23656,7 +23705,7 @@ function renderInventario(main){
           h+="</div>";
           h+="<div style='color:#6B5236;font-size:11px;margin-top:2px'>";
           if(item.tombamento) h+="<span style='color:#d4a87a'>Nº "+esc(item.tombamento)+"</span> · ";
-          h+=esc(item.localizacao||"—");
+          h+=esc(item.localizacao||"—")+(item.sublocalizacao?" › "+esc(item.sublocalizacao):"");
           if(item.marca||item.modelo) h+=" · "+esc([item.marca,item.modelo].filter(Boolean).join(" "));
           if(cargaTxt) h+=" · <span style='color:#4a9fd4'>"+cargaTxt+"</span>";
           h+="</div>";
@@ -23744,6 +23793,10 @@ function renderInventario(main){
     h+="<div id='inv-pol-content'>"+_invRenderPoliciais(itens)+"</div>";
   }
 
+  if(tab==="locais"){
+    h+="<div id='inv-locais-wrap'>"+_invRenderLocais()+"</div>";
+  }
+
   h+="</div>";
   main.innerHTML=h;
 }
@@ -23813,6 +23866,111 @@ function _invRenderPoliciais(itens){
   });
   h+="</div>";
   return h;
+}
+
+function _invRenderLocais(){
+  var locais=_invGetLocaisObj();
+  var ISm="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
+  var h="";
+  h+="<div style='display:flex;gap:8px;margin-bottom:16px;align-items:center'>";
+  h+="<input id='inv-novoloc' placeholder='Nome da localização' style='"+ISm+";flex:1'>";
+  h+="<button onclick='_invAddLocalNovo()' style='background:#2a1c10;border:1px solid #D9A53C;color:#D9A53C;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer;white-space:nowrap'>+ Adicionar</button>";
+  h+="</div>";
+  if(locais.length===0){
+    h+="<p style='color:#a07c58;text-align:center;padding:32px 0'>Nenhuma localização cadastrada.</p>";
+    return h;
+  }
+  locais.forEach(function(loc,li){
+    var emUso=(state.invItens||[]).filter(function(x){return x.ativo!==false&&x.localizacao===loc.nome;}).length;
+    h+="<div style='background:#EAD9B8;border:1px solid #A87B22;border-radius:10px;padding:14px;margin-bottom:10px'>";
+    h+="<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap'>";
+    h+="<span style='font-weight:700;color:#3D2B1A;font-size:14px'>📍 "+esc(loc.nome)+"</span>";
+    if(emUso) h+="<span style='color:#a07c58;font-size:11px'>"+emUso+" item(ns)</span>";
+    if(!emUso){
+      h+="<button onclick='_invRemoverLocal(\""+esc(loc.id)+"\")' style='margin-left:auto;background:transparent;border:1px solid #ef444455;color:#ef4444;padding:3px 10px;border-radius:5px;font-size:11px;cursor:pointer'>✕ Remover</button>";
+    } else {
+      h+="<span style='margin-left:auto;color:#a07c58;font-size:10px'>Em uso — não pode remover</span>";
+    }
+    h+="</div>";
+    // Sublocais
+    h+="<div style='margin-top:10px;padding-top:10px;border-top:1px solid #DBC79E'>";
+    if((loc.sublocais||[]).length===0){
+      h+="<p style='color:#a07c58;font-size:11px;margin:0 0 8px'>Nenhuma sublocalização.</p>";
+    } else {
+      (loc.sublocais||[]).forEach(function(s,si){
+        var subUso=(state.invItens||[]).filter(function(x){return x.ativo!==false&&x.localizacao===loc.nome&&x.sublocalizacao===s;}).length;
+        h+="<div style='display:flex;align-items:center;gap:6px;margin-bottom:5px'>";
+        h+="<span style='color:#6B5236;font-size:12px'>› "+esc(s)+(subUso?" <span style='font-size:10px;color:#a07c58'>("+subUso+")</span>":"")+"</span>";
+        if(!subUso){
+          h+="<button onclick='_invRemoverSublocal(\""+esc(loc.id)+"\","+si+")' style='background:transparent;border:none;color:#ef4444;font-size:12px;cursor:pointer;padding:0 4px' title='Remover'>✕</button>";
+        } else {
+          h+="<span style='color:#a07c58;font-size:10px'>(em uso)</span>";
+        }
+        h+="</div>";
+      });
+    }
+    h+="<div style='display:flex;gap:6px;margin-top:6px'>";
+    h+="<input id='inv-novosub-"+esc(loc.id)+"' placeholder='Nova sublocalização' style='flex:1;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:6px;border-radius:6px;font-size:12px'>";
+    h+="<button onclick='_invAddSublocal(\""+esc(loc.id)+"\")' style='background:#2a1c10;border:1px solid #A87B22;color:#D9A53C;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer'>+ Sub</button>";
+    h+="</div>";
+    h+="</div>";
+    h+="</div>";
+  });
+  return h;
+}
+function _invAddLocalNovo(){
+  var n=(document.getElementById("inv-novoloc")||{}).value||"";
+  n=n.trim();
+  if(!n){showToast("Digite o nome da localização","error");return;}
+  var locs=_invGetLocaisObj();
+  if(locs.find(function(l){return l.nome.toLowerCase()===n.toLowerCase();})){showToast("Localização já existe","error");return;}
+  locs.push({id:"loc_"+Date.now(),nome:n,sublocais:[]});
+  state.invLocais=locs;
+  _invSalvarLocal();
+  var w=document.getElementById("inv-locais-wrap");
+  if(w) w.innerHTML=_invRenderLocais();
+}
+function _invRemoverLocal(locId){
+  var locs=_invGetLocaisObj();
+  var loc=locs.find(function(l){return l.id===locId;});
+  if(!loc) return;
+  var emUso=(state.invItens||[]).filter(function(x){return x.ativo!==false&&x.localizacao===loc.nome;}).length;
+  if(emUso){showToast("Não é possível remover: "+emUso+" item(ns) usam esta localização","error");return;}
+  if(!confirm("Remover localização \""+loc.nome+"\"?")) return;
+  state.invLocais=locs.filter(function(l){return l.id!==locId;});
+  _invSalvarLocal();
+  var w=document.getElementById("inv-locais-wrap");
+  if(w) w.innerHTML=_invRenderLocais();
+}
+function _invAddSublocal(locId){
+  var input=document.getElementById("inv-novosub-"+locId);
+  if(!input) return;
+  var n=input.value.trim();
+  if(!n){showToast("Digite o nome da sublocalização","error");return;}
+  var locs=_invGetLocaisObj();
+  var loc=locs.find(function(l){return l.id===locId;});
+  if(!loc) return;
+  if(!loc.sublocais) loc.sublocais=[];
+  if(loc.sublocais.indexOf(n)>=0){showToast("Sublocalização já existe","error");return;}
+  loc.sublocais.push(n);
+  state.invLocais=locs;
+  _invSalvarLocal();
+  var w=document.getElementById("inv-locais-wrap");
+  if(w) w.innerHTML=_invRenderLocais();
+}
+function _invRemoverSublocal(locId,si){
+  var locs=_invGetLocaisObj();
+  var loc=locs.find(function(l){return l.id===locId;});
+  if(!loc||!loc.sublocais) return;
+  var s=loc.sublocais[si];
+  var emUso=(state.invItens||[]).filter(function(x){return x.ativo!==false&&x.localizacao===loc.nome&&x.sublocalizacao===s;}).length;
+  if(emUso){showToast("Não é possível remover: "+emUso+" item(ns) usam esta sublocalização","error");return;}
+  if(!confirm("Remover sublocalização \""+s+"\"?")) return;
+  loc.sublocais.splice(si,1);
+  state.invLocais=locs;
+  _invSalvarLocal();
+  var w=document.getElementById("inv-locais-wrap");
+  if(w) w.innerHTML=_invRenderLocais();
 }
 
 function _invFiltrarPoliciais(busca){
