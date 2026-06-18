@@ -22122,7 +22122,7 @@ function _invAbrirItem(id){
   else html += "<span></span>";
   html += "<div style='display:flex;gap:10px'>";
   html += "<button onclick=\"document.getElementById('modal-inv-item').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
-  html += "<button onclick='_invSalvarItem(\""+esc(id||"")+"\")'  style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>💾 Salvar</button>";
+  html += "<button id='btn-inv-salvar' onclick=\"this.disabled=true;this.style.opacity='0.6';_invSalvarItem('"+esc(id||"")+"')\" style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>💾 Salvar</button>";
   html += "</div></div>";
 
   html += "</div></div></div>";
@@ -22177,13 +22177,21 @@ function _invExcluirItem(id){
 }
 
 function _invLimparTodos(){
-  var n=(state.invItens||[]).filter(function(x){return x.ativo!==false;}).length;
+  var itensAtuais=(state.invItens||[]).slice();
+  var n=itensAtuais.filter(function(x){return x.ativo!==false;}).length;
   if(!confirm("Excluir TODOS os "+n+" itens do inventário?\n\nUse esta opção para limpar uma importação errada e reimportar corretamente.")) return;
   state.invItens=[];
   _invSalvarLocal();
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
-  showToast("Inventário limpo — reimporte os dados");
+  showToast("Inventário limpo — apagando da planilha...");
+  var _li=0;
+  (function _apagarProximo(){
+    if(_li>=itensAtuais.length){ showToast("✓ "+itensAtuais.length+" item(s) removido(s) da planilha — pode reimportar"); return; }
+    _sheetsGet({acao:"deletar",tipo:"inv_item",id:itensAtuais[_li].id});
+    _li++;
+    setTimeout(_apagarProximo,250);
+  })();
 }
 
 function _invSalvarItem(idExistente){
@@ -24400,13 +24408,17 @@ function _invExecutarImport(){
   var substituir=(document.getElementById("imp-substituir")||{}).checked!==false;
   if(!state.invItens) state.invItens=[];
 
-  // Índice por tombamento para substituição
-  var idxTomb={};
+  // Índice por tombamento (forte) e por número de série (fallback quando não há tombamento)
+  var idxTomb={}, idxSerie={};
   if(substituir){
-    state.invItens.forEach(function(x,i){ if(x.tombamento) idxTomb[String(x.tombamento).trim()]=i; });
+    state.invItens.forEach(function(x,i){
+      if(x.tombamento) idxTomb[String(x.tombamento).trim().toUpperCase()]=i;
+      if(x.numero_serie) idxSerie[String(x.numero_serie).trim().toUpperCase()]=i;
+    });
   }
 
-  var importados=0, substituidos=0, ignorados=0;
+  var importados=0, substituidos=0, ignorados=0, semIdentificador=0;
+  var _itensParaEnviar=[];
   linhas.forEach(function(row){
     var descRaw=mapa.descricao!==undefined?row[mapa.descricao]:"";
     if(!descRaw || !descRaw.trim()){ ignorados++; return; }
@@ -24449,20 +24461,29 @@ function _invExecutarImport(){
       observacoes:"",foto:"",tipo_carga:"none",ativo:true
     };
 
-    // Substitui ou adiciona
-    if(substituir && tomb && idxTomb[tomb]!==undefined){
-      var idx=idxTomb[tomb];
+    // Substitui ou adiciona — casa por tombamento OU número de série como fallback
+    var tombKey=String(tomb).trim().toUpperCase();
+    var serieKey=String(item.numero_serie||"").trim().toUpperCase();
+    var idxExistente = substituir && tombKey && idxTomb[tombKey]!==undefined ? idxTomb[tombKey]
+                     : substituir && serieKey && idxSerie[serieKey]!==undefined ? idxSerie[serieKey]
+                     : -1;
+    if(idxExistente>=0){
+      var idx=idxExistente;
       item.id=state.invItens[idx].id;
       item.criadoEm=state.invItens[idx].criadoEm;
       item.localizacao=state.invItens[idx].localizacao||item.localizacao;
       item.tipo_carga=state.invItens[idx].tipo_carga||"none";
       item.observacoes=state.invItens[idx].observacoes||"";
+      item.atualizadoEm=new Date().toISOString();
       state.invItens[idx]=item;
       substituidos++;
     } else {
+      if(!tombKey && !serieKey) semIdentificador++;
+      item.atualizadoEm=new Date().toISOString();
       state.invItens.push(item);
       importados++;
     }
+    _itensParaEnviar.push(item);
   });
 
   _invSalvarLocal();
@@ -24470,9 +24491,22 @@ function _invExecutarImport(){
   var msg="✓ "+importados+" importados";
   if(substituidos) msg+=", "+substituidos+" atualizados";
   if(ignorados) msg+=" ("+ignorados+" ignorados)";
+  if(semIdentificador) msg+=" — ⚠ "+semIdentificador+" sem tombamento/série, revisar";
   showToast(msg);
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
+
+  // Envia pra planilha em sequência (evita rajada de chamadas simultâneas)
+  if(_itensParaEnviar.length){
+    showToast("Enviando "+_itensParaEnviar.length+" item(s) à planilha...");
+    var _ie=0;
+    (function _enviarProximo(){
+      if(_ie>=_itensParaEnviar.length){ showToast("✓ Importação sincronizada com a planilha"); return; }
+      _invEnviarSheets("inv_item",_itensParaEnviar[_ie]);
+      _ie++;
+      setTimeout(_enviarProximo,250);
+    })();
+  }
 }
 
 function _invAbrirParecerModal(confId){
