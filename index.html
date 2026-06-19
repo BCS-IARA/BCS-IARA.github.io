@@ -22704,6 +22704,16 @@ function _invVerHistorico(itemId){
   document.body.insertAdjacentHTML("beforeend", html);
 }
 
+function _invItensValidosConf(conf){
+  var _belicoCats=["material_belico"];
+  var tipoBem=(conf&&conf.tipoBem)||"movel";
+  return (state.invItens||[]).filter(function(x){
+    if(x.ativo===false) return false;
+    var isBelico=_belicoCats.some(function(c){return x.categoria===c;});
+    return tipoBem==="belico"?isBelico:!isBelico;
+  });
+}
+
 function _invAbrirConferencia(confId){
   var conf = confId?(state.invConferencias||[]).find(function(x){return x.id===confId;}):null;
   var isNew = !conf;
@@ -22793,12 +22803,7 @@ function _invRenderConferencia(conf){
   if(_existeIdx<0){state.invConferencias.push(conf);} else {state.invConferencias[_existeIdx]=conf;}
   _invSalvarLocal();
   var tipoBem = conf.tipoBem || "movel";
-  var _belicoCats = ["material_belico"];
-  var itensAtivos=(state.invItens||[]).filter(function(x){
-    if(x.ativo===false) return false;
-    var isBelico=_belicoCats.some(function(c){return x.categoria===c;});
-    return tipoBem==="belico"?isBelico:!isBelico;
-  });
+  var itensAtivos=_invItensValidosConf(conf);
   var cats=Object.keys(INV_CATS);
   var tipoLabel = tipoBem==="belico"?"🔫 Material Bélico":"🏛️ Bem Permanente Móvel";
   var html="<div id='modal-inv-conf' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9300;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch'>";
@@ -22825,7 +22830,12 @@ function _invRenderConferencia(conf){
   html+="<div><label style='color:#6B5236;font-size:11px'>Observações da Comissão</label><input id='conf-parecer-obs' value='"+esc(conf.parecer_obs||"")+"' placeholder='Observações, ressalvas, prazos...' style='"+ISc+"'></div>";
   html+="</div>";
   // Busca + barra de progresso
-  var _totalConf=Object.values(conf.itens||{}).filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok"||s==="divergencia"||s==="ausente";}).length;
+  var _idsAtivosConf={}; itensAtivos.forEach(function(x){_idsAtivosConf[x.id]=true;});
+  var _totalConf=Object.entries(conf.itens||{}).filter(function(e){
+    if(!_idsAtivosConf[e[0]]) return false;
+    var v=e[1]; var s=(v&&typeof v==="object")?v.status:v;
+    return s==="ok"||s==="divergencia"||s==="ausente";
+  }).length;
   var _totalItens=itensAtivos.length;
   var _pct=_totalItens?Math.round(_totalConf/_totalItens*100):0;
   html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:10px 14px'>";
@@ -23022,14 +23032,14 @@ function _invConfAtualizarBotoes(itemId, status){
 function _invConfAtualizarBarra(){
   var conf=window._invConfAtual;
   if(!conf) return;
-  var tipoBem=conf.tipoBem||"movel";
-  var _belicoCats=["material_belico"];
-  var total=(state.invItens||[]).filter(function(x){
-    if(x.ativo===false) return false;
-    var isBelico=_belicoCats.some(function(c){return x.categoria===c;});
-    return tipoBem==="belico"?isBelico:!isBelico;
+  var itensValidos=_invItensValidosConf(conf);
+  var total=itensValidos.length;
+  var idsValidos={}; itensValidos.forEach(function(x){idsValidos[x.id]=true;});
+  var done=Object.entries(conf.itens||{}).filter(function(e){
+    if(!idsValidos[e[0]]) return false;
+    var v=e[1]; var s=(v&&typeof v==="object")?v.status:v;
+    return s==="ok"||s==="divergencia"||s==="ausente";
   }).length;
-  var done=Object.values(conf.itens||{}).filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok"||s==="divergencia"||s==="ausente";}).length;
   var pct=total?Math.round(done/total*100):0;
   var bar=document.querySelector("#modal-inv-conf .inv-conf-bar");
   if(bar){bar.style.width=pct+"%";bar.style.background=pct===100?"#3a7a4a":pct>50?"#d4a87a":"#4a9fd4";}
@@ -23759,11 +23769,13 @@ function renderInventario(main){
         if(typeof conf.itens==="string"){try{conf.itens=JSON.parse(conf.itens);}catch(e){conf.itens={};}}
         if(!conf.itens||typeof conf.itens!=="object"||Array.isArray(conf.itens)) conf.itens={};
         var dt=conf.criadoEm?new Date(conf.criadoEm).toLocaleString("pt-BR"):"—";
-        var vals=Object.values(conf.itens||{});
+        var itensValidosConf=_invItensValidosConf(conf);
+        var idsValidosConf={}; itensValidosConf.forEach(function(x){idsValidosConf[x.id]=true;});
+        var vals=Object.entries(conf.itens||{}).filter(function(e){return idsValidosConf[e[0]];}).map(function(e){return e[1];});
         var nOk=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok";}).length;
         var nDiv=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="divergencia";}).length;
         var nAus=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ausente";}).length;
-        var nPend=itens.length-vals.length;
+        var nPend=itensValidosConf.length-vals.length;
         h+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:10px;padding:14px'>";
         h+="<div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px'>";
         h+="<div><span style='color:#d4a87a;font-size:11px'>"+dt+"</span><br><span style='color:#3D2B1A;font-size:13px;font-weight:700'>Conferência "+(conf.concluida?"<span style='color:#3a7a4a;font-size:11px'>✅ Concluída</span>":"<span style='color:#f59e0b;font-size:11px'>⏳ Em andamento</span>")+"</span></div>";
@@ -24864,10 +24876,11 @@ window._invGerarParecerComissao=_invGerarParecerComissao;
 function _invGerarPDFConferencia(confId){
   var conf=(state.invConferencias||[]).find(function(x){return x.id===confId;});
   if(!conf){ showToast("Conferência não encontrada","error"); return; }
-  var itens=(state.invItens||[]).filter(function(x){return x.ativo!==false;});
+  var itens=_invItensValidosConf(conf);
   var dt=new Date(conf.criadoEm).toLocaleString("pt-BR");
   var dtConc=conf.concluidaEm?new Date(conf.concluidaEm).toLocaleString("pt-BR"):"—";
-  var vals=Object.values(conf.itens||{});
+  var idsValidosPdf={}; itens.forEach(function(x){idsValidosPdf[x.id]=true;});
+  var vals=Object.entries(conf.itens||{}).filter(function(e){return idsValidosPdf[e[0]];}).map(function(e){return e[1];});
   var nOk=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ok";}).length;
   var nDiv=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="divergencia";}).length;
   var nAus=vals.filter(function(v){var s=(v&&typeof v==="object")?v.status:v;return s==="ausente";}).length;
