@@ -23011,6 +23011,7 @@ function _invRenderConferencia(conf){
   // Botões
   html+="<div style='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap'>";
   html+="<button onclick='_invFecharConferencia()' style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Fechar</button>";
+  html+="<button onclick='_invConfScanQR()' style='background:#1a0e00;border:1px solid #D9A53C;color:#D9A53C;padding:8px 18px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>📷 Escanear QR</button>";
   html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",false)' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>💾 Salvar Progresso</button>";
   html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",true)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✅ Concluir e Gerar PDF</button>";
   html+="</div>";
@@ -24301,6 +24302,120 @@ function _invQRCode(itemId){
   html+="</div></div></div>";
   document.body.insertAdjacentHTML("beforeend", html);
   document.getElementById("modal-inv-qr").onclick=function(e){if(e.target===this)this.remove();};
+}
+
+// ── Highlight de item encontrado por QR/busca ──────────────────────────────
+function _invConfDestacarItem(tombamento){
+  // Busca na conferência atual por tombamento ou número de série
+  var conf=window._invConfAtual;
+  if(!conf) return false;
+  var item=(state.invItens||[]).find(function(x){
+    return (x.tombamento||"").toLowerCase()===tombamento.toLowerCase()||
+           (x.numero_serie||"").toLowerCase()===tombamento.toLowerCase()||
+           x.id===tombamento;
+  });
+  if(!item){ showToast("Item não encontrado: "+tombamento,"error"); return false; }
+  // Garantir filtro "Todos" para o item aparecer
+  window._invConfFiltroStatus="todos";
+  _invConfFiltrar();
+  var card=document.getElementById("inv-ci-"+item.id);
+  if(!card){ showToast("Item fora desta conferência: "+item.descricao,"error"); return false; }
+  // Scroll até o item
+  card.scrollIntoView({behavior:"smooth",block:"center"});
+  // Flash de destaque
+  var _orig=card.style.outline||"";
+  card.style.outline="3px solid #D9A53C";
+  card.style.transition="outline 0.4s";
+  setTimeout(function(){card.style.outline=_orig;},2000);
+  showToast("📍 "+item.descricao+(item.tombamento?" — Nº "+item.tombamento:""),"success");
+  return true;
+}
+
+// ── Scanner de QR na conferência ──────────────────────────────────────────
+function _invConfScanQR(){
+  var _stopScan=null;
+  var html="<div id='modal-inv-scan' style='position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9700;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px'>";
+  html+="<div style='width:100%;max-width:400px'>";
+  html+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
+  html+="<span style='color:#D9A53C;font-size:16px;font-weight:700'>📷 Escanear QR do Item</span>";
+  html+="<button onclick='_invScanFechar()' style='background:none;border:none;color:#888;font-size:22px;cursor:pointer'>✕</button>";
+  html+="</div>";
+  // Viewfinder com vídeo
+  html+="<div style='position:relative;width:100%;aspect-ratio:1;background:#000;border-radius:12px;overflow:hidden;border:2px solid #D9A53C'>";
+  html+="<video id='inv-scan-video' autoplay playsinline muted style='width:100%;height:100%;object-fit:cover'></video>";
+  html+="<canvas id='inv-scan-canvas' style='display:none'></canvas>";
+  // Mira
+  html+="<div style='position:absolute;inset:0;pointer-events:none'>";
+  html+="<div style='position:absolute;top:20%;left:20%;right:20%;bottom:20%;border:2px solid rgba(217,165,60,0.7);border-radius:6px'></div>";
+  html+="<div style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:30%;background:rgba(217,165,60,0.4)'></div>";
+  html+="<div style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);height:2px;width:30%;background:rgba(217,165,60,0.4)'></div>";
+  html+="</div>";
+  html+="<div id='inv-scan-status' style='position:absolute;bottom:8px;left:0;right:0;text-align:center;color:#D9A53C;font-size:11px;font-weight:700;text-shadow:0 1px 4px #000'>Aponte para o QR Code do item</div>";
+  html+="</div>";
+  // Fallback manual
+  html+="<div style='margin-top:14px'>";
+  html+="<p style='color:#8a6a4a;font-size:11px;margin-bottom:6px'>Ou digite o tombamento / n.º série:</p>";
+  html+="<div style='display:flex;gap:8px'>";
+  html+="<input id='inv-scan-manual' type='text' placeholder='Ex: 00115860' style='flex:1;background:#1a1a1a;border:1px solid #5e4636;color:#f5ede0;padding:10px 12px;border-radius:7px;font-size:14px' onkeydown='if(event.key===\"Enter\")_invScanManual()'>";
+  html+="<button onclick='_invScanManual()' style='background:#D9A53C;border:none;color:#2a1c10;padding:10px 16px;border-radius:7px;font-size:13px;font-weight:800;cursor:pointer'>Buscar</button>";
+  html+="</div></div></div></div>";
+  document.body.insertAdjacentHTML("beforeend", html);
+
+  window._invScanFechar=function(){
+    if(_stopScan) _stopScan();
+    var m=document.getElementById("modal-inv-scan");
+    if(m) m.remove();
+  };
+  window._invScanManual=function(){
+    var v=(document.getElementById("inv-scan-manual")||{}).value||"";
+    if(!v.trim()) return;
+    if(_invConfDestacarItem(v.trim())) window._invScanFechar();
+  };
+
+  // Tentar câmera + BarcodeDetector
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    document.getElementById("inv-scan-status").textContent="Câmera não disponível — use o campo manual";
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}})
+    .then(function(stream){
+      var video=document.getElementById("inv-scan-video");
+      if(!video){stream.getTracks().forEach(function(t){t.stop();}); return;}
+      video.srcObject=stream;
+      _stopScan=function(){stream.getTracks().forEach(function(t){t.stop();});};
+
+      if(!("BarcodeDetector" in window)){
+        document.getElementById("inv-scan-status").textContent="Scanner automático não disponível — use o campo manual";
+        return;
+      }
+      var detector=new BarcodeDetector({formats:["qr_code","code_128","code_39","ean_13"]});
+      var canvas=document.getElementById("inv-scan-canvas");
+      var ctx=canvas.getContext("2d");
+      var _ultimo="";
+      function _tick(){
+        if(!document.getElementById("modal-inv-scan")) return;
+        if(video.readyState<2){requestAnimationFrame(_tick); return;}
+        canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+        ctx.drawImage(video,0,0);
+        detector.detect(canvas).then(function(codes){
+          if(!codes.length){requestAnimationFrame(_tick); return;}
+          var raw=codes[0].rawValue;
+          if(raw===_ultimo){requestAnimationFrame(_tick); return;}
+          _ultimo=raw;
+          // Formato IARA: "77CIPM-BCS|tombamento|descricao" ou tombamento direto
+          var partes=raw.split("|");
+          var ref=partes.length>=2?partes[1]:raw;
+          document.getElementById("inv-scan-status").textContent="QR detectado: "+ref;
+          if(_invConfDestacarItem(ref.trim())) window._invScanFechar();
+          else setTimeout(function(){_ultimo="";},1500);
+        }).catch(function(){requestAnimationFrame(_tick);});
+        requestAnimationFrame(_tick);
+      }
+      video.onloadedmetadata=function(){_tick();};
+    })
+    .catch(function(){
+      document.getElementById("inv-scan-status").textContent="Sem permissão de câmera — use o campo manual";
+    });
 }
 
 function _invPDFRecibo(itemId){
