@@ -21718,8 +21718,16 @@ function abrirMonitorVCM(ocId){
   }
   document.getElementById("btn-vcm-agendar").onclick=function(){
     var r=_salvarAtendimentoVcm(false);
-    var ag={id:"ag_vcm_"+Date.now(),criadoEm:new Date().toISOString(),data:r.agData,hora:r.agHora,tipo:"Visita VCM/FRIDA",vitima_nome:ocVcm.vitima_nome||"",endereco:ocVcm.vitima_endereco||"",responsavel:"Gestor",objetivo:"Monitoramento VCM"+(ocVcm._fridaNivel?" — Nível "+ocVcm._fridaNivel:"")+" — "+(ocVcm.vitima_nome||""),status:"Agendado",ocorrenciaId:ocVcm.id};
-    if(!state.db.agendamentos)state.db.agendamentos=[];state.db.agendamentos.push(ag);enviarSheets("agendamentos",ag);salvarLocal();
+    if(!state.db.agendamentos)state.db.agendamentos=[];
+    var _agExist=state.db.agendamentos.find(function(x){return x.ocorrenciaId===ocVcm.id&&x.tipo==="Visita VCM/FRIDA"&&x.status!=="Realizado";});
+    if(_agExist){
+      _agExist.data=r.agData;_agExist.hora=r.agHora;_agExist.atualizadoEm=new Date().toISOString();
+      enviarSheets("agendamentos",_agExist);
+    } else {
+      var ag={id:"ag_vcm_"+Date.now(),criadoEm:new Date().toISOString(),data:r.agData,hora:r.agHora,tipo:"Visita VCM/FRIDA",vitima_nome:ocVcm.vitima_nome||"",endereco:ocVcm.vitima_endereco||"",responsavel:"Gestor",objetivo:"Monitoramento VCM"+(ocVcm._fridaNivel?" — Nível "+ocVcm._fridaNivel:"")+" — "+(ocVcm.vitima_nome||""),status:"Agendado",ocorrenciaId:ocVcm.id};
+      state.db.agendamentos.push(ag);enviarSheets("agendamentos",ag);
+    }
+    salvarLocal();
     showToast("✓ Atendimento salvo e visita agendada!");document.getElementById("modal-frida").remove();
   };
   document.getElementById("btn-vcm-encerrar").onclick=function(){_salvarAtendimentoVcm(true);showToast("✓ Acompanhamento encerrado e salvo!");document.getElementById("modal-frida").remove();};
