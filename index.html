@@ -424,6 +424,19 @@ function carregarLocal() {
       db.atendimentos = l.atendimentos||[];
       db.visitas = l.visitas||[];
       db.agendamentos = l.agendamentos||[];
+      // Dedup VCM: manter só o agendamento mais recente por ocorrenciaId
+      (function(){
+        var _vcmById={};
+        db.agendamentos.forEach(function(a){
+          if(a.tipo!=="Visita VCM/FRIDA"||!a.ocorrenciaId) return;
+          var prev=_vcmById[a.ocorrenciaId];
+          if(!prev||(a.criadoEm||"")>(prev.criadoEm||"")) _vcmById[a.ocorrenciaId]=a;
+        });
+        db.agendamentos=db.agendamentos.filter(function(a){
+          if(a.tipo!=="Visita VCM/FRIDA"||!a.ocorrenciaId) return true;
+          return _vcmById[a.ocorrenciaId]===a;
+        });
+      })();
     }
     // 🔒 Restaurar backup SIGESPOL (imune ao Sheets — chave separada)
     try {
@@ -872,6 +885,19 @@ async function carregarDadosAppDoSheets(){
       var _novosAg = agendamentos.filter(function(a){ return !_localAgIds.has(String(a.id)) && !_agDel.has(String(a.id)); });
       state.db.agendamentos = _localAgs.concat(_novosAg);
     }
+    // Dedup agendamentos VCM: por ocorrenciaId, manter só o mais recente não-Realizado
+    (function(){
+      var _vcmById={};
+      state.db.agendamentos.forEach(function(a){
+        if(a.tipo!=="Visita VCM/FRIDA"||!a.ocorrenciaId) return;
+        var prev=_vcmById[a.ocorrenciaId];
+        if(!prev||(a.criadoEm||"")>(prev.criadoEm||"")) _vcmById[a.ocorrenciaId]=a;
+      });
+      state.db.agendamentos=state.db.agendamentos.filter(function(a){
+        if(a.tipo!=="Visita VCM/FRIDA"||!a.ocorrenciaId) return true;
+        return _vcmById[a.ocorrenciaId]===a;
+      });
+    })();
     state.db.visitas          = _mergeById(state.db.visitas,          visitas);
     state.db.atendimentos     = _mergeById(state.db.atendimentos,     atendimentos);
     // 🏫 Módulo Escolar
