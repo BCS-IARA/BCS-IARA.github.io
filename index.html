@@ -686,6 +686,8 @@ async function sincronizarSheets(){
     await salvarDadoAppSheets("bcs_oc_encerradas",     state.ocorrenciasEncerradas||[]);
     await salvarDadoAppSheets("bcs_alertas_graves",    state.alertasGraves||[]);
     await salvarDadoAppSheets("bcs_devolutivas_crav_blob", state.devolutivasCrav||[]);
+    await salvarDadoAppSheets("bcs_encaminhamentos",   state.encaminhamentos||[]);
+    await salvarDadoAppSheets("bcs_fila_pendente",     state.filaPendente||[]);
     await salvarDadoAppSheets("bcs_conselho_atas",     state.conselho_atas||[]);
     await salvarDadoAppSheets("bcs_conselho_associados",state.conselho_associados||[]);
     await salvarDadoAppSheets("bcs_conselho_diretoria", state.conselho_diretoria||[]);
@@ -757,6 +759,8 @@ function _salvarLocalSemSync(){
     if(state.ocorrenciasEncerradas) localStorage.setItem("bcs_oc_encerradas",     JSON.stringify(state.ocorrenciasEncerradas));
     if(state.alertasGraves)       localStorage.setItem("bcs_alertas_graves",      JSON.stringify(state.alertasGraves));
     if(state.devolutivasCrav)     localStorage.setItem("bcs_devolutivas_crav",    JSON.stringify(state.devolutivasCrav));
+    if(state.encaminhamentos)     localStorage.setItem("bcs_encaminhamentos",     JSON.stringify(state.encaminhamentos));
+    if(state.filaPendente)        localStorage.setItem("bcs_fila_pendente",       JSON.stringify(state.filaPendente));
     if(state.conselho_atas)       localStorage.setItem("bcs_conselho_atas",       JSON.stringify(state.conselho_atas));
     if(state.conselho_associados) localStorage.setItem("bcs_conselho_associados", JSON.stringify(state.conselho_associados));
     if(state.conselho_diretoria)  localStorage.setItem("bcs_conselho_diretoria",  JSON.stringify(state.conselho_diretoria));
@@ -806,6 +810,8 @@ async function carregarDadosAppDoSheets(){
     var ocEncSheets          = await lerDadoAppSheets("bcs_oc_encerradas");
     var alertasGravesSheets  = await lerDadoAppSheets("bcs_alertas_graves");
     var devolutivasSheets    = await lerDadoAppSheets("bcs_devolutivas_crav_blob");
+    var encaminhamientosSheets = await lerDadoAppSheets("bcs_encaminhamentos");
+    var filaPendenteSheets   = await lerDadoAppSheets("bcs_fila_pendente");
     var conselhoAtasSheets   = await lerDadoAppSheets("bcs_conselho_atas");
     var conselhoAssocSheets  = await lerDadoAppSheets("bcs_conselho_associados");
     var conselhoDirSheets    = await lerDadoAppSheets("bcs_conselho_diretoria");
@@ -901,6 +907,14 @@ async function carregarDadosAppDoSheets(){
     state.ocorrenciasEncerradas = _mergeById(state.ocorrenciasEncerradas||[], ocEncSheets);
     state.alertasGraves       = _mergeById(state.alertasGraves||[],       alertasGravesSheets);
     state.devolutivasCrav     = _mergeById(state.devolutivasCrav||[],     devolutivasSheets);
+    state.encaminhamentos     = _mergeById(state.encaminhamentos||[],     encaminhamientosSheets);
+    // Fila de triagem: sobrescrever (ordem-dependente, sem merge)
+    if(filaPendenteSheets && Array.isArray(filaPendenteSheets)){
+      state.filaPendente = filaPendenteSheets;
+    } else if(filaPendenteSheets === null && (state.filaPendente||[]).length > 0){
+      // Sheets vazio mas locale tem dados → faz push imediato (bootstrap cross-device)
+      await salvarDadoAppSheets("bcs_fila_pendente", state.filaPendente||[]);
+    }
     // Cruzar devolutivasCrav com encaminhamentos — atualiza relato_devolutiva localmente
     (state.devolutivasCrav||[]).forEach(function(dev){
       var ocId = dev.ocorrenciaId||dev.ocorrencia_id||"";
@@ -930,6 +944,8 @@ async function carregarDadosAppDoSheets(){
     localStorage.setItem("bcs_oc_encerradas",      JSON.stringify(state.ocorrenciasEncerradas||[]));
     localStorage.setItem("bcs_alertas_graves",     JSON.stringify(state.alertasGraves||[]));
     localStorage.setItem("bcs_devolutivas_crav",   JSON.stringify(state.devolutivasCrav||[]));
+    localStorage.setItem("bcs_encaminhamentos",    JSON.stringify(state.encaminhamentos||[]));
+    localStorage.setItem("bcs_fila_pendente",      JSON.stringify(state.filaPendente||[]));
     localStorage.setItem("bcs_conselho_atas",      JSON.stringify(state.conselho_atas||[]));
     localStorage.setItem("bcs_conselho_associados",JSON.stringify(state.conselho_associados||[]));
     localStorage.setItem("bcs_conselho_diretoria", JSON.stringify(state.conselho_diretoria||[]));
