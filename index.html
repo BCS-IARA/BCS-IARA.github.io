@@ -23743,21 +23743,42 @@ function renderInventario(main){
             else if(_dias<=90) _valdBadge="<span style='background:#f59e0b22;color:#f59e0b;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700'>⚠ Vence em "+_dias+"d</span>";
             else _valdBadge="<span style='background:#22c55e11;color:#22c55e88;padding:2px 7px;border-radius:5px;font-size:10px'>Val: "+new Date(item.data_validade+"T12:00").toLocaleDateString("pt-BR")+"</span>";
           }
-          h+="<div style='background:#F2E4C8;border:1px solid "+(item.data_validade&&new Date(item.data_validade+"T12:00")<new Date()?"#ef444455":"#5e4636")+"';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap'>";
+          var _borda=item.data_validade&&new Date(item.data_validade+"T12:00")<new Date()?"#ef444455":"#C8A84B44";
+          h+="<div style='background:#F2E4C8;border:1px solid "+_borda+";border-radius:10px;overflow:hidden'>";
+          // ── Linha principal ────────────────────────────────────────────
+          h+="<div style='display:flex;gap:0'>";
+          // Foto / ícone
           var _fotoSrc=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
           if(_fotoSrc){
-            h+="<img src='"+_fotoSrc+"' style='width:56px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #A87B22;flex-shrink:0' onerror=\"this.style.display='none'\">";
+            h+="<img src='"+_fotoSrc+"' style='width:80px;min-height:80px;object-fit:cover;flex-shrink:0;border-right:1px solid #DBC79E' onerror=\"this.parentNode.querySelector('.inv-icon-fb').style.display='flex';this.style.display='none'\">";
+            h+="<div class='inv-icon-fb' style='display:none;width:80px;min-height:80px;background:#EAD9B8;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;border-right:1px solid #DBC79E'>"+INV_CATS[cat].icon+"</div>";
           } else {
-            h+="<div style='width:56px;height:42px;background:#EAD9B8;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0'>"+INV_CATS[cat].icon+"</div>";
+            h+="<div style='width:80px;min-height:80px;background:#EAD9B8;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;border-right:1px solid #DBC79E'>"+INV_CATS[cat].icon+"</div>";
           }
-          h+="<div style='flex:1;min-width:0'>";
-          h+="<div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap'>";
-          h+="<span style='color:#3D2B1A;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</span>";
-          if(item.tamanho) h+="<span style='background:#EAD9B8;color:#6B5236;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:700'>"+esc(item.tamanho)+"</span>";
-          if(item.genero) h+="<span style='background:#EAD9B8;color:#6B5236;padding:1px 7px;border-radius:5px;font-size:10px'>"+esc(item.genero)+"</span>";
-          if(_valdBadge) h+=_valdBadge;
+          // Conteúdo central
+          h+="<div style='flex:1;min-width:0;padding:10px 12px'>";
+          // Linha 1: descrição + tamanho/gênero
+          h+="<div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px'>";
+          h+="<span style='color:#3D2B1A;font-size:14px;font-weight:800;letter-spacing:.2px'>"+esc(item.descricao)+"</span>";
+          if(item.tamanho) h+="<span style='background:#DBC79E;color:#5B3E22;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:700'>"+esc(item.tamanho)+"</span>";
+          if(item.genero)  h+="<span style='background:#EAD9B8;color:#6B5236;padding:1px 7px;border-radius:5px;font-size:10px'>"+esc(item.genero)+"</span>";
+          if(_valdBadge)   h+=_valdBadge;
+          h+="</div>";
+          // Linha 2: tombamento + série (destaque)
+          h+="<div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:5px'>";
+          if(item.tombamento) h+="<span style='background:#2a1c10;color:#D9A53C;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:.3px'>🏷 "+esc(item.tombamento)+"</span>";
+          if(item.numero_serie) h+="<span style='background:#1a2030;color:#8ab4d4;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:.3px'>S/N "+esc(item.numero_serie)+"</span>";
+          if(!item.tombamento&&!item.numero_serie) h+="<span style='color:#9a7a5a;font-size:10px;font-style:italic'>Sem tombamento/série</span>";
+          h+="</div>";
+          // Linha 3: localização + marca/modelo
+          h+="<div style='color:#7a5c3a;font-size:11px;display:flex;align-items:center;gap:6px;flex-wrap:wrap'>";
+          h+="<span>📍 "+esc(item.localizacao||"—")+(item.sublocalizacao?" › "+esc(item.sublocalizacao):"")+"</span>";
+          if(item.marca||item.modelo) h+="<span style='color:#9a7a5a'>·</span><span>"+esc([item.marca,item.modelo].filter(Boolean).join(" "))+"</span>";
+          if(cargaTxt) h+="<span style='color:#9a7a5a'>·</span><span style='color:#4a9fd4'>"+cargaTxt+"</span>";
+          h+="</div>";
+          // Linha 4: badges de carga
+          h+="<div style='margin-top:5px;display:flex;gap:5px;flex-wrap:wrap'>";
           if(_lpStatus) h+="<span style='background:#22c55e22;color:#22c55e;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>🔫 Em carga: "+esc(_lpStatus.pol||"—")+"</span>";
-          // Badge situacao_carga
           if(item.tipo_carga==="fixa"||item.tipo_carga==="pessoal"){
             var _scNome=(item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+esc(item.carga_responsavel_nome||"—");
             h+="<span style='background:#4a9fd422;color:#4a9fd4;padding:1px 8px;border-radius:5px;font-size:10px;font-weight:700'>📋 Carga individual: "+_scNome+"</span>";
@@ -23769,23 +23790,23 @@ function renderInventario(main){
             h+="<span style='background:#33333322;color:#888;padding:1px 8px;border-radius:5px;font-size:10px'>📦 Em estoque</span>";
           }
           h+="</div>";
-          h+="<div style='color:#6B5236;font-size:11px;margin-top:2px'>";
-          if(item.tombamento) h+="<span style='color:#d4a87a'>Nº "+esc(item.tombamento)+"</span> · ";
-          h+=esc(item.localizacao||"—")+(item.sublocalizacao?" › "+esc(item.sublocalizacao):"");
-          if(item.marca||item.modelo) h+=" · "+esc([item.marca,item.modelo].filter(Boolean).join(" "));
-          if(cargaTxt) h+=" · <span style='color:#4a9fd4'>"+cargaTxt+"</span>";
+          h+="</div>";
+          // Estado (coluna direita)
+          h+="<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 12px;gap:4px;flex-shrink:0;border-left:1px solid #DBC79E;background:#F8F0DC'>";
+          h+="<span style='background:"+est.cor+"22;color:"+est.cor+";padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap'>"+est.label+"</span>";
           h+="</div>";
           h+="</div>";
-          h+="<div style='display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0'>";
-          h+="<span style='background:"+est.cor+"22;color:"+est.cor+";padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700'>"+est.label+"</span>";
-          h+="<div style='display:flex;gap:5px'>";
-          h+="<button onclick='_invAbrirItem(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #A87B22;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>✏️ Editar</button>";
-          h+="<button onclick='_invAbrirMovimentacao(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #5e4636;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🚛 Mover</button>";
-          h+="<button onclick='_invVerHistorico(\""+item.id+"\")' style='background:#1a2a3a;border:1px solid #4a9fd433;color:#4a9fd4;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>📜 Histórico</button>";
-          if((item.tipo_carga==="fixa"||item.tipo_carga==="secao")&&item.carga_responsavel_nome) h+="<button onclick='_invPDFRecibo(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #d4a87a55;color:#d4a87a;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>🧾 Recibo</button>";
-          if((item.tipo_carga==="fixa"||item.tipo_carga==="secao")&&item.carga_responsavel_nome) h+="<button onclick='_invDevolverItem(\""+item.id+"\")' style='background:#1a0808;border:1px solid #ef444455;color:#ef4444;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>↩ Devolver</button>";
-          h+="<button onclick='_invQRCode(\""+item.id+"\")' style='background:#EAD9B8;border:1px solid #5e4636;color:#6B5236;padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer'>📱 QR</button>";
-          h+="</div></div>";
+          // ── Barra de botões ───────────────────────────────────────────
+          h+="<div style='display:flex;gap:0;border-top:1px solid #DBC79E;background:#EAD9B8'>";
+          h+="<button onclick='_invAbrirItem(\""+item.id+"\")' style='flex:1;background:none;border:none;border-right:1px solid #DBC79E;color:#6B5236;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer'>✏️ Editar</button>";
+          h+="<button onclick='_invAbrirMovimentacao(\""+item.id+"\")' style='flex:1;background:none;border:none;border-right:1px solid #DBC79E;color:#6B5236;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer'>🚛 Mover</button>";
+          h+="<button onclick='_invVerHistorico(\""+item.id+"\")' style='flex:1;background:none;border:none;border-right:1px solid #DBC79E;color:#4a9fd4;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer'>📜 Histórico</button>";
+          if((item.tipo_carga==="fixa"||item.tipo_carga==="secao")&&item.carga_responsavel_nome){
+            h+="<button onclick='_invPDFRecibo(\""+item.id+"\")' style='flex:1;background:none;border:none;border-right:1px solid #DBC79E;color:#d4a87a;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer'>🧾 Recibo</button>";
+            h+="<button onclick='_invDevolverItem(\""+item.id+"\")' style='flex:1;background:none;border:none;border-right:1px solid #DBC79E;color:#ef4444;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer'>↩ Devolver</button>";
+          }
+          h+="<button onclick='_invQRCode(\""+item.id+"\")' style='flex:1;background:none;border:none;color:#6B5236;padding:7px 4px;font-size:11px;font-weight:700;cursor:pointer'>📱 QR</button>";
+          h+="</div>";
           h+="</div>";
         });
         h+="</div></div>";
