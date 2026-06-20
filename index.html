@@ -23308,10 +23308,11 @@ window._invConfFiltrar=function(){
 // ══════════════════════════════════════════════════════════════════
 function renderDevolutivas(main){
   state._devTab = state._devTab||"aguardando";
+  window._devMainEl = main; // referência estável para onclicks internos
   // Sync silencioso ao abrir a aba de devolutivas
   if(typeof _syncDevolutivas === "function"){
     _syncDevolutivas(function(n){
-      if(n>0){ showToast("✓ "+n+" devolutiva(s) recebida(s)","success"); renderDevolutivas(main); }
+      if(n>0){ showToast("✓ "+n+" devolutiva(s) recebida(s)","success"); renderDevolutivas(window._devMainEl); }
     });
   }
   var encs = state.encaminhamentos||[];
@@ -23346,7 +23347,7 @@ function renderDevolutivas(main){
   [["aguardando","⏳ Aguardando",_aguard.length,"#f59e0b"],["recebidas","✅ Recebidas",_receb.length,"#22c55e"],["vencidas","🔴 Vencidas",_venc.length,"#ef4444"]].forEach(function(ab){
     var ativ=state._devTab===ab[0];
     var cor=ativ?ab[3]:"#8a6a4a";
-    h.push("<button onclick=\"state._devTab='"+ab[0]+"';renderDevolutivas(document.getElementById('main')||document.getElementById('main-content'))\" style='padding:10px 18px;background:transparent;border:none;border-bottom:3px solid "+(ativ?ab[3]:"transparent")+";color:"+cor+";font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px'>"+ab[1]);
+    h.push("<button onclick=\"state._devTab='"+ab[0]+"';renderDevolutivas(window._devMainEl)\" style='padding:10px 18px;background:transparent;border:none;border-bottom:3px solid "+(ativ?ab[3]:"transparent")+";color:"+cor+";font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px'>"+ab[1]);
     if(ab[2]>0) h.push("<span style='background:"+(ativ?ab[3]+"22":"#4a3224")+";color:"+(ativ?ab[3]:"#5e4636")+";padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700'>"+ab[2]+"</span>");
     h.push("</button>");
   });
