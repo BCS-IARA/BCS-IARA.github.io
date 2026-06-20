@@ -22893,11 +22893,23 @@ function _invRenderConferencia(conf){
   html+="<div style='background:#DBC79E;border-radius:4px;height:6px'><div class='inv-conf-bar' style='background:"+(_pct===100?"#3a7a4a":_pct>50?"#d4a87a":"#4a9fd4")+";width:"+_pct+"%;height:6px;border-radius:4px;transition:width 0.3s'></div></div>";
   html+="</div>";
   html+="<input id='inv-conf-busca' type='text' placeholder='🔍 Buscar por nome, n.º série ou categoria…' oninput='_invConfFiltrar()' style='width:100%;box-sizing:border-box;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px 12px;border-radius:7px;font-size:13px'>";
+  // Filtro por status
+  var _cntAll=itensAtivos.length;
+  var _cntOk=itensAtivos.filter(function(x){var r=conf.itens[x.id];var s=(r&&typeof r==="object")?r.status:r;return s==="ok";}).length;
+  var _cntDiv=itensAtivos.filter(function(x){var r=conf.itens[x.id];var s=(r&&typeof r==="object")?r.status:r;return s==="divergencia";}).length;
+  var _cntAus=itensAtivos.filter(function(x){var r=conf.itens[x.id];var s=(r&&typeof r==="object")?r.status:r;return s==="ausente";}).length;
+  var _cntPend=_cntAll-_cntOk-_cntDiv-_cntAus;
+  html+="<div id='inv-conf-filtros' style='display:flex;gap:6px;flex-wrap:wrap'>";
+  [["todos","Todos",_cntAll,"#5e4636","#DBC79E"],["pendente","⏳ Pendentes",_cntPend,"#4a9fd4","#1a2030"],["ok","✓ OK",_cntOk,"#3a7a4a","#0a1a0a"],["divergencia","⚠ DIV",_cntDiv,"#f59e0b","#2a1800"],["ausente","✗ AUS",_cntAus,"#ef4444","#2a0808"]].forEach(function(f){
+    var ativo=(!window._invConfFiltroStatus&&f[0]==="todos")||(window._invConfFiltroStatus===f[0]);
+    html+="<button type='button' onclick='window._invConfFiltroStatus=\""+f[0]+"\";_invConfFiltrar()' style='padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid "+f[2]+";color:"+(ativo?f[3]+"cc":f[2])+";background:"+(ativo?f[2]+"33":"transparent")+"'>"+f[1]+" <span style='background:"+f[2]+"22;padding:1px 6px;border-radius:8px'>"+f[3]+"</span></button>";
+  });
+  html+="</div>";
   // Lista de itens por categoria
   cats.forEach(function(cat){
     var catItens=itensAtivos.filter(function(x){return x.categoria===cat;});
     if(!catItens.length) return;
-    html+="<div style='border:1px solid "+(INV_CATS[cat].cor)+"33;border-radius:8px;overflow:hidden'>";
+    html+="<div class='inv-conf-cat-wrap' style='border:1px solid "+(INV_CATS[cat].cor)+"33;border-radius:8px;overflow:hidden'>";
     html+="<div style='background:"+(INV_CATS[cat].cor)+"18;padding:8px 14px;border-bottom:1px solid "+(INV_CATS[cat].cor)+"33'>";
     html+="<span style='color:"+INV_CATS[cat].cor+";font-size:12px;font-weight:700'>"+INV_CATS[cat].icon+" "+INV_CATS[cat].label+" ("+catItens.length+")</span>";
     html+="</div><div style='padding:8px 14px'>";
@@ -22998,6 +23010,7 @@ function _invRenderConferencia(conf){
   html+="</div></div></div>";
   document.body.insertAdjacentHTML("beforeend", html);
   window._invConfAtual=conf;
+  window._invConfFiltroStatus="todos"; // resetar filtro ao abrir nova conferência
   // Exibir quem está conferindo
   var _confLabel=window._invConferenteAtual?(window._invConferenteAtual.posto?" "+window._invConferenteAtual.posto+" ":"")+window._invConferenteAtual.nome+" ("+window._invConferenteAtual.matricula+")":"—";
   var _confBadge=document.createElement("div");
@@ -23030,6 +23043,7 @@ function _invConfItens(itemId, status){
     _invConfAtualizarBarra();
     var pan = document.getElementById("inv-ci-cat-"+itemId);
     if(pan) pan.style.display = "none";
+    if(typeof _invConfFiltrar==="function") _invConfFiltrar();
     return;
   }
 
@@ -23044,6 +23058,7 @@ function _invConfItens(itemId, status){
   conf.atualizadoEm = new Date().toISOString();
   _invConfAtualizarBotoes(itemId, status);
   _invConfAtualizarBarra();
+  if(typeof _invConfFiltrar==="function") _invConfFiltrar();
 
   // Mostrar painel inline
   var pan2 = document.getElementById("inv-ci-cat-"+itemId);
@@ -23348,10 +23363,28 @@ function _invAplicarFiltros(resetPage){
 
 window._invConfFiltrar=function(){
   var inp=document.getElementById("inv-conf-busca");
-  if(!inp) return;
-  var q=inp.value.toLowerCase().trim();
+  var q=(inp?inp.value.toLowerCase().trim():"");
+  var fs=window._invConfFiltroStatus||"todos";
+  var conf=window._invConfAtual;
   document.querySelectorAll(".inv-conf-item").forEach(function(el){
-    el.style.display=(q&&!el.dataset.busca.includes(q))?"none":"block";
+    var iid=el.id.replace("inv-ci-","");
+    var raw=conf&&conf.itens?conf.itens[iid]:null;
+    var st=(raw&&typeof raw==="object")?raw.status:(raw||"pendente");
+    var passaFiltro=(fs==="todos")||(fs==="pendente"&&(!st||st==="pendente"))||(st===fs);
+    var passaBusca=!q||el.dataset.busca.includes(q);
+    el.style.display=(passaFiltro&&passaBusca)?"flex":"none";
+  });
+  // Reborda grupos sem itens visíveis
+  document.querySelectorAll("#modal-inv-conf .inv-conf-cat-wrap").forEach(function(wrap){
+    var temVis=Array.from(wrap.querySelectorAll(".inv-conf-item")).some(function(el){return el.style.display!=="none";});
+    wrap.style.display=temVis?"block":"none";
+  });
+  // Atualiza destaque dos botões de filtro
+  document.querySelectorAll("#inv-conf-filtros button").forEach(function(btn){
+    var bfs=btn.getAttribute("onclick").match(/"([^"]+)"/);
+    var bKey=bfs?bfs[1]:"todos";
+    btn.style.fontWeight=bKey===fs?"900":"700";
+    btn.style.opacity=bKey===fs?"1":"0.6";
   });
 };
 
