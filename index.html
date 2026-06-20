@@ -22970,6 +22970,7 @@ function _invRenderConferencia(conf){
       }
       if(det.foto_link){html+="<a href='"+esc(det.foto_link)+"' target='_blank' style='color:#D9A53C;font-size:11px'>📷 Ver foto da conferência</a>";}
       html+="<label style='cursor:pointer;padding:3px 10px;background:transparent;border:1px solid #5e4636;border-radius:5px;color:#a07c58;font-size:11px'>📷 Anexar foto de divergência<input type='file' accept='image/*' capture='environment' style='display:none' onchange='_invConfFoto(\""+iid+"\",this)'></label>";
+      html+="<button type='button' onclick='_invQRCode(\""+iid+"\")' style='align-self:flex-start;background:transparent;border:1px solid #D9A53C;color:#D9A53C;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>📱 QR</button>";
       html+="<button type='button' onclick='_invConfEditarItem(\""+iid+"\")' style='align-self:flex-start;background:transparent;border:1px solid #A87B22;color:#6B5236;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer'>✏️ Editar item completo</button>";
       html+="</div>";
       html+="</div>";
