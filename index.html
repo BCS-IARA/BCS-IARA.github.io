@@ -22913,6 +22913,13 @@ function _invRenderConferencia(conf){
     html+="<div style='background:"+(INV_CATS[cat].cor)+"18;padding:8px 14px;border-bottom:1px solid "+(INV_CATS[cat].cor)+"33'>";
     html+="<span style='color:"+INV_CATS[cat].cor+";font-size:12px;font-weight:700'>"+INV_CATS[cat].icon+" "+INV_CATS[cat].label+" ("+catItens.length+")</span>";
     html+="</div><div style='padding:8px 14px'>";
+    // Pendentes no topo, marcados no final
+    catItens=catItens.slice().sort(function(a,b){
+      var sa=(function(x){var r=conf.itens[x.id];return (r&&typeof r==="object")?r.status:(r||"pendente");})(a);
+      var sb=(function(x){var r=conf.itens[x.id];return (r&&typeof r==="object")?r.status:(r||"pendente");})(b);
+      var ord={pendente:0,divergencia:1,ausente:2,ok:3};
+      return (ord[sa]||0)-(ord[sb]||0);
+    });
     catItens.forEach(function(item){
       var raw=conf.itens[item.id];
       var det=(raw&&typeof raw==="object")?raw:{status:raw||"pendente"};
@@ -22920,32 +22927,32 @@ function _invRenderConferencia(conf){
       var iid=item.id;
       var _ciFoto=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
       var _ciStat={ok:"#3a7a4a",divergencia:"#f59e0b",ausente:"#ef4444",pendente:"#5e4636"}[status]||"#5e4636";
-      html+="<div class='inv-conf-item' id='inv-ci-"+iid+"' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' style='flex-direction:column;border-bottom:1px solid #DBC79E;overflow:hidden'>";
+      var _ciMarcado=(status==="ok"||status==="divergencia"||status==="ausente");
+      html+="<div class='inv-conf-item' id='inv-ci-"+iid+"' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' data-status='"+status+"' style='flex-direction:column;border-bottom:1px solid #DBC79E;overflow:hidden;opacity:"+(_ciMarcado?"0.65":"1")+";transition:opacity 0.2s'>";
       // ── linha principal ─────────────────────────────────────────────
-      html+="<div style='display:flex;align-items:stretch;gap:0;border-left:3px solid "+_ciStat+"'>";
+      html+="<div style='display:flex;align-items:stretch;gap:0;border-left:4px solid "+_ciStat+";background:"+(_ciMarcado?"#EDE4CE":"#F2E4C8")+"'>";
       // foto / ícone
       if(_ciFoto){
-        html+="<img src='"+_ciFoto+"' style='width:60px;min-height:60px;object-fit:cover;flex-shrink:0;border-right:1px solid #DBC79E' onerror=\"this.style.display='none'\">";
+        html+="<img src='"+_ciFoto+"' style='width:64px;min-height:64px;object-fit:cover;flex-shrink:0;border-right:1px solid #DBC79E' onerror=\"this.style.display='none'\">";
       } else {
-        html+="<div style='width:60px;min-height:60px;background:#EAD9B8;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;border-right:1px solid #DBC79E'>"+INV_CATS[cat].icon+"</div>";
+        html+="<div style='width:64px;min-height:64px;background:#EAD9B8;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;border-right:1px solid #DBC79E'>"+INV_CATS[cat].icon+"</div>";
       }
       // conteúdo
-      html+="<div style='flex:1;min-width:0;padding:8px 10px;display:flex;flex-direction:column;justify-content:center;gap:4px'>";
-      html+="<span style='color:#3D2B1A;font-size:12px;font-weight:700'>"+esc(item.descricao)+"</span>";
+      html+="<div style='flex:1;min-width:0;padding:10px 12px;display:flex;flex-direction:column;justify-content:center;gap:5px'>";
+      html+="<span style='color:#3D2B1A;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</span>";
       html+="<div style='display:flex;gap:5px;flex-wrap:wrap'>";
-      if(item.tombamento) html+="<span style='background:#2a1c10;color:#D9A53C;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700'>🏷 "+esc(item.tombamento)+"</span>";
-      if(item.numero_serie) html+="<span style='background:#1a2030;color:#8ab4d4;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700'>S/N "+esc(item.numero_serie)+"</span>";
+      if(item.tombamento) html+="<span style='background:#2a1c10;color:#D9A53C;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700'>🏷 "+esc(item.tombamento)+"</span>";
+      if(item.numero_serie) html+="<span style='background:#1a2030;color:#8ab4d4;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700'>S/N "+esc(item.numero_serie)+"</span>";
       if(!item.tombamento&&!item.numero_serie) html+="<span style='color:#9a7a5a;font-size:10px;font-style:italic'>Sem identificação</span>";
-      if(det.estado) html+="<span style='background:#5e463622;color:#a07c58;padding:1px 7px;border-radius:4px;font-size:10px'>"+det.estado+"</span>";
+      if(det.estado) html+="<span style='background:#5e463622;color:#a07c58;padding:2px 8px;border-radius:4px;font-size:10px'>"+det.estado+"</span>";
       html+="</div></div>";
-      // botões
-      html+="<div style='display:flex;flex-direction:column;gap:3px;padding:6px 8px;justify-content:center;flex-shrink:0'>";
-      html+="<div style='display:flex;gap:3px'>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ok\")' style='padding:3px 10px;border-radius:4px;font-size:11px;font-weight:800;min-height:32px;border:1.5px solid #3a7a4a;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer'>OK</button>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"divergencia\")' style='padding:3px 10px;border-radius:4px;font-size:11px;font-weight:800;min-height:32px;border:1.5px solid #f59e0b;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer'>DIV</button>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ausente\")' style='padding:3px 10px;border-radius:4px;font-size:11px;font-weight:800;min-height:32px;border:1.5px solid #ef4444;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer'>AUS</button>";
-      html+="<button type='button' onclick='_invConfExpandir(\""+iid+"\")' style='padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;min-height:32px;border:1.5px solid #5e4636;color:#a07c58;background:transparent;cursor:pointer'>+</button>";
-      html+="</div></div></div>";
+      // botões — maiores para toque fácil
+      html+="<div style='display:flex;align-items:center;gap:4px;padding:8px 10px;flex-shrink:0'>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ok\")' style='padding:0 14px;border-radius:6px;font-size:13px;font-weight:800;height:48px;min-width:48px;border:2px solid #3a7a4a;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer;transition:all .15s'>OK</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"divergencia\")' style='padding:0 12px;border-radius:6px;font-size:13px;font-weight:800;height:48px;min-width:48px;border:2px solid #f59e0b;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer;transition:all .15s'>DIV</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ausente\")' style='padding:0 12px;border-radius:6px;font-size:13px;font-weight:800;height:48px;min-width:48px;border:2px solid #ef4444;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer;transition:all .15s'>AUS</button>";
+      html+="<button type='button' onclick='_invConfExpandir(\""+iid+"\")' style='padding:0 10px;border-radius:6px;font-size:16px;height:48px;min-width:36px;border:1.5px solid #5e4636;color:#a07c58;background:transparent;cursor:pointer'>+</button>";
+      html+="</div></div>";
       // painel de detalhes (colapsado por padrão)
       var ISci="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:5px 8px;border-radius:5px;font-size:12px;box-sizing:border-box";
       html+="<div id='inv-ci-det-"+iid+"' style='display:none;flex-direction:column;gap:6px;margin-top:6px;padding:8px;background:#EAD9B8;border-radius:7px;border:1px solid #DBC79E'>";
@@ -23102,12 +23109,25 @@ function _invConfItens(itemId, status){
 
 function _invConfAtualizarBotoes(itemId, status){
   var cores={ok:"#3a7a4a",divergencia:"#f59e0b",ausente:"#ef4444"};
+  var corBorda={ok:"#3a7a4a",divergencia:"#f59e0b",ausente:"#ef4444",pendente:"#5e4636"};
   ["ok","divergencia","ausente"].forEach(function(s){
     try{
       var btn=document.querySelector("[onclick='_invConfItens(\""+itemId+"\",\""+s+"\")']");
       if(btn){btn.style.background=status===s?cores[s]:"transparent";btn.style.color=status===s?"#fff":cores[s];}
     }catch(e){}
   });
+  // Atualizar borda lateral e opacidade do card
+  var card=document.getElementById("inv-ci-"+itemId);
+  if(card){
+    var marcado=status==="ok"||status==="divergencia"||status==="ausente";
+    card.style.opacity=marcado?"0.65":"1";
+    card.dataset.status=status;
+    var linha=card.querySelector("div[style*='border-left']");
+    if(linha){
+      linha.style.borderLeftColor=corBorda[status]||"#5e4636";
+      linha.style.background=marcado?"#EDE4CE":"#F2E4C8";
+    }
+  }
 }
 
 function _invConfAtualizarBarra(){
