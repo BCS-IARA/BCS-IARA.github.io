@@ -22892,7 +22892,10 @@ function _invRenderConferencia(conf){
   html+="<div style='display:flex;justify-content:space-between;margin-bottom:6px'><span style='color:#6B5236;font-size:11px;font-weight:700'>Progresso</span><span class='inv-conf-bar-lbl' style='color:#3D2B1A;font-size:11px;font-weight:700'>"+_totalConf+"/"+_totalItens+" itens · "+_pct+"%</span></div>";
   html+="<div style='background:#DBC79E;border-radius:4px;height:6px'><div class='inv-conf-bar' style='background:"+(_pct===100?"#3a7a4a":_pct>50?"#d4a87a":"#4a9fd4")+";width:"+_pct+"%;height:6px;border-radius:4px;transition:width 0.3s'></div></div>";
   html+="</div>";
-  html+="<input id='inv-conf-busca' type='text' placeholder='🔍 Buscar por nome, n.º série ou categoria…' oninput='_invConfFiltrar()' style='width:100%;box-sizing:border-box;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px 12px;border-radius:7px;font-size:13px'>";
+  html+="<div style='display:flex;gap:8px'>";
+  html+="<input id='inv-conf-busca' type='text' placeholder='🔍 Buscar por nome, n.º série ou categoria…' oninput='_invConfFiltrar()' style='flex:1;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px 12px;border-radius:7px;font-size:13px;box-sizing:border-box'>";
+  html+="<button onclick='_invConfScanQR()' style='background:#1a0e00;border:1px solid #D9A53C;color:#D9A53C;padding:9px 14px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0'>📷 QR</button>";
+  html+="</div>";
   // Filtro por status
   var _cntAll=itensAtivos.length;
   var _cntOk=itensAtivos.filter(function(x){var r=conf.itens[x.id];var s=(r&&typeof r==="object")?r.status:r;return s==="ok";}).length;
@@ -23012,7 +23015,6 @@ function _invRenderConferencia(conf){
   // Botões
   html+="<div style='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap'>";
   html+="<button onclick='_invFecharConferencia()' style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>Fechar</button>";
-  html+="<button onclick='_invConfScanQR()' style='background:#1a0e00;border:1px solid #D9A53C;color:#D9A53C;padding:8px 18px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>📷 Escanear QR</button>";
   html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",false)' style='background:#1a2a3a;border:1px solid #4a9fd4;color:#4a9fd4;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer'>💾 Salvar Progresso</button>";
   html+="<button onclick='_invSalvarConferencia(\""+esc(conf.id)+"\",true)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✅ Concluir e Gerar PDF</button>";
   html+="</div>";
