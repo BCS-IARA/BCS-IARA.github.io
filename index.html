@@ -23486,7 +23486,7 @@ function renderDevolutivas(main){
 
   h.push("</div>");
   main.innerHTML=h.join("");
-  _renderCentralBar(main,"devolutivas");
+  if(!state._inFilaDia) _renderCentralBar(main,"devolutivas");
 
   // Funções
   window._reenviarDevolutiva = function(encId){
