@@ -22928,31 +22928,31 @@ function _invRenderConferencia(conf){
       var _ciFoto=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
       var _ciStat={ok:"#3a7a4a",divergencia:"#f59e0b",ausente:"#ef4444",pendente:"#5e4636"}[status]||"#5e4636";
       var _ciMarcado=(status==="ok"||status==="divergencia"||status==="ausente");
-      html+="<div class='inv-conf-item' id='inv-ci-"+iid+"' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' data-status='"+status+"' style='flex-direction:column;border-bottom:1px solid #DBC79E;overflow:hidden;opacity:"+(_ciMarcado?"0.65":"1")+";transition:opacity 0.2s'>";
-      // ── linha principal ─────────────────────────────────────────────
-      html+="<div style='display:flex;align-items:stretch;gap:0;border-left:4px solid "+_ciStat+";background:"+(_ciMarcado?"#EDE4CE":"#F2E4C8")+"'>";
-      // foto / ícone
+      html+="<div class='inv-conf-item' id='inv-ci-"+iid+"' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' data-status='"+status+"' style='border-bottom:1px solid #DBC79E;overflow:hidden;opacity:"+(_ciMarcado?"0.65":"1")+";transition:opacity 0.2s;border-left:4px solid "+_ciStat+";background:"+(_ciMarcado?"#EDE4CE":"#F2E4C8")+"'>";
+      // ── linha topo: foto + conteúdo ─────────────────────────────────
+      html+="<div style='display:flex;align-items:center;gap:10px;padding:10px 12px'>";
+      // foto / ícone compacto
       if(_ciFoto){
-        html+="<img src='"+_ciFoto+"' style='width:64px;min-height:64px;object-fit:cover;flex-shrink:0;border-right:1px solid #DBC79E' onerror=\"this.style.display='none'\">";
+        html+="<img src='"+_ciFoto+"' style='width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #DBC79E;flex-shrink:0' onerror=\"this.style.display='none'\">";
       } else {
-        html+="<div style='width:64px;min-height:64px;background:#EAD9B8;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;border-right:1px solid #DBC79E'>"+INV_CATS[cat].icon+"</div>";
+        html+="<div style='width:48px;height:48px;background:#EAD9B8;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0'>"+INV_CATS[cat].icon+"</div>";
       }
-      // conteúdo
-      html+="<div style='flex:1;min-width:0;padding:10px 12px;display:flex;flex-direction:column;justify-content:center;gap:5px'>";
-      html+="<span style='color:#3D2B1A;font-size:13px;font-weight:700'>"+esc(item.descricao)+"</span>";
-      html+="<div style='display:flex;gap:5px;flex-wrap:wrap'>";
-      if(item.tombamento) html+="<span style='background:#2a1c10;color:#D9A53C;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700'>🏷 "+esc(item.tombamento)+"</span>";
-      if(item.numero_serie) html+="<span style='background:#1a2030;color:#8ab4d4;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700'>S/N "+esc(item.numero_serie)+"</span>";
-      if(!item.tombamento&&!item.numero_serie) html+="<span style='color:#9a7a5a;font-size:10px;font-style:italic'>Sem identificação</span>";
-      if(det.estado) html+="<span style='background:#5e463622;color:#a07c58;padding:2px 8px;border-radius:4px;font-size:10px'>"+det.estado+"</span>";
-      html+="</div></div>";
-      // botões — maiores para toque fácil
-      html+="<div style='display:flex;align-items:center;gap:4px;padding:8px 10px;flex-shrink:0'>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ok\")' style='padding:0 14px;border-radius:6px;font-size:13px;font-weight:800;height:48px;min-width:48px;border:2px solid #3a7a4a;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer;transition:all .15s'>OK</button>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"divergencia\")' style='padding:0 12px;border-radius:6px;font-size:13px;font-weight:800;height:48px;min-width:48px;border:2px solid #f59e0b;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer;transition:all .15s'>DIV</button>";
-      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ausente\")' style='padding:0 12px;border-radius:6px;font-size:13px;font-weight:800;height:48px;min-width:48px;border:2px solid #ef4444;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer;transition:all .15s'>AUS</button>";
-      html+="<button type='button' onclick='_invConfExpandir(\""+iid+"\")' style='padding:0 10px;border-radius:6px;font-size:16px;height:48px;min-width:36px;border:1.5px solid #5e4636;color:#a07c58;background:transparent;cursor:pointer'>+</button>";
-      html+="</div></div>";
+      // descrição + badges
+      html+="<div style='flex:1;min-width:0'>";
+      html+="<div style='color:#3D2B1A;font-size:13px;font-weight:700;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical'>"+esc(item.descricao)+"</div>";
+      html+="<div style='display:flex;gap:4px;flex-wrap:wrap;margin-top:5px'>";
+      if(item.tombamento) html+="<span style='background:#2a1c10;color:#D9A53C;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700'>🏷 "+esc(item.tombamento)+"</span>";
+      if(item.numero_serie) html+="<span style='background:#1a2030;color:#8ab4d4;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700'>S/N "+esc(item.numero_serie)+"</span>";
+      if(!item.tombamento&&!item.numero_serie) html+="<span style='color:#9a7a5a;font-size:10px;font-style:italic'>Sem ID</span>";
+      if(det.estado) html+="<span style='background:#5e463622;color:#a07c58;padding:2px 7px;border-radius:4px;font-size:10px'>"+det.estado+"</span>";
+      html+="</div></div></div>";
+      // ── barra de botões na base — largura total ──────────────────────
+      html+="<div style='display:flex;border-top:1px solid #DBC79E'>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ok\")' style='flex:1;height:44px;font-size:14px;font-weight:800;border:none;border-right:1px solid #DBC79E;color:"+(status==="ok"?"#fff":"#3a7a4a")+";background:"+(status==="ok"?"#3a7a4a":"transparent")+";cursor:pointer;transition:all .15s'>OK</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"divergencia\")' style='flex:1;height:44px;font-size:14px;font-weight:800;border:none;border-right:1px solid #DBC79E;color:"+(status==="divergencia"?"#fff":"#f59e0b")+";background:"+(status==="divergencia"?"#f59e0b":"transparent")+";cursor:pointer;transition:all .15s'>DIV</button>";
+      html+="<button type='button' onclick='_invConfItens(\""+iid+"\",\"ausente\")' style='flex:1;height:44px;font-size:14px;font-weight:800;border:none;border-right:1px solid #DBC79E;color:"+(status==="ausente"?"#fff":"#ef4444")+";background:"+(status==="ausente"?"#ef4444":"transparent")+";cursor:pointer;transition:all .15s'>AUS</button>";
+      html+="<button type='button' onclick='_invConfExpandir(\""+iid+"\")' style='width:44px;height:44px;font-size:18px;border:none;color:#a07c58;background:transparent;cursor:pointer'>+</button>";
+      html+="</div>";
       // painel de detalhes (colapsado por padrão)
       var ISci="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:5px 8px;border-radius:5px;font-size:12px;box-sizing:border-box";
       html+="<div id='inv-ci-det-"+iid+"' style='display:none;flex-direction:column;gap:6px;margin-top:6px;padding:8px;background:#EAD9B8;border-radius:7px;border:1px solid #DBC79E'>";
@@ -23117,17 +23117,14 @@ function _invConfAtualizarBotoes(itemId, status){
       if(btn){btn.style.background=status===s?cores[s]:"transparent";btn.style.color=status===s?"#fff":cores[s];}
     }catch(e){}
   });
-  // Atualizar borda lateral e opacidade do card
+  // Atualizar borda lateral, fundo e opacidade do card
   var card=document.getElementById("inv-ci-"+itemId);
   if(card){
     var marcado=status==="ok"||status==="divergencia"||status==="ausente";
     card.style.opacity=marcado?"0.65":"1";
     card.dataset.status=status;
-    var linha=card.querySelector("div[style*='border-left']");
-    if(linha){
-      linha.style.borderLeftColor=corBorda[status]||"#5e4636";
-      linha.style.background=marcado?"#EDE4CE":"#F2E4C8";
-    }
+    card.style.borderLeftColor=corBorda[status]||"#5e4636";
+    card.style.background=marcado?"#EDE4CE":"#F2E4C8";
   }
 }
 
