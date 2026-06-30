@@ -22317,6 +22317,38 @@ function _invEnviarSheets(tipo, dados){
   setTimeout(function(){ if(window[cb]){ delete window[cb]; } }, 15000);
 }
 
+// ── Recarrega inventário completo do Sheets (descarta cache local) ────────────
+window._invRecarregarDoSheets = async function(){
+  if(!confirm("Isso vai substituir todos os itens locais pelos dados do Sheets.\nContinuar?")) return;
+  showToast("Carregando do Sheets...");
+  state._invSincronizando = false; // libera lock
+  try{
+    var rItens = await _sheetsGet({acao:"listar",tipo:"inv_itens"});
+    var rMovs  = await _sheetsGet({acao:"listar",tipo:"inv_movimentacoes"});
+    var rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
+    if(rItens&&rItens.ok&&Array.isArray(rItens.dados)){
+      // Sheets ganha sobre tudo local — sem merge
+      state.invItens = rItens.dados.map(function(x){
+        if(typeof x.itens==="string"){try{x.itens=JSON.parse(x.itens);}catch(e){x.itens={};}} return x;
+      });
+    }
+    if(rMovs&&rMovs.ok&&Array.isArray(rMovs.dados)) state.invMovimentacoes = rMovs.dados;
+    if(rConfs&&rConfs.ok&&Array.isArray(rConfs.dados)){
+      state.invConferencias = rConfs.dados.map(function(x){
+        if(typeof x.itens==="string"){try{x.itens=JSON.parse(x.itens);}catch(e){x.itens={};}} return x;
+      });
+    }
+    _invSalvarLocal();
+    state._invLastSync = Date.now();
+    var m=document.getElementById("main-content")||document.getElementById("main");
+    if(m&&state.tela==="inventario") renderInventario(m);
+    showToast("✓ Inventário recarregado do Sheets ("+((state.invItens||[]).length)+" itens)","success");
+  }catch(e){
+    console.error("[INV] Recarregar falhou:",e);
+    showToast("Erro ao recarregar do Sheets","error");
+  }
+};
+
 // ── Envia conferência via POST (conf.itens pode ser grande demais para JSONP) ──
 function _invEnviarConferenciaPost(conf){
   if(!SHEETS_URL) return;
@@ -24088,6 +24120,7 @@ function renderInventario(main){
   h+="<span style='font-size:10px;color:"+_invSincCor+";background:"+_invSincCor+"18;border:1px solid "+_invSincCor+"44;border-radius:6px;padding:4px 9px'>"+_invSincTxt+"</span>";
   h+="<div style='display:flex;border:1px solid #5e4636;border-radius:8px;overflow:hidden'>";
   h+="<button onclick='state._invLastSync=0;_invSincronizarDoSheets().then(function(){var m=document.getElementById(\"main-content\")||document.getElementById(\"main\");if(m&&state.tela===\"inventario\")renderInventario(m);showToast(\"✓ Sincronizado\");})' title='Sincronizar"+(state._invLastSync?" — última: "+new Date(state._invLastSync).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"")+"' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#a07c58;padding:8px 12px;font-size:13px;cursor:pointer'>🔄</button>";
+  h+="<button onclick='_invRecarregarDoSheets()' title='Recarregar tudo do Sheets (descarta cache local)' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#4a9fd4;padding:8px 12px;font-size:13px;cursor:pointer'>↓</button>";
   h+="<button onclick='_invAbrirImport()' title='Importar Lista' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#a07c58;padding:8px 12px;font-size:13px;cursor:pointer'>📤</button>";
   if((state.invItens||[]).length) h+="<button onclick='_invLimparTodos()' title='Limpar Tudo' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#A8492E;padding:8px 12px;font-size:13px;cursor:pointer'>🗑</button>";
   h+="<button onclick='_invGerarPDF()' title='Exportar PDF' style='background:transparent;border:none;color:#a07c58;padding:8px 12px;font-size:13px;cursor:pointer'>📄</button>";
