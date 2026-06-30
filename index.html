@@ -22303,6 +22303,26 @@ function _invEnviarSheets(tipo, dados){
   setTimeout(function(){ if(window[cb]){ delete window[cb]; } }, 15000);
 }
 
+// ── Envia conferência via POST (conf.itens pode ser grande demais para JSONP) ──
+function _invEnviarConferenciaPost(conf){
+  if(!SHEETS_URL) return;
+  var copia=Object.assign({},conf);
+  // Remove assinaturas base64 (grandes) para não estourar o POST body
+  ["assin1","assin2"].forEach(function(k){ if(copia[k]&&copia[k].length>2000) copia[k]="[assin_local]"; });
+  // itens fica como objeto — o Apps Script recebe via JSON.parse(e.postData.contents)
+  var payload = JSON.stringify({token: BCS_TOKEN, tipo: "inv_conferencia", registro: copia});
+  fetch(SHEETS_URL, {method:"POST", headers:{"Content-Type":"text/plain"}, body: payload})
+    .then(function(r){return r.text();})
+    .then(function(txt){
+      try{
+        var j=JSON.parse(txt.replace(/^[^{[]*([{\[].*[}\]])[^}\]]*$/s,"$1"));
+        if(j&&j.ok){console.log("[INV] Conferência enviada:",conf.id);}
+        else{console.warn("[INV] Erro conferência POST:",j);}
+      }catch(e){console.warn("[INV] Parse resposta conf POST:",e);}
+    })
+    .catch(function(e){console.warn("[INV] Conf POST falhou:",e);});
+}
+
 // ── Carrega inventário do Sheets e merge com local ──────────────
 async function _invSincronizarDoSheets(){
   if(!SHEETS_URL||state._invSincronizando) return;
@@ -23751,7 +23771,8 @@ function _invSalvarConferencia(confId, concluir){
   var cidx=(state.invConferencias||[]).findIndex(function(x){return x.id===confId;});
   if(cidx>=0) state.invConferencias[cidx]=conf; else state.invConferencias.push(conf);
   _invSalvarLocal();
-  _invEnviarSheets("inv_conferencia", conf);
+  // Conferências usam POST (conf.itens pode ser enorme — URL JSONP estoura com muitos itens)
+  _invEnviarConferenciaPost(conf);
   document.getElementById("modal-inv-conf").remove();
   if(concluir){
     showToast("✓ Conferência concluída!");

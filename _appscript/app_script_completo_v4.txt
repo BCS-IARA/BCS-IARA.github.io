@@ -1226,7 +1226,37 @@ function listarInvItens(ss){return{ok:true,dados:_listarJson(ss,"inv_itens")};}
 function deletarInvItem(ss,id){return _deletarJson(ss,"inv_itens",id);}
 function salvarInvMovimentacao(ss,dados){var c=Object.assign({},dados);if(c.assinatura&&c.assinatura.length>2000)c.assinatura="[assin_local]";return _salvarJson(ss,"inv_movimentacoes","#0a1a12","#34d399",c);}
 function listarInvMovimentacoes(ss){return{ok:true,dados:_listarJson(ss,"inv_movimentacoes")};}
-function salvarInvConferencia(ss,dados){var c=Object.assign({},dados);if(c.assin1&&c.assin1.length>2000)c.assin1="[assin_local]";if(c.assin2&&c.assin2.length>2000)c.assin2="[assin_local]";return _salvarJson(ss,"inv_conferencias","#0a1a10","#6ee7b7",c);}
+function salvarInvConferencia(ss,dados){
+  var lock=LockService.getScriptLock();
+  lock.waitLock(15000);
+  try{
+    var copia=Object.assign({},dados);
+    if(copia.assin1&&copia.assin1.length>2000)copia.assin1="[assin_local]";
+    if(copia.assin2&&copia.assin2.length>2000)copia.assin2="[assin_local]";
+    // itens pode chegar serializado como string JSON (envio POST de payload grande)
+    if(typeof copia.itens==="string"){try{copia.itens=JSON.parse(copia.itens);}catch(e){copia.itens={};}}
+    var aba=_garantirAbaJson(ss,"inv_conferencias","#0a1a10","#6ee7b7");
+    var nRows=aba.getLastRow()-1;
+    if(nRows>0){
+      var ids=aba.getRange(2,1,nRows,1).getValues();
+      for(var i=0;i<ids.length;i++){
+        if(String(ids[i][0])===String(copia.id)){
+          var atualRaw=aba.getRange(i+2,3).getValue();
+          var atual={};
+          try{atual=JSON.parse(atualRaw||"{}");}catch(e){}
+          if(typeof atual.itens==="string"){try{atual.itens=JSON.parse(atual.itens);}catch(e){atual.itens={};}}
+          var itensMesclados=Object.assign({},atual.itens||{},copia.itens||{});
+          var mesclado=Object.assign({},atual,copia,{itens:itensMesclados});
+          aba.getRange(i+2,2).setValue(mesclado.criadoEm||new Date().toISOString());
+          aba.getRange(i+2,3).setValue(JSON.stringify(mesclado));
+          return{ok:true,id:copia.id,acao:"mesclado",registro:mesclado};
+        }
+      }
+    }
+    aba.appendRow([copia.id,copia.criadoEm||new Date().toISOString(),JSON.stringify(copia)]);
+    return{ok:true,id:copia.id,acao:"inserido",registro:copia};
+  }finally{lock.releaseLock();}
+}
 function listarInvConferencias(ss){return{ok:true,dados:_listarJson(ss,"inv_conferencias")};}
 
 function salvarAlertaCrescimento(ss,d){return _salvarJson(ss,"alertas_crescimento","#1a0808","#ef4444",d);}
