@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
@@ -9,14 +9,16 @@
 <title>IARA — 77ª CIPM BCS</title>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json"/>
-<meta name="theme-color" content="#d4a87a"/>
+<meta name="theme-color" content="#C47A2B"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="IARA BCS"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <!-- /PWA -->
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -31,9 +33,9 @@
   --papel-3:       #DBC79E;
   --tinta:         #3D2B1A;
   --tinta-2:       #6B5236;
-  --ambar:         #D9A53C;
-  --ambar-2:       #A87B22;
-  --ambar-claro:   #EFDFC0;
+  --ambar:         #C47A2B;
+  --ambar-2:       #8B5514;
+  --ambar-claro:   #F5EBD8;
   --verde:         #6E8F52;
   --verde-2:       #4F6B38;
   --verm:          #A8492E;
@@ -42,16 +44,16 @@
   --roxo:          #6A4A8A;
   --azul:          #2A5A8A;
   /* ── Aliases de compatibilidade (paleta antiga → pergaminho) ── */
-  --gold:#D9A53C;--gold-dim:rgba(217,165,60,0.15);--gold-border:rgba(168,123,34,0.4);
+  --gold:#C47A2B;--gold-dim:rgba(217,165,60,0.15);--gold-border:rgba(168,123,34,0.4);
   --bg:#F2E4C8;--bg-dark:#3E2A1A;--surface:#EAD9B8;--surface-deep:#DBC79E;
   --border:#DBC79E;--border-light:#C9B48A;
   --text:#3D2B1A;--muted:#6B5236;--muted-dark:#5A3D26;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:var(--madeira-3);color:var(--tinta);min-height:100vh;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--madeira-3);color:var(--tinta);min-height:100vh;}
 input,select,textarea,button{font-family:inherit;outline:none;}
 button{cursor:pointer;}
-h1,h2,h3,.titulo-serif{font-family:Georgia,'Times New Roman',serif;}
+h1,h2,h3,.titulo-serif{font-family:'Syne',sans-serif;font-weight:700;letter-spacing:-0.02em;}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
 @keyframes piscar{0%,50%{opacity:1}51%,100%{opacity:0.35}}
@@ -157,7 +159,7 @@ h1,h2,h3,.titulo-serif{font-family:Georgia,'Times New Roman',serif;}
 .btn-sm{padding:7px 14px;font-size:12px;}
 
 /* Tags */
-.tag{display:inline-flex;align-items:center;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:0.3px;}
+.tag{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.3px;}
 
 /* Ocorrência row */
 .oc-row{background:var(--papel-2);border:1.5px solid var(--papel-3);border-radius:8px;padding:14px 16px;margin-bottom:8px;transition:border-color 0.2s;box-shadow:inset 0 1px 0 rgba(255,255,255,.35);}
@@ -933,7 +935,7 @@ async function carregarDadosAppDoSheets(){
     state.ocorrenciasEncerradas = _mergeById(state.ocorrenciasEncerradas||[], ocEncSheets);
     state.alertasGraves       = _mergeById(state.alertasGraves||[],       alertasGravesSheets);
     state.devolutivasCrav     = _mergeById(state.devolutivasCrav||[],     devolutivasSheets);
-    state.encaminhamentos     = _mergeById(state.encaminhamentos||[],     encaminhamientosSheets);
+    state.encaminhamentos     = _mergeByIdTimestamp(state.encaminhamentos||[], encaminhamientosSheets);
     // Fila de triagem: sobrescrever (ordem-dependente, sem merge)
     if(filaPendenteSheets && Array.isArray(filaPendenteSheets)){
       state.filaPendente = filaPendenteSheets;
@@ -23583,6 +23585,7 @@ function renderDevolutivas(main){
     e.relato_devolutiva = texto;
     e.data_devolutiva   = new Date().toISOString().slice(0,10);
     e.status            = "aguardando_devolutiva";
+    e.atualizadoEm      = new Date().toISOString();
     localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
     salvarLocal();
     _sheetsGet({acao:"atualizarEncaminhamento", id:encId, relato_devolutiva:texto, status:"aguardando_devolutiva"}).catch(function(){});
@@ -23597,6 +23600,7 @@ function renderDevolutivas(main){
     e.registrado_na_ficha = true;
     e.registrado_em = new Date().toLocaleDateString("pt-BR");
     e.status = "concluido";
+    e.atualizadoEm = new Date().toISOString();
     // Adicionar na linha do tempo da vítima
     if(e.vitima_id){
       var vit=(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;});
@@ -23607,6 +23611,8 @@ function renderDevolutivas(main){
       }
     }
     localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
+    // Sincronizar imediatamente para outros aparelhos não reverterem o status
+    salvarDadoAppSheets("bcs_encaminhamentos", state.encaminhamentos||[]).catch(function(){});
     showToast("Devolutiva registrada na ficha da vítima!","success");
     renderDevolutivas(main);
   };
