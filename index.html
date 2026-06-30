@@ -357,13 +357,15 @@ function salvarLocal() {
   (state.db.ocorrencias||[]).forEach(function(o){ delete o._idx; });
   try {
     _salvarModulos(); // persiste campos de módulo em chave separada, imune ao sync
-    const light={
-      ocorrencias:state.db.ocorrencias,
-      atendimentos:state.db.atendimentos,
-      visitas:state.db.visitas,
-      agendamentos:state.db.agendamentos
-    };
-    localStorage.setItem("bcs_db_light",JSON.stringify(light));
+    // Salvar cada coleção em chave separada para evitar QuotaExceededError
+    // (787 OCs + 7322 agendamentos num único JSON ultrapassava o limite de 10MB)
+    try{ localStorage.setItem("bcs_db_oc",    JSON.stringify(state.db.ocorrencias||[])); }catch(e){ console.warn("[BCS] Quota OC",e); }
+    try{ localStorage.setItem("bcs_db_at",    JSON.stringify(state.db.atendimentos||[])); }catch(e){ console.warn("[BCS] Quota AT",e); }
+    try{ localStorage.setItem("bcs_db_vis",   JSON.stringify(state.db.visitas||[])); }catch(e){ console.warn("[BCS] Quota VIS",e); }
+    try{ localStorage.setItem("bcs_db_ag",    JSON.stringify(state.db.agendamentos||[])); }catch(e){ console.warn("[BCS] Quota AG",e); }
+    // Manter bcs_db_light apenas com OCs para compatibilidade reversa
+    const light={ ocorrencias:state.db.ocorrencias };
+    try{ localStorage.setItem("bcs_db_light",JSON.stringify(light)); }catch(e){ console.warn("[BCS] Quota light",e); }
     // Manter bcs_sigespol_backup sincronizado com edições locais
     try{
       var _spRaw = localStorage.getItem("bcs_sigespol_backup");
@@ -421,26 +423,38 @@ function carregarLocal() {
     localStorage.removeItem("bcs_db");
     const saved=localStorage.getItem("bcs_db_light");
     const db = {ocorrencias:[],atendimentos:[],visitas:[],agendamentos:[],avisos:JSON.parse(localStorage.getItem("bcs_db_avisos")||"[]")};
-    if(saved){
+    // Ler das chaves separadas (novo formato) — fallback para bcs_db_light (formato antigo)
+    var _oc  = localStorage.getItem("bcs_db_oc");
+    var _at  = localStorage.getItem("bcs_db_at");
+    var _vis = localStorage.getItem("bcs_db_vis");
+    var _ag  = localStorage.getItem("bcs_db_ag");
+    if(_oc||_at||_vis||_ag){
+      // Novo formato: chaves separadas
+      db.ocorrencias  = _oc  ? JSON.parse(_oc)  : [];
+      db.atendimentos = _at  ? JSON.parse(_at)  : [];
+      db.visitas      = _vis ? JSON.parse(_vis) : [];
+      db.agendamentos = _ag  ? JSON.parse(_ag)  : [];
+    } else if(saved){
+      // Fallback legado: bcs_db_light unificado
       const l=JSON.parse(saved);
       db.ocorrencias = l.ocorrencias||[];
       db.atendimentos = l.atendimentos||[];
       db.visitas = l.visitas||[];
       db.agendamentos = l.agendamentos||[];
-      // Dedup VCM: manter só o agendamento mais recente por ocorrenciaId
-      (function(){
-        var _vcmById={};
-        db.agendamentos.forEach(function(a){
-          if(a.tipo!=="Visita VCM/FRIDA"||!a.ocorrenciaId) return;
-          var prev=_vcmById[a.ocorrenciaId];
-          if(!prev||(a.criadoEm||"")>(prev.criadoEm||"")) _vcmById[a.ocorrenciaId]=a;
-        });
-        db.agendamentos=db.agendamentos.filter(function(a){
-          if(a.tipo!=="Visita VCM/FRIDA"||!a.ocorrenciaId) return true;
-          return _vcmById[a.ocorrenciaId]===a;
-        });
-      })();
     }
+    // Dedup VCM: manter só o agendamento mais recente por ocorrenciaId
+    (function(){
+      var _vcmById={};
+      db.agendamentos.forEach(function(a){
+        if(a.tipo!=="Visita VCM/FRIDA"||!a.ocorrenciaId) return;
+        var prev=_vcmById[a.ocorrenciaId];
+        if(!prev||(a.criadoEm||"")>(prev.criadoEm||"")) _vcmById[a.ocorrenciaId]=a;
+      });
+      db.agendamentos=db.agendamentos.filter(function(a){
+        if(a.tipo!=="Visita VCM/FRIDA"||!a.ocorrenciaId) return true;
+        return _vcmById[a.ocorrenciaId]===a;
+      });
+    })();
     // 🔒 Restaurar backup SIGESPOL (imune ao Sheets — chave separada)
     try {
       const spRaw = localStorage.getItem("bcs_sigespol_backup");
@@ -743,15 +757,15 @@ function agendarSyncSheets(){
 function _salvarLocalSemSync(){
   try{
     var db=state.db||{};
-    var light={
-      ocorrencias:(db.ocorrencias||[]).map(function(o){
-        var x=Object.assign({},o); delete x.texto_original; return x;
-      }),
-      agendamentos:db.agendamentos||[],
-      visitas:db.visitas||[],
-      atendimentos:db.atendimentos||[]
-    };
-    localStorage.setItem("bcs_db_light",JSON.stringify(light));
+    var _ocSemTexto=(db.ocorrencias||[]).map(function(o){
+      var x=Object.assign({},o); delete x.texto_original; return x;
+    });
+    try{ localStorage.setItem("bcs_db_oc",  JSON.stringify(_ocSemTexto)); }catch(e){ console.warn("[BCS] Quota OC",e); }
+    try{ localStorage.setItem("bcs_db_at",  JSON.stringify(db.atendimentos||[])); }catch(e){ console.warn("[BCS] Quota AT",e); }
+    try{ localStorage.setItem("bcs_db_vis", JSON.stringify(db.visitas||[])); }catch(e){ console.warn("[BCS] Quota VIS",e); }
+    try{ localStorage.setItem("bcs_db_ag",  JSON.stringify(db.agendamentos||[])); }catch(e){ console.warn("[BCS] Quota AG",e); }
+    var light={ ocorrencias:_ocSemTexto };
+    try{ localStorage.setItem("bcs_db_light",JSON.stringify(light)); }catch(e){ console.warn("[BCS] Quota light",e); }
     if(state.eventosAvulsos) localStorage.setItem("bcs_eventos_avulsos",JSON.stringify(state.eventosAvulsos));
     if(state.projetos) localStorage.setItem("bcs_projetos",JSON.stringify(state.projetos));
     if(state.rascunhos) localStorage.setItem("bcs_rascunhos",JSON.stringify(state.rascunhos));
