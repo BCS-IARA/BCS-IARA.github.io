@@ -397,6 +397,7 @@ function salvarLocal() {
     if(state.policiais) localStorage.setItem("bcs_policiais",JSON.stringify(state.policiais));
     if(state.solicitacoes) localStorage.setItem("bcs_solicitacoes",JSON.stringify(state.solicitacoes));
     if(state.encaminhamentos) localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
+    if(state.db.acompanhamentos) localStorage.setItem("bcs_acompanhamentos",JSON.stringify(state.db.acompanhamentos));
     if(state.escolas) localStorage.setItem("bcs_escolas",JSON.stringify(state.escolas));
     if(state.visitasEscolares) localStorage.setItem("bcs_visitas_escolares",JSON.stringify(state.visitasEscolares));
     if(state.atividadesEscolares) localStorage.setItem("bcs_atividades_escolares",JSON.stringify(state.atividadesEscolares));
@@ -694,6 +695,7 @@ async function sincronizarSheets(){
     await salvarDadoAppSheets("bcs_inv_conf",          state.invConferencias||[]);
     await salvarDadoAppSheets("bcs_visitas_escolares", state.visitasEscolares||[]);
     await salvarDadoAppSheets("bcs_candidaturas",      state.candidaturas||[]);
+    await salvarDadoAppSheets("bcs_acompanhamentos",  state.db.acompanhamentos||[]);
     await salvarDadoAppSheets("bcs_instrutores_cad",   state.cadastroInstrutores||[]);
     await salvarDadoAppSheets("bcs_oc_complementos",   state.ocComplementos||[]);
     await salvarDadoAppSheets("bcs_oc_pendentes",      state.ocorrenciasPendentes||[]);
@@ -811,6 +813,7 @@ async function carregarDadosAppDoSheets(){
     var inscricoesSheets  = await lerDadoAppSheets("bcs_inscricoes_proj");
     var policiaisSheets   = await lerDadoAppSheets("bcs_policiais");
     var vcmCasosSheets       = await lerDadoAppSheets("bcs_vcm_casos");
+    var acompanhamentosSheets = await lerDadoAppSheets("bcs_acompanhamentos");
     var chamadasSheets       = await lerDadoAppSheets("bcs_chamadas");
     var cargasSheets         = await lerDadoAppSheets("bcs_cargas_armamento");
     var invItensSheets       = await lerDadoAppSheets("bcs_inv_itens");
@@ -921,6 +924,7 @@ async function carregarDadosAppDoSheets(){
 
 
     // 📋 Módulos sem sync anterior — merge por id
+    state.db.acompanhamentos = _mergeById(state.db.acompanhamentos||[], acompanhamentosSheets);
     state.chamadas            = _mergeById(state.chamadas||[],            chamadasSheets);
     state.cargasArmamento     = _mergeById(state.cargasArmamento||[],     cargasSheets);
     state.invItens            = _mergeByIdTimestamp(state.invItens||[],            invItensSheets);
@@ -1384,6 +1388,7 @@ if(!state.db.ocorrencias) state.db.ocorrencias = [];
 if(!state.db.atendimentos) state.db.atendimentos = [];
 if(!state.db.visitas) state.db.visitas = [];
 if(!state.db.agendamentos) state.db.agendamentos = [];
+if(!state.db.acompanhamentos) state.db.acompanhamentos = [];
 
 // IDs excluídos (tombstone) — carregados AQUI pois carregarLocal() é chamado antes de state existir
 try{ var _agEx=localStorage.getItem("bcs_ag_excluidos"); state.agExcluidos=_agEx?new Set(JSON.parse(_agEx)):new Set(); }catch(e){ state.agExcluidos=new Set(); }
@@ -13559,6 +13564,303 @@ function renderHistoricoAtendimento(main) {
   setTimeout(function(){var el=document.getElementById('hist-busca');if(el){el.focus();var v=el.value.length;el.setSelectionRange(v,v);}},50);
 }
 
+
+// ── renderAcompanhamento ──────────────────────────────────────────────────────
+function renderAcompanhamento(main) {
+  var hojeStr = hoje();
+  var semanaStr = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+  var casos = (state.db.acompanhamentos||[]);
+  var ativos = casos.filter(function(c){return c.status==="ativo";});
+
+  function agDoCaso(c){
+    return (state.db.agendamentos||[]).find(function(a){return a.id===c.agendamentoAtualId;});
+  }
+
+  var vencidos = ativos.filter(function(c){var ag=agDoCaso(c);return ag&&ag.data<hojeStr;});
+  var estaSemana = ativos.filter(function(c){var ag=agDoCaso(c);return ag&&ag.data>=hojeStr&&ag.data<=semanaStr;});
+  var emDia = ativos.filter(function(c){var ag=agDoCaso(c);return !ag||ag.data>semanaStr;});
+
+  var corte=new Date(); corte.setMonth(corte.getMonth()-2);
+  var corteStr=corte.toISOString().slice(0,10);
+  var jaTemAcomp=new Set((state.db.acompanhamentos||[]).map(function(c){return c.origemOcorrenciaId;}));
+  var legados=(state.db.ocorrencias||[]).filter(function(o){
+    return o.situacao==="em_acompanhamento"&&!jaTemAcomp.has(o.id)&&(o.data||"")>=corteStr;
+  });
+
+  var filtroTipo = state._acompFiltroTipo||"todos";
+  var tipoOpts = {todos:"Todos",vitima_decisao:"Vítima em decisão",individuo_obs:"Indivíduo em observação",familia_acomp:"Família em acompanhamento",escola_atencao:"Escola em atenção",demanda_comunitaria:"Demanda comunitária"};
+
+  var h = "<div style='padding:14px 16px'>";
+
+  // KPI blocos
+  h += "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px'>";
+  function kpiBloco(n,label,cor){
+    return "<div style='background:var(--papel-2);border:1.5px solid "+cor+";border-radius:8px;padding:10px 12px;text-align:center'>"+
+      "<div style='font-size:22px;font-weight:900;color:"+cor+"'>"+n+"</div>"+
+      "<div style='font-size:10px;color:var(--tinta-2);font-weight:700;text-transform:uppercase;letter-spacing:.4px'>"+label+"</div></div>";
+  }
+  h += kpiBloco(vencidos.length,"Vencidos","var(--verm)");
+  h += kpiBloco(estaSemana.length,"Vence esta semana","var(--ambar)");
+  h += kpiBloco(emDia.length,"Em dia","var(--verde)");
+  h += "</div>";
+
+  // Filtros tipo
+  h += "<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px'>";
+  Object.keys(tipoOpts).forEach(function(k){
+    var ativo=filtroTipo===k;
+    h += "<button onclick=\"state._acompFiltroTipo='"+k+"';renderAcompanhamento(document.getElementById('fila-dia-content'))\" style='padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid var(--papel-3);cursor:pointer;background:"+(ativo?"var(--ambar)":"var(--papel-2)")+";color:"+(ativo?"var(--madeira-3)":"var(--tinta)")+"'>"+tipoOpts[k]+"</button>";
+  });
+  h += "</div>";
+
+  // Lista ordenada (mais vencido primeiro)
+  var listaFiltrada = ativos.filter(function(c){
+    return filtroTipo==="todos"||c.tipo===filtroTipo;
+  }).sort(function(a,b){
+    var da=(agDoCaso(a)||{}).data||""; var db=(agDoCaso(b)||{}).data||"";
+    return da<db?-1:da>db?1:0;
+  });
+
+  if(!listaFiltrada.length){
+    h += "<div style='text-align:center;padding:40px;color:var(--tinta-3);font-size:14px'>Nenhum caso em acompanhamento ativo.</div>";
+  } else {
+    listaFiltrada.forEach(function(c){
+      var ag=agDoCaso(c);
+      var dataAg=ag?ag.data:"";
+      var vencido=dataAg&&dataAg<hojeStr;
+      var proxSem=dataAg&&dataAg>=hojeStr&&dataAg<=semanaStr;
+      var semCor=c.semaforo==="vermelho"?"var(--verm)":c.semaforo==="amarelo"?"var(--ambar)":"var(--verde)";
+      var dataLabel=dataAg?dataAg.split("-").reverse().join("/"):"-";
+      var tpLabel=tipoOpts[c.tipo]||c.tipo||"";
+      var bordaCor=vencido?"var(--verm)":proxSem?"var(--ambar)":"var(--papel-3)";
+      var bgExtra=vencido?"background:rgba(168,74,46,0.06);":proxSem?"background:rgba(200,134,10,0.05);":"";
+
+      h += "<div onclick=\"abrirCasoCompleto('"+esc(c.id)+"')\" style='border:1.5px solid "+bordaCor+";"+bgExtra+"border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:.15s'>";
+      h += "<div style='display:flex;align-items:flex-start;justify-content:space-between;gap:8px'>";
+      h += "<div style='flex:1'>";
+      h += "<div style='display:flex;align-items:center;gap:6px;margin-bottom:4px'>";
+      h += "<span style='width:10px;height:10px;border-radius:50%;background:"+semCor+";display:inline-block;flex-shrink:0'></span>";
+      h += "<span style='font-size:13px;font-weight:700;color:var(--ambar)'>"+(c.nome_referencia?esc(c.nome_referencia):"(sem nome)")+"</span>";
+      h += "</div>";
+      h += "<div style='font-size:11px;color:var(--tinta-2);margin-bottom:3px'>"+esc(tpLabel)+"</div>";
+      h += "<div style='display:flex;gap:10px;flex-wrap:wrap'>";
+      if(c.bairro) h += "<span style='font-size:11px;color:var(--tinta-3)'>📍 "+esc(c.bairro)+"</span>";
+      if(dataAg) h += "<span style='font-size:11px;color:"+(vencido?"var(--verm)":"var(--tinta-3)")+"'>📅 Revisão: "+dataLabel+(vencido?" ⚠️":"")+"</span>";
+      if(c.periodicidade) h += "<span style='font-size:11px;color:var(--tinta-3)'>🔄 "+esc(c.periodicidade)+"</span>";
+      h += "</div></div>";
+      h += "<span style='font-size:18px'>"+(c.semaforo==="vermelho"?"🔴":c.semaforo==="amarelo"?"🟡":"🟢")+"</span>";
+      h += "</div></div>";
+    });
+  }
+
+  // Aviso legados
+  if(legados.length){
+    h += "<div style='margin-top:20px;padding:14px;border:1.5px dashed var(--ambar-2);border-radius:8px;background:rgba(200,134,10,0.04)'>";
+    h += "<p style='font-size:12px;font-weight:700;color:var(--ambar);margin:0 0 8px'>⚠️ "+legados.length+" caso(s) legado(s) sem classificação.</p>";
+    h += "<p style='font-size:11px;color:var(--tinta-2);margin:0 0 10px'>Ocorrências antigas com status \"em_acompanhamento\" que não foram migradas ainda.</p>";
+    h += "<button onclick='_renderMigracaoLegados(document.getElementById(\"fila-dia-content\"))' style='padding:8px 16px;background:var(--ambar);color:var(--madeira-3);border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>Revisar e Migrar Casos Antigos</button>";
+    h += "</div>";
+  }
+
+  h += "</div>";
+  main.innerHTML = h;
+}
+
+// ── abrirCasoCompleto ─────────────────────────────────────────────────────────
+window.abrirCasoCompleto = function(acompId) {
+  var caso = (state.db.acompanhamentos||[]).find(function(c){return c.id===acompId;});
+  if(!caso){ showToast("Caso não encontrado","error"); return; }
+  var oc = caso.origemOcorrenciaId?(state.db.ocorrencias||[]).find(function(o){return o.id===caso.origemOcorrenciaId;}):null;
+  var encVinc = (state.encaminhamentos||[]).filter(function(e){
+    return e.ocorrencia_id===caso.origemOcorrenciaId||e.ocorrenciaId===caso.origemOcorrenciaId;
+  });
+  var tipoOpts2={vitima_decisao:"Vítima em decisão",individuo_obs:"Indivíduo em observação",familia_acomp:"Família em acompanhamento",escola_atencao:"Escola em atenção",demanda_comunitaria:"Demanda comunitária"};
+  var semCor2=caso.semaforo==="vermelho"?"var(--verm)":caso.semaforo==="amarelo"?"var(--ambar)":"var(--verde)";
+  var ag=caso.agendamentoAtualId?(state.db.agendamentos||[]).find(function(a){return a.id===caso.agendamentoAtualId;}):null;
+  var dataRevStr=ag?ag.data.split("-").reverse().join("/"):"-";
+  var nomeDisplay=caso.nome_referencia||(oc?(oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||""):"")|| "(sem nome)";
+
+  var mh = "";
+  mh += "<div style='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto' id='modal-caso-completo' onclick=\"if(event.target.id==='modal-caso-completo')document.getElementById('modal-caso-completo').remove()\">";
+  mh += "<div style='background:var(--papel);border-radius:12px;padding:20px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto'>";
+
+  mh += "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px'>";
+  mh += "<div><h2 style='margin:0 0 4px;font-size:17px;color:var(--ambar);font-family:Georgia,serif'>"+esc(nomeDisplay)+"</h2>";
+  mh += "<span style='font-size:11px;color:var(--tinta-2)'>"+esc(tipoOpts2[caso.tipo]||caso.tipo)+"</span></div>";
+  mh += "<button onclick=\"document.getElementById('modal-caso-completo').remove()\" style='background:none;border:none;font-size:20px;cursor:pointer;color:var(--tinta-2)'>✕</button></div>";
+
+  mh += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px'>";
+  mh += "<div style='background:var(--papel-2);border-radius:6px;padding:8px 10px'><div style='font-size:10px;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px'>Risco</div>";
+  mh += "<div style='font-size:14px;font-weight:700;color:"+semCor2+"'>"+(caso.semaforo==="vermelho"?"🔴 Alto":caso.semaforo==="amarelo"?"🟡 Médio":"🟢 Baixo")+"</div></div>";
+  mh += "<div style='background:var(--papel-2);border-radius:6px;padding:8px 10px'><div style='font-size:10px;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px'>Próxima Revisão</div>";
+  mh += "<div style='font-size:13px;font-weight:700;color:var(--tinta)'>"+dataRevStr+"</div></div>";
+  mh += "<div style='background:var(--papel-2);border-radius:6px;padding:8px 10px'><div style='font-size:10px;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px'>Periodicidade</div>";
+  mh += "<div style='font-size:13px;font-weight:700;color:var(--tinta)'>"+(caso.periodicidade||"-")+"</div></div>";
+  mh += "</div>";
+
+  mh += "<div style='margin-bottom:14px'><p style='font-size:11px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px'>Histórico</p>";
+  if(caso.historico&&caso.historico.length){
+    caso.historico.slice().reverse().forEach(function(h){
+      mh += "<div style='padding:7px 10px;border-left:3px solid var(--ambar);margin-bottom:6px;background:var(--papel-2);border-radius:0 5px 5px 0'>";
+      mh += "<span style='font-size:10px;color:var(--tinta-3)'>"+(h.data||"")+(h.autor?" · "+h.autor:"")+"</span><br>";
+      mh += "<span style='font-size:12px;color:var(--tinta)'>"+esc(h.nota)+"</span></div>";
+    });
+  } else { mh += "<p style='font-size:12px;color:var(--tinta-3);font-style:italic'>Sem registros</p>"; }
+  mh += "</div>";
+
+  if(encVinc.length){
+    mh += "<div style='margin-bottom:14px'><p style='font-size:11px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px'>Encaminhamentos vinculados</p>";
+    encVinc.forEach(function(e){
+      mh += "<div style='padding:7px 10px;border:1px solid var(--papel-3);border-radius:5px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center'>";
+      mh += "<span style='font-size:12px;color:var(--tinta)'>"+esc(e.tipo||"")+"</span>";
+      mh += "<span style='font-size:11px;color:var(--tinta-3)'>"+esc(e.status||"")+"</span></div>";
+    });
+    mh += "</div>";
+  }
+
+  mh += "<div style='border-top:1px solid var(--papel-3);padding-top:14px;display:flex;gap:8px;flex-wrap:wrap'>";
+  mh += "<button onclick=\"_renovarAcomp('"+esc(caso.id)+"')\" style='flex:1;min-width:130px;padding:10px;background:rgba(110,143,82,0.1);border:1.5px solid var(--verde);border-radius:6px;color:var(--tinta);font-size:12px;font-weight:700;cursor:pointer'>🔄 Renovar</button>";
+  mh += "<button onclick=\"_encerrarAcomp('"+esc(caso.id)+"')\" style='flex:1;min-width:130px;padding:10px;background:rgba(168,74,46,0.07);border:1.5px solid var(--verm);border-radius:6px;color:var(--verm);font-size:12px;font-weight:700;cursor:pointer'>✕ Encerrar</button>";
+  if(caso.origemOcorrenciaId){
+    mh += "<button onclick=\"document.getElementById('modal-caso-completo').remove();state.popEditarOc='"+esc(caso.origemOcorrenciaId)+"';state.tela='ocorrencias';renderTela()\" style='flex:1;min-width:130px;padding:10px;background:var(--papel-2);border:1.5px solid var(--papel-3);border-radius:6px;color:var(--tinta-2);font-size:12px;font-weight:700;cursor:pointer'>📄 Ver OC</button>";
+  }
+  mh += "</div>";
+  mh += "</div></div>";
+
+  var div=document.createElement("div");
+  div.innerHTML=mh;
+  document.body.appendChild(div.firstChild);
+};
+
+// ── Renovar / Encerrar ────────────────────────────────────────────────────────
+window._renovarAcomp = function(acompId){
+  var novaData=prompt("Nova data de revisão (AAAA-MM-DD):");
+  if(!novaData||!/^\d{4}-\d{2}-\d{2}$/.test(novaData)){showToast("Data inválida","error");return;}
+  var idx=(state.db.acompanhamentos||[]).findIndex(function(c){return c.id===acompId;});
+  if(idx<0) return;
+  var caso=state.db.acompanhamentos[idx];
+  if(caso.agendamentoAtualId){
+    var agIdx=(state.db.agendamentos||[]).findIndex(function(a){return a.id===caso.agendamentoAtualId;});
+    if(agIdx>=0) state.db.agendamentos[agIdx].status="Concluído";
+  }
+  var novoAgId="ag_acomp_"+Date.now();
+  var novoAg={id:novoAgId,criadoEm:new Date().toISOString(),data:novaData,hora:"08:00",
+    tipo:"Revisão de Acompanhamento",vitima_nome:caso.nome_referencia||"",endereco:caso.endereco||"",
+    responsavel:"",objetivo:"Revisão de caso em acompanhamento interno",status:"Agendado",
+    ocorrenciaId:caso.origemOcorrenciaId||"",acompanhamentoId:acompId};
+  state.db.agendamentos.push(novoAg);
+  enviarSheets("agendamentos",novoAg);
+  caso.agendamentoAtualId=novoAgId;
+  caso.historico=caso.historico||[];
+  caso.historico.push({data:hoje(),nota:"Revisão renovada. Próxima: "+novaData,autor:"Sistema"});
+  salvarLocal();
+  salvarDadoAppSheets("bcs_acompanhamentos",state.db.acompanhamentos).catch(function(){});
+  var m=document.getElementById("modal-caso-completo"); if(m) m.remove();
+  showToast("Revisão renovada para "+novaData.split("-").reverse().join("/"),"success");
+  var c=document.getElementById("fila-dia-content"); if(c) renderAcompanhamento(c);
+};
+
+window._encerrarAcomp = function(acompId){
+  var motivo=prompt("Motivo do encerramento:");
+  if(motivo===null) return;
+  var idx=(state.db.acompanhamentos||[]).findIndex(function(c){return c.id===acompId;});
+  if(idx<0) return;
+  var caso=state.db.acompanhamentos[idx];
+  if(caso.agendamentoAtualId){
+    var agIdx=(state.db.agendamentos||[]).findIndex(function(a){return a.id===caso.agendamentoAtualId;});
+    if(agIdx>=0) state.db.agendamentos[agIdx].status="Concluído";
+  }
+  caso.status="encerrado";
+  caso.motivoEncerramento=motivo||"(sem motivo)";
+  caso.historico=caso.historico||[];
+  caso.historico.push({data:hoje(),nota:"Caso encerrado. Motivo: "+caso.motivoEncerramento,autor:"Sistema"});
+  salvarLocal();
+  salvarDadoAppSheets("bcs_acompanhamentos",state.db.acompanhamentos).catch(function(){});
+  var m=document.getElementById("modal-caso-completo"); if(m) m.remove();
+  showToast("Caso encerrado","success");
+  var c=document.getElementById("fila-dia-content"); if(c) renderAcompanhamento(c);
+};
+
+// ── Migração legados ──────────────────────────────────────────────────────────
+window._criarCasoAcompanhamento = function(oc, tipo, semaforo, dataRevisao, periodicidade){
+  if(!state.db.acompanhamentos) state.db.acompanhamentos=[];
+  var acompId="ac_"+Date.now()+"_"+Math.random().toString(36).slice(2,5);
+  var agId="ag_acomp_"+Date.now()+"_"+Math.random().toString(36).slice(2,5);
+  var nome=oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||oc.escolaNome||"";
+  var novoAg={id:agId,criadoEm:new Date().toISOString(),data:dataRevisao,hora:"08:00",
+    tipo:"Revisão de Acompanhamento",vitima_nome:nome||"",endereco:oc.local||oc.bairro||"",
+    responsavel:"",objetivo:"Revisão de caso em acompanhamento interno",status:"Agendado",
+    ocorrenciaId:oc.id,acompanhamentoId:acompId};
+  state.db.agendamentos.push(novoAg);
+  enviarSheets("agendamentos",novoAg);
+  var novoCaso={id:acompId,criadoEm:new Date().toISOString(),tipo:tipo,semaforo:semaforo,
+    nome_referencia:nome,endereco:oc.local||"",bairro:oc.bairro||"",responsavel:"",
+    origemOcorrenciaId:oc.id,periodicidade:periodicidade,agendamentoAtualId:agId,
+    historico:[{data:hoje(),nota:"Caso migrado do sistema legado.",autor:"Migração"}],
+    status:"ativo",motivoEncerramento:null,convertidoPara:null};
+  state.db.acompanhamentos.push(novoCaso);
+  return novoCaso;
+};
+
+window._renderMigracaoLegados = function(container){
+  var corte=new Date(); corte.setMonth(corte.getMonth()-2);
+  var corteStr=corte.toISOString().slice(0,10);
+  var jaTemAcomp=new Set((state.db.acompanhamentos||[]).map(function(c){return c.origemOcorrenciaId;}));
+  var legados=(state.db.ocorrencias||[]).filter(function(o){
+    return o.situacao==="em_acompanhamento"&&!jaTemAcomp.has(o.id)&&(o.data||"")>=corteStr;
+  });
+  if(!legados.length){showToast("Nenhum caso legado a migrar","success");return;}
+
+  var h="<div style='padding:14px 16px'>";
+  h+="<button onclick=\"renderAcompanhamento(document.getElementById('fila-dia-content'))\" style='background:none;border:none;color:var(--ambar);font-size:12px;cursor:pointer;margin-bottom:12px'>← Voltar</button>";
+  h+="<h3 style='margin:0 0 12px;font-size:15px;color:var(--tinta);font-family:Georgia,serif'>Migração de Casos Legados ("+legados.length+")</h3>";
+  h+="<p style='font-size:11px;color:var(--tinta-2);margin:0 0 14px'>Classifique cada caso e confirme a migração.</p>";
+  h+="<table style='width:100%;border-collapse:collapse;font-size:12px'>";
+  h+="<tr style='background:var(--papel-2)'><th style='padding:8px;text-align:left;font-size:11px'>Nome / OC</th><th style='padding:8px;font-size:11px'>Tipo</th><th style='padding:8px;font-size:11px'>Risco</th></tr>";
+  legados.forEach(function(o,idx){
+    var nome=o.vitima_nome||o.nome_vitima||(o.vitimas&&o.vitimas[0]?o.vitimas[0].nome:"")||"(sem nome)";
+    h+="<tr style='border-bottom:1px solid var(--papel-3)'>";
+    h+="<td style='padding:8px'><strong>"+esc(nome)+"</strong><br><span style='color:var(--tinta-3);font-size:10px'>"+esc(o.numero||o.id)+"</span></td>";
+    h+="<td style='padding:8px'><select id='mig-tipo-"+idx+"' style='padding:4px 6px;border:1px solid var(--papel-3);border-radius:4px;background:var(--papel);color:var(--tinta);font-size:11px'>";
+    h+="<option value='vitima_decisao'>Vítima em decisão</option>";
+    h+="<option value='individuo_obs'>Indivíduo em observação</option>";
+    h+="<option value='familia_acomp'>Família em acompanhamento</option>";
+    h+="<option value='escola_atencao'>Escola em atenção</option>";
+    h+="<option value='demanda_comunitaria'>Demanda comunitária</option>";
+    h+="</select></td>";
+    h+="<td style='padding:8px'><select id='mig-sem-"+idx+"' style='padding:4px 6px;border:1px solid var(--papel-3);border-radius:4px;background:var(--papel);color:var(--tinta);font-size:11px'>";
+    h+="<option value='verde'>🟢 Verde</option><option value='amarelo'>🟡 Amarelo</option><option value='vermelho'>🔴 Vermelho</option>";
+    h+="</select></td></tr>";
+  });
+  h+="</table>";
+  h+="<input type='hidden' id='mig-ids' value='"+esc(legados.map(function(o){return o.id;}).join(","))+"'>";
+  h+="<button onclick='_confirmarMigracao()' style='margin-top:16px;width:100%;padding:12px;background:var(--ambar);color:var(--madeira-3);border:none;border-radius:7px;font-size:14px;font-weight:700;cursor:pointer'>✓ Confirmar e Migrar Todos</button>";
+  h+="</div>";
+  container.innerHTML=h;
+};
+
+window._confirmarMigracao = function(){
+  var idsEl=document.getElementById("mig-ids");
+  if(!idsEl) return;
+  var ids=idsEl.value.split(",").filter(Boolean);
+  var d=new Date(); d.setDate(d.getDate()+30);
+  var dataRev=d.toISOString().slice(0,10);
+  var migrados=0;
+  ids.forEach(function(ocId,idx){
+    var o=(state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
+    if(!o) return;
+    var tipo=(document.getElementById("mig-tipo-"+idx)||{value:"individuo_obs"}).value;
+    var sem=(document.getElementById("mig-sem-"+idx)||{value:"verde"}).value;
+    _criarCasoAcompanhamento(o,tipo,sem,dataRev,"mensal");
+    migrados++;
+  });
+  if(migrados){
+    salvarLocal();
+    salvarDadoAppSheets("bcs_acompanhamentos",state.db.acompanhamentos).catch(function(){});
+    showToast(migrados+" caso(s) migrado(s)","success");
+  }
+  var c=document.getElementById("fila-dia-content"); if(c) renderAcompanhamento(c);
+};
+
 function renderFilaDia(main) {
   if(!state._filaTab) state._filaTab = "triagem";
   var tab = state._filaTab;
@@ -13573,13 +13875,20 @@ function renderFilaDia(main) {
   }).length + (state.encaminhamentos||[]).filter(function(e){return e.vcm&&e.status==="pendente";}).length;
   var _nEnc  = (state.encaminhamentos||[]).filter(function(e){return e.status!=="concluido";}).length;
   var _nDev  = (state.encaminhamentos||[]).filter(function(e){return e.relato_devolutiva&&!e.registrado_na_ficha;}).length;
+  var _hojeStr2 = hoje();
+  var _nAcompVenc = (state.db.acompanhamentos||[]).filter(function(c){
+    if(c.status!=="ativo") return false;
+    var ag=(state.db.agendamentos||[]).find(function(a){return a.id===c.agendamentoAtualId;});
+    return ag && ag.data < _hojeStr2;
+  }).length;
 
   var abas = [
     {k:"triagem",       label:"Triagem",          badge:_nTri,  cor:"var(--verm)"},
     {k:"agenda",        label:"Fila do Dia",       badge:0,      cor:"var(--ambar)"},
     {k:"encaminhamentos",label:"Encaminhamentos",  badge:_nEnc,  cor:"var(--ambar)"},
     {k:"devolutivas",   label:"Devolutivas",       badge:_nDev,  cor:"var(--verde)"},
-    {k:"historico",      label:"Histórico",         badge:0,      cor:"var(--azul)"}
+    {k:"historico",      label:"Histórico",         badge:0,      cor:"var(--azul)"},
+    {k:"acompanhamento", label:"Em Acompanhamento", badge:_nAcompVenc, cor:"var(--verm)"}
   ];
 
   // Injeta wrapper com barra de abas no topo
@@ -13601,6 +13910,7 @@ function renderFilaDia(main) {
     else if(tab === "vcm")             renderDashboardVCM(content);
     else if(tab === "encaminhamentos") renderFilaEncaminhamentos(content);
     else if(tab === "devolutivas")     renderDevolutivas(content);
+    else if(tab === "acompanhamento")      renderAcompanhamento(content);
     else if(tab === "historico")          renderHistoricoAtendimento(content);
     else                               renderFilaAuxiliar(content);
   } finally {
@@ -14189,6 +14499,8 @@ function renderTriagem(main) {
       h += "<label style='display:flex;align-items:center;gap:5px;background:var(--papel-3);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:12px;color:var(--tinta)'>";
       h += "<input type='checkbox' class='tri-orgao' value='"+esc(org)+"'> "+esc(org)+"</label>";
     });
+    h += "<div style='margin-top:10px'><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Prazo de Retorno</label>";
+    h += "<input id='tri-enc-prazo' type='date' style='width:220px;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px;box-sizing:border-box'></div>";
     h += "</div></div></div>";
 
     // Trilho Visita
@@ -14206,6 +14518,35 @@ function renderTriagem(main) {
     h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Data</label>";
     h += "<input id='tri-vis-data' type='date' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px;box-sizing:border-box'></div>";
     h += "</div></div></div>";
+
+    // Trilho Acompanhamento Interno
+    h += "<div id='tri-acomp-bloco' style='border:1.5px solid var(--papel-3);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:var(--papel-2);transition:.2s'>";
+    h += "<label style='display:flex;align-items:center;gap:8px;cursor:pointer'>";
+    h += "<input type='checkbox' id='tri-acomp' onchange='_triToggle(\"acomp\")'> ";
+    h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>🕯 Acompanhamento Interno</span></label>";
+    h += "<div id='tri-acomp-extra' style='display:none;margin-top:10px'>";
+    h += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px'>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Tipo de Caso</label>";
+    h += "<select id='tri-acomp-tipo' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px'>";
+    h += "<option value='vitima_decisao'>Vítima em decisão</option>";
+    h += "<option value='individuo_obs'>Indivíduo em observação</option>";
+    h += "<option value='familia_acomp'>Família em acompanhamento</option>";
+    h += "<option value='escola_atencao'>Escola em atenção</option>";
+    h += "<option value='demanda_comunitaria'>Demanda comunitária</option>";
+    h += "</select></div>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Nível de Risco</label>";
+    h += "<select id='tri-acomp-semaforo' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px'>";
+    h += "<option value='verde'>🟢 Verde</option><option value='amarelo'>🟡 Amarelo</option><option value='vermelho'>🔴 Vermelho</option>";
+    h += "</select></div></div>";
+    h += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Próxima Revisão</label>";
+    h += "<input id='tri-acomp-data' type='date' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px;box-sizing:border-box'></div>";
+    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Periodicidade</label>";
+    h += "<select id='tri-acomp-period' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px'>";
+    h += "<option value='semanal'>Semanal</option><option value='quinzenal'>Quinzenal</option><option value='mensal'>Mensal</option><option value='unica'>Data única</option>";
+    h += "</select></div></div>";
+    h += "<p style='font-size:10px;color:var(--tinta-2);margin:8px 0 0;font-style:italic'>↳ Cria o caso em Em Acompanhamento e gera agendamento de revisão automaticamente.</p>";
+    h += "</div></div>";
     h += "</div>"; // fim card bloco 2
 
     // BLOCO 3 — Decisão
@@ -14264,7 +14605,7 @@ window._triToggle = function(trilho) {
   var extra = document.getElementById("tri-"+trilho+"-extra");
   if(!cb||!bloco||!extra) return;
   if(cb.checked){
-    var cor = trilho==="menor"?"var(--ambar)":trilho==="enc"?"var(--ambar-2)":"var(--verde)";
+    var cor = trilho==="menor"?"var(--ambar)":trilho==="enc"?"var(--ambar-2)":trilho==="acomp"?"var(--azul)":"var(--verde)";
     var bg  = trilho==="menor"?"var(--ambar-claro)":trilho==="enc"?"rgba(217,165,60,0.06)":"rgba(110,143,82,0.06)";
     bloco.style.borderColor=cor; bloco.style.background=bg;
     extra.style.display="block";
@@ -14337,7 +14678,8 @@ window._salvarTriagem = function(ocId) {
         tipo: cb.value,
         descricao:"",
         data: hoje(),
-        status:"pendente"
+        status:"pendente",
+        prazo: (document.getElementById("tri-enc-prazo")||{value:""}).value||null
       };
       state.encaminhamentos.push(enc);
       _sheetsGet({acao:"salvarEncaminhamento",dados:JSON.stringify(enc)}).catch(function(){});
@@ -14369,6 +14711,50 @@ window._salvarTriagem = function(ocId) {
     } else {
       showToast("Informe a data da visita","error"); return;
     }
+  }
+
+
+  // Validação: situação em_acompanhamento requer trilho marcado
+  var _situacaoSel = (document.getElementById("tri-situacao")||{value:"em_acompanhamento"}).value;
+  var _acompAtivo = !!(document.getElementById("tri-acomp")||{}).checked;
+  if(_situacaoSel === "em_acompanhamento" && !_acompAtivo){
+    showToast("Marque o trilho 'Acompanhamento Interno' para classificar o caso","error"); return;
+  }
+
+  // Trilho Acompanhamento Interno
+  if(_acompAtivo){
+    var acTipo   = (document.getElementById("tri-acomp-tipo")||{value:"individuo_obs"}).value;
+    var acSem    = (document.getElementById("tri-acomp-semaforo")||{value:"verde"}).value;
+    var acData   = (document.getElementById("tri-acomp-data")||{value:""}).value;
+    var acPeriod = (document.getElementById("tri-acomp-period")||{value:"mensal"}).value;
+    if(!acData){ showToast("Informe a próxima data de revisão do acompanhamento","error"); return; }
+    if(!state.db.acompanhamentos) state.db.acompanhamentos = [];
+    var _acompId = "ac_"+Date.now();
+    var _agAcId  = "ag_acomp_"+Date.now();
+    var _novoAgAc = {
+      id: _agAcId, criadoEm: new Date().toISOString(),
+      data: acData, hora: "08:00",
+      tipo: "Revisão de Acompanhamento",
+      vitima_nome: oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||"(sem nome)",
+      endereco: oc.local||oc.bairro||"",
+      responsavel: "", objetivo: "Revisão de caso em acompanhamento interno",
+      status: "Agendado", ocorrenciaId: ocId, acompanhamentoId: _acompId
+    };
+    state.db.agendamentos.push(_novoAgAc);
+    enviarSheets("agendamentos", _novoAgAc);
+    var _novoCaso = {
+      id: _acompId, criadoEm: new Date().toISOString(),
+      tipo: acTipo, semaforo: acSem,
+      nome_referencia: oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||oc.escolaNome||"",
+      endereco: oc.local||"", bairro: oc.bairro||"",
+      responsavel: "", origemOcorrenciaId: ocId,
+      periodicidade: acPeriod, agendamentoAtualId: _agAcId,
+      historico: [{data: hoje(), nota: "Caso aberto na triagem.", autor: "Triagem"}],
+      status: "ativo", motivoEncerramento: null, convertidoPara: null
+    };
+    state.db.acompanhamentos.push(_novoCaso);
+    enviarSheets("acompanhamentos", _novoCaso);
+    salvarDadoAppSheets("bcs_acompanhamentos", state.db.acompanhamentos).catch(function(){});
   }
 
   // Observações finais
