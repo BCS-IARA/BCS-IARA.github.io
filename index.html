@@ -13353,11 +13353,10 @@ function renderHistoricoAtendimento(main) {
   var registros = [];
 
   // Todas as ocorrencias que ja foram atendidas (situacao != "nova")
-  var _sitLabel = {em_triagem:'Em triagem', em_acompanhamento:'Acompanhamento', encerrada:'Encerrada', historico:'Hist\u00f3rico'};
-  var _sitCor   = {em_triagem:'var(--ambar)', em_acompanhamento:'var(--azul)', encerrada:'var(--tinta-2)', historico:'var(--verde)'};
+  var _sitLabel = {nova:'Nova', em_triagem:'Em triagem', em_acompanhamento:'Acompanhamento', encerrada:'Encerrada', historico:'Hist\u00f3rico'};
+  var _sitCor   = {nova:'var(--tinta-2)', em_triagem:'var(--ambar)', em_acompanhamento:'var(--azul)', encerrada:'var(--tinta-2)', historico:'var(--verde)'};
   (state.db.ocorrencias||[]).forEach(function(o){
     var sit = o.situacao||o.status||'nova';
-    if(sit==='nova') return; // ainda nao atendida
     registros.push({
       tipo:'ocorrencia', icone:'\u{1F4CB}',
       id: o.id||'',
