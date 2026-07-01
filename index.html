@@ -298,6 +298,8 @@ function esc(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+// Retorna src de assinatura apenas se for base64 válido (evita 404 com [assin_local])
+function _assinSrc(val){ return (val&&typeof val==="string"&&val.indexOf("data:")===0)?val:""; }
 const TIPOS_VISITA = ["Visita Solidária","Visita Comunitária","Visita Institucional Comunitária","Visita a Vítima de Violência","Visita de Acompanhamento","Ronda Escolar"];
 const COR_VISITA = {"Visita Solidária":"#d4a87a","Visita Comunitária":"#b87333","Visita Institucional Comunitária":"#c4833a","Visita a Vítima de Violência":"#ef4444","Visita de Acompanhamento":"#10b981","Ronda Escolar":"#38bdf8"};
 const CONCEITO_VISITA = {"Visita Solidária":"🤝 Apoio emocional e orientação a vítimas. Foco na escuta ativa e encaminhamentos.","Visita Comunitária":"🏘 Presença institucional para fortalecer laços comunitários.","Visita Institucional Comunitária":"🏛 Articulação com CRAS, CREAS, UBS e escolas (teoria do crescimento comunitário).","Visita a Vítima de Violência":"🛡 Acompanhamento de vítimas e verificação de medidas protetivas.","Visita de Acompanhamento":"🔄 Seguimento de casos anteriores.","Ronda Escolar":"🏫 Visita a escola para presença institucional, prevenção e articulação com educadores."};
@@ -10888,8 +10890,8 @@ function _solAbrirDetalhe(protocolo){
   // Assinatura do solicitante
   h.push("<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px'>");
   h.push("<div><div style='color:#8a6848;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:4px'>Assinatura do Solicitante</div>");
-  if(s.assinatura){
-    h.push("<div style='background:#070d1a;border:1px solid #2a1c10;border-radius:8px;padding:6px;text-align:center'><img src='"+s.assinatura+"' style='max-height:70px;max-width:100%'/></div>");
+  if(_assinSrc(s.assinatura)){
+    h.push("<div style='background:#070d1a;border:1px solid #2a1c10;border-radius:8px;padding:6px;text-align:center'><img src='"+_assinSrc(s.assinatura)+"' style='max-height:70px;max-width:100%'/></div>");
     h.push("<div style='color:#5e4636;font-size:10px;margin-top:4px;text-align:center'>"+esc(s.nome||"")+"  ·  Mat. "+esc(s.matricula||"")+"</div>");
   } else {
     h.push("<div style='background:#070d1a;border:1px dashed #2a1c10;border-radius:8px;padding:20px;text-align:center;color:#3a2a1a;font-size:11px'>Sem assinatura</div>");
@@ -11096,8 +11098,8 @@ function _solGerarPDF(protocolo){
     "</div>";
   }
 
-  var assinPolHtml  = s.assinatura  ? "<img src='"+s.assinatura +"' style='max-height:60px;max-width:200px'/>" : "<div style='height:50px'></div>";
-  var assinCmtHtml  = s.assinatura_cmt ? "<img src='"+s.assinatura_cmt+"' style='max-height:60px;max-width:200px'/>" : "<div style='height:50px'></div>";
+  var assinPolHtml  = _assinSrc(s.assinatura)  ? "<img src='"+_assinSrc(s.assinatura) +"' style='max-height:60px;max-width:200px'/>" : "<div style='height:50px'></div>";
+  var assinCmtHtml  = _assinSrc(s.assinatura_cmt) ? "<img src='"+_assinSrc(s.assinatura_cmt)+"' style='max-height:60px;max-width:200px'/>" : "<div style='height:50px'></div>";
 
   var textoEsc = (s.texto||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
 
@@ -23303,9 +23305,10 @@ function _invItensValidosConf(conf){
 function _invAbrirConferencia(confId){
   // Sync preventivo: puxa conferências do Sheets antes de abrir, para capturar itens de outros aparelhos
   if(confId && SHEETS_URL){
-    _invBuscarConferenciasPost().then(function(rConfs){
-      if(!rConfs||!rConfs.ok||!Array.isArray(rConfs.dados)) return;
-      state.invConferencias = _invMergeConferencias(state.invConferencias||[], rConfs.dados);
+    _sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(rConfs){
+      if(!rConfs||!rConfs.ok||!Array.isArray(rConfs.dados)||!rConfs.dados.length) return;
+      var novo = _invMergeConferencias(state.invConferencias||[], rConfs.dados);
+      state.invConferencias = novo;
       _invSalvarLocal();
       // Re-renderizar modal se já estiver aberto
       var modalAberto = document.getElementById("modal-inv-conf");
