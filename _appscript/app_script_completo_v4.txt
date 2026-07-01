@@ -968,6 +968,32 @@ function doGet(e) {
     if(acao==="listar"&&tipo==="inv_movimentacoes") return saida(listarInvMovimentacoes(ss),cb);
     if(acao==="salvar"&&tipo==="inv_conferencia"){var dCONF={};try{dCONF=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInvConferencia(ss,dCONF),cb);}
     if(acao==="listar"&&tipo==="inv_conferencias") return saida(listarInvConferencias(ss),cb);
+    if(acao==="marcarItemConf"){
+      var confId2=e.parameter.confId, itemId=e.parameter.itemId, status2=e.parameter.status;
+      var categ=e.parameter.categoria||"", obs2=e.parameter.obs||"", confEm=e.parameter.conferido_em||new Date().toISOString();
+      var conferente2=e.parameter.conferente?JSON.parse(decodeURIComponent(e.parameter.conferente)):null;
+      if(!confId2||!itemId) return saida({ok:false,erro:"confId e itemId obrigatórios"},cb);
+      var aba=_garantirAbaJson(ss,"inv_conferencias","#0a1a10","#6ee7b7");
+      var nRows=aba.getLastRow()-1;
+      if(nRows>0){
+        var ids=aba.getRange(2,1,nRows,1).getValues();
+        for(var i=0;i<ids.length;i++){
+          if(String(ids[i][0])===String(confId2)){
+            var raw=aba.getRange(i+2,3).getValue();
+            var conf2={}; try{conf2=JSON.parse(raw||"{}");}catch(e2){}
+            if(typeof conf2.itens==="string"){try{conf2.itens=JSON.parse(conf2.itens);}catch(e3){conf2.itens={};}}
+            if(!conf2.itens) conf2.itens={};
+            var itemAtual=conf2.itens[itemId]||{};
+            conf2.itens[itemId]=Object.assign({},itemAtual,{status:status2,categoria:categ,obs:obs2,conferido_em:confEm});
+            if(conferente2) conf2.itens[itemId].conferente=conferente2;
+            conf2.atualizadoEm=new Date().toISOString();
+            aba.getRange(i+2,3).setValue(JSON.stringify(conf2));
+            return saida({ok:true,id:confId2,itemId:itemId,status:status2},cb);
+          }
+        }
+      }
+      return saida({ok:false,erro:"Conferência não encontrada"},cb);
+    }
 
     // ── INSCRIÇÕES DE PROJETOS/CURSOS ───────────────────────────────
     if(acao==="salvar"&&tipo==="inscricoes_projetos"){var dInsc={};try{dInsc=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInscricaoProjeto(ss,dInsc),cb);}
