@@ -362,7 +362,26 @@ function salvarLocal() {
     try{ localStorage.setItem("bcs_db_oc",    JSON.stringify(state.db.ocorrencias||[])); }catch(e){ console.warn("[BCS] Quota OC",e); }
     try{ localStorage.setItem("bcs_db_at",    JSON.stringify(state.db.atendimentos||[])); }catch(e){ console.warn("[BCS] Quota AT",e); }
     try{ localStorage.setItem("bcs_db_vis",   JSON.stringify(state.db.visitas||[])); }catch(e){ console.warn("[BCS] Quota VIS",e); }
-    try{ localStorage.setItem("bcs_db_ag",    JSON.stringify(state.db.agendamentos||[])); }catch(e){ console.warn("[BCS] Quota AG",e); }
+    (function(){
+      var _ags = state.db.agendamentos||[];
+      try{ localStorage.setItem("bcs_db_ag", JSON.stringify(_ags)); }
+      catch(e){
+        // Quota estourou — dedup agressivo e trunca para os 500 mais recentes
+        console.warn("[BCS] Quota AG — aplicando dedup emergencial",e);
+        var _vcmM={}, _out=[];
+        _ags.forEach(function(a){
+          var _vcmKey=(a.tipo||"").toLowerCase().indexOf("vcm")>=0||(a.tipo||"").toLowerCase().indexOf("frida")>=0;
+          if(_vcmKey&&a.ocorrenciaId){ var p=_vcmM[a.ocorrenciaId]; if(!p||(a.criadoEm||a.id||"")>(p.criadoEm||p.id||"")) _vcmM[a.ocorrenciaId]=a; }
+          else _out.push(a);
+        });
+        _out=_out.concat(Object.values(_vcmM));
+        _out.sort(function(a,b){return (b.data||"").localeCompare(a.data||"");});
+        if(_out.length>500) _out=_out.slice(0,500);
+        state.db.agendamentos=_out;
+        try{ localStorage.setItem("bcs_db_ag", JSON.stringify(_out)); console.warn("[BCS] Quota AG resolvido: "+_out.length+" agendamentos"); }
+        catch(e2){ console.error("[BCS] Quota AG irrecuperável",e2); }
+      }
+    })();
     // Manter bcs_db_light apenas com OCs para compatibilidade reversa
     const light={ ocorrencias:state.db.ocorrencias };
     try{ localStorage.setItem("bcs_db_light",JSON.stringify(light)); }catch(e){ console.warn("[BCS] Quota light",e); }
@@ -1193,7 +1212,9 @@ async function carregarDoSheets() {
       var _vcmMap = {};
       var _normais = [];
       _agsRaw.forEach(function(ag){
-        if(ag.tipo==="Visita VCM/FRIDA" && ag.ocorrenciaId){
+        var _tipoLow=(ag.tipo||"").toLowerCase();
+        var _isVcm=(_tipoLow.indexOf("vcm")>=0||_tipoLow.indexOf("frida")>=0)&&ag.ocorrenciaId;
+        if(_isVcm){
           var prev = _vcmMap[ag.ocorrenciaId];
           if(!prev || (ag.criadoEm||ag.id||"") > (prev.criadoEm||prev.id||"")) _vcmMap[ag.ocorrenciaId] = ag;
         } else {
