@@ -23303,18 +23303,7 @@ function _invItensValidosConf(conf){
 }
 
 function _invAbrirConferencia(confId){
-  // Sync preventivo: puxa conferências do Sheets antes de abrir, para capturar itens de outros aparelhos
-  if(confId && SHEETS_URL){
-    _sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(rConfs){
-      if(!rConfs||!rConfs.ok||!Array.isArray(rConfs.dados)||!rConfs.dados.length) return;
-      var novo = _invMergeConferencias(state.invConferencias||[], rConfs.dados);
-      state.invConferencias = novo;
-      _invSalvarLocal();
-      // Re-renderizar modal se já estiver aberto
-      var modalAberto = document.getElementById("modal-inv-conf");
-      if(modalAberto){ modalAberto.remove(); _invAbrirConferencia(confId); }
-    }).catch(function(){});
-  }
+  // (sync feito pelo botão 🔄 dentro do modal)
   var conf = confId?(state.invConferencias||[]).find(function(x){return x.id===confId;}):null;
   var isNew = !conf;
   if(isNew){
@@ -23444,6 +23433,7 @@ function _invRenderConferencia(conf){
   html+="</div>";
   html+="<div style='display:flex;gap:8px'>";
   html+="<input id='inv-conf-busca' type='text' placeholder='🔍 Buscar por nome, n.º série ou categoria…' oninput='_invConfFiltrar()' style='flex:1;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px 12px;border-radius:7px;font-size:13px;box-sizing:border-box'>";
+  html+="<button id='btn-conf-sync' onclick='_invConfSyncAgora(\""+esc(conf.id)+"\")' title='Sincronizar itens de outros aparelhos' style='background:#1a2a0e;border:1px solid #4a8a2a;color:#8aba4a;padding:9px 14px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0'>🔄</button>";
   html+="<button onclick='_invConfScanQR()' style='background:#1a0e00;border:1px solid #D9A53C;color:#D9A53C;padding:9px 14px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0'>📷 QR</button>";
   html+="</div>";
   // Filtro por status
@@ -23933,6 +23923,51 @@ function _invAplicarFiltros(resetPage){
   if(main) renderInventario(main);
 }
 
+window._invConfSyncAgora=function(confId){
+  var btn=document.getElementById("btn-conf-sync");
+  if(btn){btn.textContent="⏳";btn.disabled=true;}
+  console.log("[CONF-SYNC] Iniciando sync para confId="+confId);
+  _sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(rConfs){
+    console.log("[CONF-SYNC] Resposta recebida:",rConfs);
+    if(!rConfs){
+      console.warn("[CONF-SYNC] Resposta nula — timeout ou erro de rede");
+      if(btn){btn.textContent="❌";btn.disabled=false;}
+      showToast("Sem resposta do servidor","error"); return;
+    }
+    if(!rConfs.ok){
+      console.warn("[CONF-SYNC] ok=false:",rConfs);
+      if(btn){btn.textContent="❌";btn.disabled=false;}
+      showToast("Erro: "+(rConfs.erro||"?"),"error"); return;
+    }
+    if(!Array.isArray(rConfs.dados)){
+      console.warn("[CONF-SYNC] dados não é array:",typeof rConfs.dados, rConfs.dados);
+      if(btn){btn.textContent="❌";btn.disabled=false;}
+      showToast("Formato inesperado do servidor","error"); return;
+    }
+    console.log("[CONF-SYNC] "+rConfs.dados.length+" conferências recebidas");
+    var confRemota=rConfs.dados.find(function(x){return String(x.id)===String(confId);});
+    if(!confRemota){
+      console.warn("[CONF-SYNC] Conferência "+confId+" não encontrada no Sheets");
+      if(btn){btn.textContent="⚠️";btn.disabled=false;}
+      showToast("Conferência não encontrada no Sheets","error"); return;
+    }
+    if(typeof confRemota.itens==="string"){try{confRemota.itens=JSON.parse(confRemota.itens);}catch(e){confRemota.itens={};}}
+    var nItensRemoto=Object.keys(confRemota.itens||{}).length;
+    console.log("[CONF-SYNC] Conferência remota tem "+nItensRemoto+" itens marcados:",confRemota.itens);
+    state.invConferencias=_invMergeConferencias(state.invConferencias||[],[confRemota]);
+    _invSalvarLocal();
+    if(btn){btn.textContent="✅";btn.disabled=false;}
+    showToast("✓ Sync: "+nItensRemoto+" itens do Sheets","success");
+    // Reabrir modal com dados atualizados
+    var m=document.getElementById("modal-inv-conf");
+    if(m){m.remove();}
+    setTimeout(function(){_invAbrirConferencia(confId);},300);
+  }).catch(function(e){
+    console.error("[CONF-SYNC] Erro:",e);
+    if(btn){btn.textContent="❌";btn.disabled=false;}
+    showToast("Falha no sync","error");
+  });
+};
 window._invConfFiltrar=function(){
   var inp=document.getElementById("inv-conf-busca");
   var q=(inp?inp.value.toLowerCase().trim():"");
