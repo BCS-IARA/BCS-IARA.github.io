@@ -22325,7 +22325,8 @@ window._invRecarregarDoSheets = async function(){
   try{
     var rItens = await _sheetsGet({acao:"listar",tipo:"inv_itens"});
     var rMovs  = await _sheetsGet({acao:"listar",tipo:"inv_movimentacoes"});
-    var rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
+    var rConfs = await _invBuscarConferenciasPost();
+    if(!rConfs||!rConfs.ok) rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
     if(rItens&&rItens.ok&&Array.isArray(rItens.dados)){
       // Sheets ganha sobre tudo local — sem merge
       state.invItens = rItens.dados.map(function(x){
@@ -22370,13 +22371,27 @@ function _invEnviarConferenciaPost(conf){
 }
 
 // ── Carrega inventário do Sheets e merge com local ──────────────
+// Busca conferências via POST para evitar timeout de JSONP em respostas grandes
+async function _invBuscarConferenciasPost(){
+  if(!SHEETS_URL) return null;
+  try{
+    var payload=JSON.stringify({token:BCS_TOKEN, tipo:"listar_inv_conferencias"});
+    var r=await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:payload});
+    var txt=await r.text();
+    var j=JSON.parse(txt.replace(/^[^{[]*([{\[].*[}\]])[^}\]]*$/s,"$1"));
+    return j;
+  }catch(e){ console.warn("[INV] POST conferências falhou:",e); return null; }
+}
+
 async function _invSincronizarDoSheets(){
   if(!SHEETS_URL||state._invSincronizando) return;
   state._invSincronizando=true;
   try{
     var rItens = await _sheetsGet({acao:"listar",tipo:"inv_itens"});
     var rMovs  = await _sheetsGet({acao:"listar",tipo:"inv_movimentacoes"});
-    var rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
+    // Conferências via POST (resposta pode ser grande — evita timeout JSONP)
+    var rConfs = await _invBuscarConferenciasPost();
+    if(!rConfs||!rConfs.ok) rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
     function _mergeInv(local, remoto){
       if(!remoto||!remoto.ok||!Array.isArray(remoto.dados)||!remoto.dados.length) return local||[];
       var ids=new Set((local||[]).map(function(x){return String(x.id);}));
