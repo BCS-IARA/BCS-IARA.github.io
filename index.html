@@ -686,6 +686,47 @@ function _mergeByIdTimestamp(local, remoto, campo){
   return Object.keys(map).map(function(k){ return map[k]; });
 }
 
+function _invMergeUmaConferencia(loc, rem){
+  if(!loc) return rem;
+  if(!rem) return loc;
+  var locItens = (loc.itens && typeof loc.itens==="object" && !Array.isArray(loc.itens)) ? loc.itens : {};
+  var remItens = (rem.itens && typeof rem.itens==="object" && !Array.isArray(rem.itens)) ? rem.itens : {};
+  var itensMesclados = {};
+  var todasChaves = {};
+  Object.keys(locItens).forEach(function(k){ todasChaves[k]=true; });
+  Object.keys(remItens).forEach(function(k){ todasChaves[k]=true; });
+  Object.keys(todasChaves).forEach(function(k){
+    var li = locItens[k], ri = remItens[k];
+    if(li && !ri){ itensMesclados[k]=li; return; }
+    if(ri && !li){ itensMesclados[k]=ri; return; }
+    if(!li && !ri) return;
+    var lt = li.conferido_em||"", rt = ri.conferido_em||"";
+    itensMesclados[k] = (rt>lt) ? ri : li;
+  });
+  var locTs = loc.atualizadoEm||loc.concluidaEm||loc.criadoEm||"";
+  var remTs = rem.atualizadoEm||rem.concluidaEm||rem.criadoEm||"";
+  var base = (remTs>locTs) ? rem : loc;
+  return Object.assign({}, base, {itens: itensMesclados});
+}
+
+function _invMergeConferencias(local, remoto){
+  if(!remoto || !Array.isArray(remoto) || !remoto.length) return local||[];
+  var map = {};
+  (local||[]).forEach(function(c){
+    if(c && c.id){
+      if(typeof c.itens==="string"){ try{ c.itens=JSON.parse(c.itens); }catch(e){ c.itens={}; } }
+      map[String(c.id)] = c;
+    }
+  });
+  remoto.forEach(function(r){
+    if(!r || !r.id) return;
+    if(typeof r.itens==="string"){ try{ r.itens=JSON.parse(r.itens); }catch(e){ r.itens={}; } }
+    var k = String(r.id);
+    map[k] = _invMergeUmaConferencia(map[k], r);
+  });
+  return Object.keys(map).map(function(k){ return map[k]; });
+}
+
 async function sincronizarSheets(){
   if(!SHEETS_URL) return;
   try{
@@ -945,7 +986,7 @@ async function carregarDadosAppDoSheets(){
     state.cargasArmamento     = _mergeById(state.cargasArmamento||[],     cargasSheets);
     state.invItens            = _mergeByIdTimestamp(state.invItens||[],            invItensSheets);
     state.invMovimentacoes    = _mergeById(state.invMovimentacoes||[],    invMovSheets);
-    state.invConferencias     = _mergeByIdTimestamp(state.invConferencias||[],     invConfSheets);
+    state.invConferencias     = _invMergeConferencias(state.invConferencias||[],   invConfSheets);
     state.visitasEscolares    = _mergeById(state.visitasEscolares||[],    visEscSheets);
     state.candidaturas        = _mergeById(state.candidaturas||[],        candidaturasSheets);
     state.cadastroInstrutores = _mergeById(state.cadastroInstrutores||[], instrutoresSheets);
@@ -22351,7 +22392,7 @@ window._invRecarregarDoSheets = async function(){
     var rItens = await _sheetsGet({acao:"listar",tipo:"inv_itens"});
     var rMovs  = await _sheetsGet({acao:"listar",tipo:"inv_movimentacoes"});
     var rConfs = await _invBuscarConferenciasPost();
-    if(!rConfs||!rConfs.ok) rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
+    if(!rConfs||!rConfs.ok||!Array.isArray(rConfs.dados)) rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
     if(rItens&&rItens.ok&&Array.isArray(rItens.dados)){
       // Sheets ganha sobre tudo local — sem merge
       state.invItens = rItens.dados.map(function(x){
@@ -22416,7 +22457,7 @@ async function _invSincronizarDoSheets(){
     var rMovs  = await _sheetsGet({acao:"listar",tipo:"inv_movimentacoes"});
     // Conferências via POST (resposta pode ser grande — evita timeout JSONP)
     var rConfs = await _invBuscarConferenciasPost();
-    if(!rConfs||!rConfs.ok) rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
+    if(!rConfs||!rConfs.ok||!Array.isArray(rConfs.dados)) rConfs = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
     function _mergeInv(local, remoto){
       if(!remoto||!remoto.ok||!Array.isArray(remoto.dados)||!remoto.dados.length) return local||[];
       var ids=new Set((local||[]).map(function(x){return String(x.id);}));
@@ -22450,31 +22491,8 @@ async function _invSincronizarDoSheets(){
       }).filter(function(x){return !x._dup;});
     }
     if(rMovs &&rMovs.ok)  state.invMovimentacoes=_mergeInv(state.invMovimentacoes, rMovs);
-    if(rConfs&&rConfs.ok){
-      // Merge de conferências: desempate por número de itens conferidos (evita versão vazia local ganhar)
-      var _confLocal=state.invConferencias||[];
-      var _confRemoto=rConfs.dados||[];
-      var _confMap={};
-      _confLocal.forEach(function(c){
-        if(c&&c.id){
-          if(typeof c.itens==="string"){try{c.itens=JSON.parse(c.itens);}catch(e){c.itens={};}}
-          _confMap[String(c.id)]=c;
-        }
-      });
-      _confRemoto.forEach(function(r){
-        if(!r||!r.id) return;
-        if(typeof r.itens==="string"){try{r.itens=JSON.parse(r.itens);}catch(e){r.itens={};}}
-        var k=String(r.id);
-        var loc=_confMap[k];
-        if(!loc){_confMap[k]=r; return;}
-        var locTs=loc.atualizadoEm||loc.concluidaEm||loc.criadoEm||"";
-        var remTs=r.atualizadoEm||r.concluidaEm||r.criadoEm||"";
-        var locItens=Object.keys(loc.itens||{}).length;
-        var remItens=Object.keys(r.itens||{}).length;
-        // Remoto ganha se tiver timestamp maior OU mesmo timestamp mas mais itens conferidos
-        if(remTs>locTs||(remTs===locTs&&remItens>locItens)) _confMap[k]=r;
-      });
-      state.invConferencias=Object.keys(_confMap).map(function(k){return _confMap[k];});
+    if(rConfs&&rConfs.ok&&Array.isArray(rConfs.dados)){
+      state.invConferencias = _invMergeConferencias(state.invConferencias||[], rConfs.dados);
     }
     _invSalvarLocal();
   }catch(e){ console.warn("[INV] Sync falhou:",e); }

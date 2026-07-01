@@ -1023,7 +1023,7 @@ function doPost(e) {
       if (d.tipo==="inv_item"&&d.registro) return saida(salvarInvItem(ss,d.registro),cb);
       if (d.tipo==="inv_movimentacao"&&d.registro) return saida(salvarInvMovimentacao(ss,d.registro),cb);
       if (d.tipo==="inv_conferencia"&&d.registro) return saida(salvarInvConferencia(ss,d.registro),cb);
-      if (d.tipo==="listar_inv_conferencias") return saida({ok:true,dados:listarInvConferencias(ss)},cb);
+      if (d.tipo==="listar_inv_conferencias") return saida(listarInvConferencias(ss),cb);
       if (d.tipo==="vitima"&&d.registro) return saida(salvarVitima(ss,d.registro),cb);
       if (d.tipo==="encaminhamento"&&d.registro) return saida(salvarEncaminhamento(ss,d.registro),cb);
       if (d.tipo&&d.registro) return saida(salvar(ss,d.tipo,d.registro),cb);
