@@ -412,7 +412,7 @@ function salvarLocal() {
     if(state.perfil) localStorage.setItem("bcs_perfil",state.perfil);
     else localStorage.removeItem("bcs_perfil");
     if(state.perfil) localStorage.setItem("bcs_tela_ultima",state.tela||"dashboard");
-    console.log("[BCS] Salvado - OC:",light.ocorrencias.length,"Agendamentos:",light.agendamentos.length,"Visitas:",light.visitas.length);
+    console.log("[BCS] Salvado - OC:",(state.db.ocorrencias||[]).length,"Agendamentos:",(state.db.agendamentos||[]).length,"Visitas:",(state.db.visitas||[]).length);
     agendarSyncSheets();
   } catch(e){
     console.error("[BCS] Erro ao salvar:",e);
@@ -1144,11 +1144,34 @@ async function carregarDoSheets() {
     if((rj0.dados.frida||[]).length) state.db.frida = rj0.dados.frida;
     if((rj0.dados.visitas||[]).length) state.db.visitas = rj0.dados.visitas;
     if((rj0.dados.agendamentos||[]).length) {
-      state.db.agendamentos = (rj0.dados.agendamentos||[]).filter(function(ag){
+      var _agsRaw = (rj0.dados.agendamentos||[]).filter(function(ag){
         return ag && ag.data && String(ag.data).trim() !== "" &&
                (!state.agExcluidos || !state.agExcluidos.has(String(ag.id)));
       });
-      console.log("[BCS] Agendamentos do Sheets: "+(rj0.dados.agendamentos||[]).length+" → filtrados: "+state.db.agendamentos.length);
+      // Dedup VCM: para cada ocorrenciaId + tipo VCM/FRIDA, manter apenas o mais recente
+      var _vcmMap = {};
+      var _normais = [];
+      _agsRaw.forEach(function(ag){
+        if(ag.tipo==="Visita VCM/FRIDA" && ag.ocorrenciaId){
+          var prev = _vcmMap[ag.ocorrenciaId];
+          if(!prev || (ag.criadoEm||ag.id||"") > (prev.criadoEm||prev.id||"")) _vcmMap[ag.ocorrenciaId] = ag;
+        } else {
+          _normais.push(ag);
+        }
+      });
+      state.db.agendamentos = _normais.concat(Object.values(_vcmMap));
+      var _nDepois = state.db.agendamentos.length;
+      var _nAntes = rj0.dados.agendamentos.length;
+      console.log("[BCS] Agendamentos do Sheets: "+_nAntes+" → após dedup VCM: "+_nDepois);
+      // Se havia muitos duplicados, acionar limpeza automática no Sheets
+      if(_nAntes - _nDepois > 50 && !localStorage.getItem("bcs_ag_dedup_done")){
+        console.log("[BCS] Acionando limpeza automática de duplicados VCM no Sheets...");
+        setTimeout(function(){
+          _sheetsGet({acao:"deduplicar",token:BCS_TOKEN}).then(function(r){
+            if(r&&r.ok){ localStorage.setItem("bcs_ag_dedup_done","1"); console.log("[BCS] Dedup Sheets concluído: "+r.removidos+" removidos"); }
+          }).catch(function(){});
+        }, 3000);
+      }
     }
 
     const total = rj0.total || todasOcs.length;
