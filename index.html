@@ -9999,7 +9999,7 @@ function abrirCadastroInstrutor(editId){
     cv.onmousedown=cv.ontouchstart=function(e){e.preventDefault();painting=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);};
     cv.onmousemove=cv.ontouchmove=function(e){e.preventDefault();if(!painting)return;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();};
     cv.onmouseup=cv.onmouseleave=cv.ontouchend=function(){painting=false;_assinInstr=cv.toDataURL("image/jpeg",.85);};
-    if(edit&&edit.assinatura){var img=new Image();img.onload=function(){ctx.drawImage(img,0,0,cv.width,cv.height);};img.src=edit.assinatura;_assinInstr=edit.assinatura;}
+    if(edit&&_assinSrc(edit.assinatura)){var img=new Image();img.onload=function(){ctx.drawImage(img,0,0,cv.width,cv.height);};img.src=_assinSrc(edit.assinatura);_assinInstr=_assinSrc(edit.assinatura);}
   })();
   window._limparInstrPad=function(){var cv=document.getElementById("instr-pad");if(!cv)return;var ctx=cv.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,cv.width,cv.height);_assinInstr="";};
   window._instrTipo=function(t){document.getElementById("instr-tipo").value=t;document.getElementById("btn-tipo-pm").style.background=t==="pm"?"#DBC79E":"transparent";document.getElementById("btn-tipo-vol").style.background=t==="voluntario"?"#0a2a1a":"transparent";};
