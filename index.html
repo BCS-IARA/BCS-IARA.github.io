@@ -22466,6 +22466,9 @@ async function _invBuscarConferenciasPost(){
     var r=await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:payload});
     var txt=await r.text();
     var j=JSON.parse(txt.replace(/^[^{[]*([{\[].*[}\]])[^}\]]*$/s,"$1"));
+    // Tolerante ao double-wrap antigo {ok,dados:{ok,dados:[...]}} E ao formato correto {ok,dados:[]}
+    if(j&&j.ok&&j.dados&&!Array.isArray(j.dados)&&j.dados.dados) j={ok:true,dados:j.dados.dados};
+    console.log("[INV] POST conferências: ok="+!!(j&&j.ok)+" dados="+((j&&Array.isArray(j.dados))?j.dados.length:"?"));
     return j;
   }catch(e){ console.warn("[INV] POST conferências falhou:",e); return null; }
 }
@@ -23298,6 +23301,17 @@ function _invItensValidosConf(conf){
 }
 
 function _invAbrirConferencia(confId){
+  // Sync preventivo: puxa conferências do Sheets antes de abrir, para capturar itens de outros aparelhos
+  if(confId && SHEETS_URL){
+    _invBuscarConferenciasPost().then(function(rConfs){
+      if(!rConfs||!rConfs.ok||!Array.isArray(rConfs.dados)) return;
+      state.invConferencias = _invMergeConferencias(state.invConferencias||[], rConfs.dados);
+      _invSalvarLocal();
+      // Re-renderizar modal se já estiver aberto
+      var modalAberto = document.getElementById("modal-inv-conf");
+      if(modalAberto){ modalAberto.remove(); _invAbrirConferencia(confId); }
+    }).catch(function(){});
+  }
   var conf = confId?(state.invConferencias||[]).find(function(x){return x.id===confId;}):null;
   var isNew = !conf;
   if(isNew){
