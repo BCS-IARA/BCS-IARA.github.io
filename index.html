@@ -23175,8 +23175,8 @@ function _invVerHistorico(itemId){
       // Autorizador
       html+="<div style='background:#EAD9B8;border:1px solid #A87B22;border-radius:6px;padding:8px;text-align:center'>";
       html+="<p style='color:#d4a87a;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 5px'>🗝️ Autorizou</p>";
-      if(m.autorizador_assinatura||m.assinatura){
-        html+="<img src='"+(m.autorizador_assinatura||m.assinatura)+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #A87B22;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
+      if((m.autorizador_assinatura&&m.autorizador_assinatura!=="[assin_local]")||(m.assinatura&&m.assinatura!=="[assin_local]")){
+        html+="<img src='"+((m.autorizador_assinatura!=="[assin_local]"?m.autorizador_assinatura:null)||(m.assinatura!=="[assin_local]"?m.assinatura:null))+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #A87B22;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
       } else {
         html+="<div style='height:40px;border-bottom:1px solid #A87B22;margin-bottom:4px'></div>";
       }
@@ -23186,7 +23186,7 @@ function _invVerHistorico(itemId){
       // Receptor
       html+="<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:6px;padding:8px;text-align:center'>";
       html+="<p style='color:#6B5236;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 5px'>👮 Recebeu</p>";
-      if(m.receptor_assinatura){
+      if(m.receptor_assinatura&&m.receptor_assinatura!=="[assin_local]"){
         html+="<img src='"+m.receptor_assinatura+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #5e4636;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
       } else {
         html+="<div style='height:40px;border-bottom:1px solid #5e4636;margin-bottom:4px'></div>";
@@ -24737,7 +24737,7 @@ function _invTermoResponsabilidade(chavePolicial){
   h+="</table>";
   h+="<p style='margin-top:8px;font-size:10px;color:#555'>Total: "+itens.length+" item(s) · Emitido em: "+dt+" · Vitória da Conquista / BA</p>";
   // Assinatura do policial
-  var assinImg=itens[0].carga_assinatura||"";
+  var assinImg=(itens[0].carga_assinatura&&itens[0].carga_assinatura!=="[assin_local]")?itens[0].carga_assinatura:"";
   h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px'>";
   h+="<div class='assin-box'><p style='font-size:9px;font-weight:700;text-transform:uppercase;color:#3a5a8a;margin-bottom:8px;text-align:left'>👮 Policial Responsável</p>";
   if(assinImg) h+="<img src='"+assinImg+"'/>"; else h+="<div class='assin-linha'></div>";
@@ -24949,7 +24949,7 @@ function _invPDFRecibo(itemId){
   // Quem recebe
   html+="<div class='assin-bloco'>";
   html+="<div class='lbl' style='text-align:left;margin-bottom:8px;color:#1a4a1a'>👮 Policial que Recebe a Carga</div>";
-  if(item.carga_assinatura){
+  if(item.carga_assinatura&&item.carga_assinatura!=="[assin_local]"){
     html+="<img src='"+item.carga_assinatura+"'/>";
   } else {
     html+="<div class='assin-linha'></div>";
@@ -24961,7 +24961,7 @@ function _invPDFRecibo(itemId){
   // Quem libera
   html+="<div class='assin-bloco'>";
   html+="<div class='lbl' style='text-align:left;margin-bottom:8px;color:#4a2a00'>🗝️ Responsável que Libera a Carga</div>";
-  if(item.carga_liberador_assinatura){
+  if(item.carga_liberador_assinatura&&item.carga_liberador_assinatura!=="[assin_local]"){
     html+="<img src='"+item.carga_liberador_assinatura+"'/>";
   } else {
     html+="<div class='assin-linha'></div>";
