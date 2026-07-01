@@ -22439,6 +22439,42 @@ window._invRecarregarDoSheets = async function(){
   }
 };
 
+// ── Exporta conferências salvas SÓ neste celular (localStorage), sem sincronizar ──
+// Uso: recuperar dados de conferência que nunca chegaram no Sheets (bug do JSONP antigo)
+window._invExportarConferenciasLocais = function(){
+  var raw = localStorage.getItem("bcs_inv_conf");
+  var confs = [];
+  try{ confs = JSON.parse(raw||"[]"); }catch(e){ confs = []; }
+  if(!confs.length){
+    showToast("Nenhuma conferência salva neste celular","error");
+    return;
+  }
+  var resumo = confs.map(function(c){
+    var itens = c.itens;
+    if(typeof itens==="string"){try{itens=JSON.parse(itens);}catch(e){itens={};}}
+    var vals = Object.values(itens||{});
+    var ok = vals.filter(function(v){return (v&&v.status)==="ok";}).length;
+    var div = vals.filter(function(v){return (v&&v.status)==="divergencia";}).length;
+    var aus = vals.filter(function(v){return (v&&v.status)==="ausente";}).length;
+    return c.id+" — "+(c.criadoEm||"")+" — "+vals.length+" itens ("+ok+" OK, "+div+" div, "+aus+" aus)";
+  }).join("\n");
+  var full = JSON.stringify(confs, null, 2);
+  var mh = "<div id='modal-export-conf' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px'>";
+  mh += "<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;padding:20px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto'>";
+  mh += "<h3 style='color:#3D2B1A;margin:0 0 8px'>📋 Conferências salvas neste celular</h3>";
+  mh += "<p style='color:#6B5236;font-size:12px;margin:0 0 12px;white-space:pre-line'>"+esc(resumo)+"</p>";
+  mh += "<p style='color:#6B5236;font-size:11px;margin:0 0 6px'>Copie o texto abaixo (toque e segure → Selecionar tudo → Copiar) e envie para o comandante:</p>";
+  mh += "<textarea readonly style='width:100%;height:220px;font-family:monospace;font-size:10px;padding:8px;border:1px solid #A87B22;border-radius:6px;background:#fff' onclick='this.select()'>"+esc(full)+"</textarea>";
+  mh += "<div style='display:flex;gap:8px;margin-top:12px'>";
+  mh += "<button onclick=\"document.getElementById('modal-export-conf').remove()\" style='flex:1;padding:10px;background:#5e4636;color:#F2E4C8;border:none;border-radius:6px;font-weight:700;cursor:pointer'>Fechar</button>";
+  mh += "</div></div></div>";
+  var div=document.createElement("div");
+  div.innerHTML=mh;
+  document.body.appendChild(div.firstChild);
+  var ta=document.querySelector("#modal-export-conf textarea");
+  if(ta) ta.focus();
+};
+
 // ── Envia conferência via POST (conf.itens pode ser grande demais para JSONP) ──
 function _invEnviarConferenciaPost(conf){
   if(!SHEETS_URL) return;
@@ -23303,33 +23339,120 @@ function _invItensValidosConf(conf){
 }
 
 function _invAbrirConferencia(confId){
-  // (sync feito pelo botão 🔄 dentro do modal)
-  var conf = confId?(state.invConferencias||[]).find(function(x){return x.id===confId;}):null;
-  var isNew = !conf;
-  if(isNew){
-    var mTipo = document.createElement("div");
-    mTipo.id = "modal-inv-tipo-bem";
-    mTipo.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9400;display:flex;align-items:center;justify-content:center;padding:20px";
-    mTipo.innerHTML = "<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;padding:28px 32px;max-width:360px;width:100%;text-align:center'>" +
+  if(!confId){
+    // — Nova conferência: perguntar tipoBem primeiro, depois verificar se já existe uma aberta no Sheets
+    var mTipo=document.createElement("div");
+    mTipo.id="modal-inv-tipo-bem";
+    mTipo.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9400;display:flex;align-items:center;justify-content:center;padding:20px";
+    mTipo.innerHTML="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;padding:28px 32px;max-width:360px;width:100%;text-align:center'>" +
       "<h3 style='color:#3D2B1A;font-size:16px;font-weight:700;margin:0 0 8px'>Nova Conferência</h3>" +
       "<p style='color:#6B5236;font-size:13px;margin:0 0 20px'>Selecione o tipo de bem a conferir:</p>" +
-      "<div style='display:flex;flex-direction:column;gap:10px'>" +
+      "<div id='inv-tipo-btns' style='display:flex;flex-direction:column;gap:10px'>" +
       "<button onclick='_invIniciarConf(\"movel\")' style='background:#1a3a1a;border:2px solid #3a7a4a;color:#a0d0a0;padding:14px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;min-height:44px'>🏛️ Bem Permanente Móvel</button>" +
       "<button onclick='_invIniciarConf(\"belico\")' style='background:#3a1a1a;border:2px solid #7a3a3a;color:#d0a0a0;padding:14px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;min-height:44px'>🔫 Material Bélico</button>" +
       "</div>" +
       "<button onclick='document.getElementById(\"modal-inv-tipo-bem\").remove()' style='margin-top:16px;background:transparent;border:none;color:#6B5236;font-size:12px;cursor:pointer'>Cancelar</button>" +
       "</div>";
     document.body.appendChild(mTipo);
-    window._invIniciarConf = function(tipoBem) {
-      document.getElementById("modal-inv-tipo-bem").remove();
-      var novaConf = {id:_invId("conf"),criadoEm:new Date().toISOString(),tipoBem:tipoBem,itens:{},responsavel1:"",responsavel2:"",assin1:"",assin2:"",concluida:false};
-      _invAbrirConferencia2(novaConf);
+    window._invIniciarConf=function(tipoBem){
+      var btns=document.getElementById("inv-tipo-btns");
+      if(btns) btns.innerHTML="<p style='color:#6B5236;font-size:13px'>🔄 Verificando conferências existentes…</p>";
+      // Verificar no Sheets se já existe conferência aberta do mesmo tipo
+      _sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(r){
+        var mEl=document.getElementById("modal-inv-tipo-bem");
+        if(r&&r.ok&&Array.isArray(r.dados)){
+          r.dados.forEach(function(c){
+            if(typeof c.itens==="string"){try{c.itens=JSON.parse(c.itens);}catch(e){c.itens={};}}
+            if(!c.itens||typeof c.itens!=="object"||Array.isArray(c.itens)) c.itens={};
+          });
+          state.invConferencias=_invMergeConferencias(state.invConferencias||[], r.dados);
+          _invSalvarLocal();
+          var abertas=(r.dados||[]).filter(function(c){return (c.tipoBem||"movel")===tipoBem&&!c.concluida;})
+            .sort(function(a,b){return (b.atualizadoEm||b.criadoEm||"")>(a.atualizadoEm||a.criadoEm||"")?"1":-1;});
+          if(abertas.length){
+            var conf=abertas[0];
+            var nItens=Object.keys(conf.itens||{}).filter(function(k){var s=(conf.itens[k]||{}).status;return s&&s!=="pendente";}).length;
+            var dtLabel=conf.criadoEm?new Date(conf.criadoEm).toLocaleDateString("pt-BR"):"?";
+            if(mEl) mEl.remove();
+            var mConf=document.createElement("div");
+            mConf.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9400;display:flex;align-items:center;justify-content:center;padding:20px";
+            mConf.innerHTML="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;padding:28px 32px;max-width:380px;width:100%;text-align:center'>" +
+              "<h3 style='color:#3D2B1A;font-size:16px;font-weight:700;margin:0 0 8px'>Conferência em Andamento</h3>" +
+              "<p style='color:#6B5236;font-size:13px;margin:0 0 20px'>Existe uma conferência aberta desde <b>"+dtLabel+"</b> com <b>"+nItens+" itens</b> já marcados.<br><br>Deseja continuar ela ou iniciar uma nova?</p>" +
+              "<div style='display:flex;flex-direction:column;gap:10px'>" +
+              "<button id='btn-continuar-conf' style='background:#1a3a1a;border:2px solid #3a7a4a;color:#a0d0a0;padding:14px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;min-height:44px'>▶ Continuar conferência existente</button>" +
+              "<button id='btn-nova-conf' style='background:#2a1c10;border:1px solid #5e4636;color:#a07c58;padding:14px;border-radius:8px;font-size:14px;cursor:pointer;min-height:44px'>+ Iniciar nova conferência</button>" +
+              "</div>" +
+              "<button id='btn-cancelar-conf' style='margin-top:16px;background:transparent;border:none;color:#6B5236;font-size:12px;cursor:pointer'>Cancelar</button>" +
+              "</div>";
+            document.body.appendChild(mConf);
+            mConf.querySelector("#btn-continuar-conf").onclick=function(){mConf.remove();_invAbrirConferencia(conf.id);};
+            mConf.querySelector("#btn-nova-conf").onclick=function(){
+              mConf.remove();
+              var nova={id:_invId("conf"),criadoEm:new Date().toISOString(),tipoBem:tipoBem,itens:{},responsavel1:"",responsavel2:"",assin1:"",assin2:"",concluida:false};
+              _invAbrirConferencia2(nova);
+            };
+            mConf.querySelector("#btn-cancelar-conf").onclick=function(){mConf.remove();};
+            return;
+          }
+        }
+        if(mEl) mEl.remove();
+        var nova={id:_invId("conf"),criadoEm:new Date().toISOString(),tipoBem:tipoBem,itens:{},responsavel1:"",responsavel2:"",assin1:"",assin2:"",concluida:false};
+        _invAbrirConferencia2(nova);
+      }).catch(function(){
+        var mEl=document.getElementById("modal-inv-tipo-bem");
+        if(mEl) mEl.remove();
+        var nova={id:_invId("conf"),criadoEm:new Date().toISOString(),tipoBem:tipoBem,itens:{},responsavel1:"",responsavel2:"",assin1:"",assin2:"",concluida:false};
+        _invAbrirConferencia2(nova);
+      });
     };
     return;
   }
-  _invAbrirConferencia2(conf);
+  // — Abrir conferência existente: buscar dados frescos do Sheets antes de renderizar
+  var confLocal=(state.invConferencias||[]).find(function(x){return x.id===confId;})||{id:confId,itens:{},criadoEm:new Date().toISOString(),tipoBem:"movel",concluida:false};
+  _invAbrirConferencia2(confLocal, true /* sincronizar do Sheets ao abrir */);
 }
-function _invAbrirConferencia2(conf){
+function _invAbrirConferencia2(conf, sincronizar){
+  // Se sincronizar=true: busca dados frescos do Sheets e mescla antes de abrir o modal
+  if(sincronizar){
+    _sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(r){
+      if(r&&r.ok&&Array.isArray(r.dados)){
+        r.dados.forEach(function(c){
+          if(typeof c.itens==="string"){try{c.itens=JSON.parse(c.itens);}catch(e){c.itens={};}}
+          if(!c.itens||typeof c.itens!=="object"||Array.isArray(c.itens)) c.itens={};
+        });
+        // Mesclar TODAS as conferências — inclusive absorver itens de conferências irmãs (mesmo tipoBem)
+        state.invConferencias=_invMergeConferencias(state.invConferencias||[], r.dados);
+        var tipoBem=conf.tipoBem||"movel";
+        var confAtualizada=state.invConferencias.find(function(x){return x.id===conf.id;});
+        if(!confAtualizada) confAtualizada=conf;
+        // Absorver itens marcados de conferências irmãs para esta e enviar de volta ao Sheets
+        var _itensAbs={};
+        r.dados.forEach(function(c){
+          if(c.id===conf.id||(c.tipoBem||"movel")!==tipoBem) return;
+          Object.keys(c.itens||{}).forEach(function(iid){
+            var ri=c.itens[iid];
+            if(!ri||!ri.status||ri.status==="pendente") return;
+            var li=confAtualizada.itens[iid];
+            if(!li||li.status==="pendente"||(ri.conferido_em&&(!li.conferido_em||ri.conferido_em>li.conferido_em))){
+              confAtualizada.itens[iid]=ri;
+              _itensAbs[iid]=ri;
+            }
+          });
+        });
+        confAtualizada.atualizadoEm=new Date().toISOString();
+        _invSalvarLocal();
+        // Enviar itens absorvidos ao Sheets para persistir na conf principal
+        Object.keys(_itensAbs).forEach(function(iid){
+          _invConfEnviarItemSheets(conf.id, iid, _itensAbs[iid]);
+        });
+        if(Object.keys(_itensAbs).length) console.log("[INV] "+Object.keys(_itensAbs).length+" itens absorvidos e enviados ao Sheets");
+        conf=confAtualizada;
+      }
+      _invAbrirConferencia2(conf, false);
+    }).catch(function(){ _invAbrirConferencia2(conf, false); });
+    return;
+  }
   // Sempre pede quem está conferindo (não persiste — sempre pergunta ao abrir)
   function _polAtivos(){
     return (state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";})
@@ -23574,8 +23697,34 @@ function _invRenderConferencia(conf){
     if(pc){
       _invIniciarPad(pc,null);
       var aKey="assin"+n;
-      if(conf[aKey]) _invCarregarAssin(pc,conf[aKey]);
+      if(conf[aKey]&&conf[aKey].indexOf("data:")===0) _invCarregarAssin(pc,conf[aKey]);
     }
+  });
+}
+
+function _invConfEnviarItemSheets(confId, itemId, itemData){
+  if(!confId||!itemId||!SHEETS_URL) return;
+  var params={
+    acao:"marcarItemConf",
+    token:BCS_TOKEN,
+    confId:confId,
+    itemId:itemId,
+    status:itemData.status||"pendente",
+    categoria:itemData.categoria||"",
+    obs:itemData.obs||"",
+    conferido_em:itemData.conferido_em||new Date().toISOString()
+  };
+  if(itemData.conferente){
+    try{ params.conferente=encodeURIComponent(JSON.stringify(itemData.conferente)); }catch(e){}
+  }
+  _sheetsGet(params).then(function(r){
+    if(r&&r.ok){
+      console.log("[INV] Item marcado no Sheets: confId="+confId+" itemId="+itemId+" status="+itemData.status);
+    } else {
+      console.warn("[INV] Falha ao marcar item no Sheets:",r);
+    }
+  }).catch(function(e){
+    console.warn("[INV] Erro ao enviar item ao Sheets:",e);
   });
 }
 
@@ -23590,6 +23739,7 @@ function _invConfItens(itemId, status){
     if(window._invConferenteAtual) cur.conferente = window._invConferenteAtual;
     conf.itens[itemId] = cur;
     conf.atualizadoEm = new Date().toISOString();
+    _invConfEnviarItemSheets(conf.id, itemId, cur);
     _invConfAtualizarBotoes(itemId, "ok");
     _invConfAtualizarBarra();
     var pan = document.getElementById("inv-ci-cat-"+itemId);
@@ -23607,6 +23757,7 @@ function _invConfItens(itemId, status){
   if(window._invConferenteAtual) cur2.conferente = window._invConferenteAtual;
   conf.itens[itemId] = cur2;
   conf.atualizadoEm = new Date().toISOString();
+  _invConfEnviarItemSheets(conf.id, itemId, cur2);
   _invConfAtualizarBotoes(itemId, status);
   _invConfAtualizarBarra();
   if(typeof _invConfFiltrar==="function") _invConfFiltrar();
@@ -23737,6 +23888,7 @@ function _invConfConfirmarCat(itemId){
     cur.categoriaExtra={portaria:portaria,data:datab,bir:bir};
   }
   conf.itens[itemId]=cur;
+  _invConfEnviarItemSheets(conf.id, itemId, cur);
   var pan=document.getElementById("inv-ci-cat-"+itemId);
   if(pan) pan.style.display="none";
   showToast("✓ Registrado!");
@@ -23923,6 +24075,32 @@ function _invAplicarFiltros(resetPage){
   if(main) renderInventario(main);
 }
 
+window._invSyncListaConferencias=function(silencioso){
+  var btn=document.getElementById("btn-conf-sync-lista");
+  if(btn){btn.textContent="⏳ Sincronizando...";btn.disabled=true;}
+  _sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(r){
+    if(!r||!r.ok||!Array.isArray(r.dados)){
+      if(!silencioso) showToast("Falha ao buscar conferências","error");
+      if(btn){btn.textContent="🔄 Sincronizar";btn.disabled=false;}
+      return;
+    }
+    r.dados.forEach(function(c){
+      if(typeof c.itens==="string"){try{c.itens=JSON.parse(c.itens);}catch(e){c.itens={};}}
+      if(!c.itens||typeof c.itens!=="object"||Array.isArray(c.itens)) c.itens={};
+    });
+    state.invConferencias=_invMergeConferencias(state.invConferencias||[], r.dados);
+    _invSalvarLocal();
+    var m=document.getElementById("main-content")||document.getElementById("main");
+    if(m&&state.tela==="inventario") renderInventario(m);
+    if(!silencioso) showToast("✓ "+r.dados.length+" conferências sincronizadas","success");
+    if(btn){btn.textContent="🔄 Sincronizar";btn.disabled=false;}
+  }).catch(function(e){
+    console.warn("[INV] Sync lista confs falhou:",e);
+    if(!silencioso) showToast("Erro ao sincronizar","error");
+    if(btn){btn.textContent="🔄 Sincronizar";btn.disabled=false;}
+  });
+};
+
 window._invConfSyncAgora=function(confId){
   var btn=document.getElementById("btn-conf-sync");
   if(btn){btn.textContent="⏳";btn.disabled=true;}
@@ -23930,38 +24108,72 @@ window._invConfSyncAgora=function(confId){
   _sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(rConfs){
     console.log("[CONF-SYNC] Resposta recebida:",rConfs);
     if(!rConfs){
-      console.warn("[CONF-SYNC] Resposta nula — timeout ou erro de rede");
       if(btn){btn.textContent="❌";btn.disabled=false;}
       showToast("Sem resposta do servidor","error"); return;
     }
     if(!rConfs.ok){
-      console.warn("[CONF-SYNC] ok=false:",rConfs);
       if(btn){btn.textContent="❌";btn.disabled=false;}
       showToast("Erro: "+(rConfs.erro||"?"),"error"); return;
     }
     if(!Array.isArray(rConfs.dados)){
-      console.warn("[CONF-SYNC] dados não é array:",typeof rConfs.dados, rConfs.dados);
       if(btn){btn.textContent="❌";btn.disabled=false;}
       showToast("Formato inesperado do servidor","error"); return;
     }
-    console.log("[CONF-SYNC] "+rConfs.dados.length+" conferências recebidas");
-    var confRemota=rConfs.dados.find(function(x){return String(x.id)===String(confId);});
-    if(!confRemota){
-      console.warn("[CONF-SYNC] Conferência "+confId+" não encontrada no Sheets");
-      if(btn){btn.textContent="⚠️";btn.disabled=false;}
-      showToast("Conferência não encontrada no Sheets","error"); return;
+    // Parsear itens de todas as conferências remotas
+    rConfs.dados.forEach(function(c){
+      if(typeof c.itens==="string"){try{c.itens=JSON.parse(c.itens);}catch(e){c.itens={};}}
+      if(!c.itens||typeof c.itens!=="object"||Array.isArray(c.itens)) c.itens={};
+    });
+    console.log("[CONF-SYNC] "+rConfs.dados.length+" conferências recebidas do Sheets");
+
+    // Mesclar TODAS as conferências remotas no estado local
+    state.invConferencias=_invMergeConferencias(state.invConferencias||[], rConfs.dados);
+
+    // Absorver itens marcados de conferências irmãs (mesmo tipoBem) para a conferência principal
+    var confPrincipal=state.invConferencias.find(function(c){return String(c.id)===String(confId);});
+    var itensAbsorvidos={};
+    if(confPrincipal){
+      var tipoBem=confPrincipal.tipoBem||"movel";
+      rConfs.dados.forEach(function(c){
+        if(String(c.id)===String(confId)||(c.tipoBem||"movel")!==tipoBem) return;
+        Object.keys(c.itens||{}).forEach(function(iid){
+          var ri=c.itens[iid];
+          if(!ri||!ri.status||ri.status==="pendente") return;
+          var li=confPrincipal.itens[iid];
+          if(!li||li.status==="pendente"||(ri.conferido_em&&(!li.conferido_em||ri.conferido_em>li.conferido_em))){
+            confPrincipal.itens[iid]=ri;
+            itensAbsorvidos[iid]=ri;
+            console.log("[CONF-SYNC] Absorvendo "+iid+" ("+ri.status+") de conf "+c.id);
+          }
+        });
+      });
+      confPrincipal.atualizadoEm=new Date().toISOString();
     }
-    if(typeof confRemota.itens==="string"){try{confRemota.itens=JSON.parse(confRemota.itens);}catch(e){confRemota.itens={};}}
-    var nItensRemoto=Object.keys(confRemota.itens||{}).length;
-    console.log("[CONF-SYNC] Conferência remota tem "+nItensRemoto+" itens marcados:",confRemota.itens);
-    state.invConferencias=_invMergeConferencias(state.invConferencias||[],[confRemota]);
+
     _invSalvarLocal();
+
+    // Enviar itens absorvidos ao Sheets (para conf principal) — garante persistência
+    var absorvidosKeys=Object.keys(itensAbsorvidos);
+    if(absorvidosKeys.length && confPrincipal){
+      absorvidosKeys.forEach(function(iid){
+        _invConfEnviarItemSheets(confId, iid, itensAbsorvidos[iid]);
+      });
+      console.log("[CONF-SYNC] Enviando "+absorvidosKeys.length+" itens absorvidos ao Sheets");
+    }
+
+    var nTotal=confPrincipal?Object.keys(confPrincipal.itens||{}).filter(function(k){
+      return confPrincipal.itens[k]&&confPrincipal.itens[k].status&&confPrincipal.itens[k].status!=="pendente";
+    }).length:0;
     if(btn){btn.textContent="✅";btn.disabled=false;}
-    showToast("✓ Sync: "+nItensRemoto+" itens do Sheets","success");
-    // Reabrir modal com dados atualizados
+    showToast("✓ Sync: "+nTotal+" itens marcados"+(absorvidosKeys.length?" (+"+absorvidosKeys.length+" absorvidos)":""),"success");
     var m=document.getElementById("modal-inv-conf");
     if(m){m.remove();}
-    setTimeout(function(){_invAbrirConferencia(confId);},300);
+    // Reabrir SEM re-sincronizar (já temos os dados frescos)
+    if(confPrincipal) window._invConfAtual=confPrincipal;
+    setTimeout(function(){
+      var c=confPrincipal||(state.invConferencias||[]).find(function(x){return x.id===confId;});
+      if(c) _invAbrirConferencia2(c, false);
+    },300);
   }).catch(function(e){
     console.error("[CONF-SYNC] Erro:",e);
     if(btn){btn.textContent="❌";btn.disabled=false;}
@@ -24256,8 +24468,9 @@ function renderInventario(main){
   h+="<button onclick='_invAbrirImport()' title='Importar Lista' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#a07c58;padding:8px 12px;font-size:13px;cursor:pointer'>📤</button>";
   if((state.invItens||[]).length) h+="<button onclick='_invLimparTodos()' title='Limpar Tudo' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#A8492E;padding:8px 12px;font-size:13px;cursor:pointer'>🗑</button>";
   h+="<button onclick='_invGerarPDF()' title='Exportar PDF' style='background:transparent;border:none;color:#a07c58;padding:8px 12px;font-size:13px;cursor:pointer'>📄</button>";
-  if(state._invFiltLoc) h+="<button onclick='_invGerarPDFSecao(\""+esc(state._invFiltLoc)+"\")' title='PDF da Seção' style='background:transparent;border:none;border-left:1px solid #5e4636;color:#6E8F52;padding:8px 12px;font-size:13px;cursor:pointer'>📄+</button>";
+  if(state._invFiltLoc) h+="<button onclick='_invGerarPDFSecao(\""+esc(state._invFiltLoc)+"\")' title='PDF da Seção' style='background:transparent;border:none;border-left:1px solid #5e4636;color:#6E8F52;padding:8px 12px;border-radius:7px;font-size:13px;cursor:pointer'>📄+</button>";
   h+="</div>";
+  h+="<button onclick='_invExportarConferenciasLocais()' title='Exportar conferências salvas neste celular (sem sincronizar)' style='background:rgba(110,143,82,0.12);border:1.5px solid #6E8F52;color:#6E8F52;padding:8px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>📋 Exportar Local</button>";
   h+="<button onclick='_invAbrirItem(null)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Item</button>";
   h+="</div></div>";
 
@@ -24496,9 +24709,15 @@ function renderInventario(main){
       h+="</div>";
     }
   } else if(tab==="conferencias"){
-    h+="<div style='margin-bottom:12px;display:flex;justify-content:flex-end'>";
+    h+="<div style='margin-bottom:12px;display:flex;justify-content:flex-end;gap:8px'>";
+    h+="<button id='btn-conf-sync-lista' onclick='_invSyncListaConferencias()' title='Sincronizar conferências de outros aparelhos' style='background:#1a2a0e;border:1px solid #4a8a2a;color:#8aba4a;padding:8px 14px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>🔄 Sincronizar</button>";
     h+="<button onclick='_invAbrirConferencia(null)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 18px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Nova Conferência</button>";
     h+="</div>";
+    // Auto-sync silencioso ao abrir a lista de conferências
+    if(!window._invConfListaSyncFeito){
+      window._invConfListaSyncFeito=true;
+      setTimeout(function(){ _invSyncListaConferencias(true); }, 800);
+    }
     var confs=(state.invConferencias||[]).slice().sort(function(a,b){return(b.criadoEm||"")>(a.criadoEm||"")?1:-1;});
     if(!confs.length){
       h+="<div style='text-align:center;padding:50px;color:#555;font-size:14px'>Nenhuma conferência realizada ainda.</div>";
@@ -26224,22 +26443,31 @@ if(SHEETS_URL){
 
 <!-- PWA: registro do Service Worker -->
 <script>
+window._forcarAtualizacaoApp=function(){
+  if(!('serviceWorker' in navigator)){ location.reload(true); return; }
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    var ps=regs.map(function(r){return r.unregister();});
+    Promise.all(ps).then(function(){ location.reload(true); });
+  }).catch(function(){ location.reload(true); });
+};
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('sw.js')
       .then(function(reg){
-        // Verifica se há atualização disponível
+        window._swReg=reg;
         reg.addEventListener('updatefound', function(){
           var newWorker = reg.installing;
           newWorker.addEventListener('statechange', function(){
             if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
-              // Nova versão disponível — mostra aviso no app
+              newWorker.postMessage({type:'SKIP_WAITING'});
               if(typeof showToast === 'function'){
-                showToast('🔄 Nova versão disponível! Feche e reabra o app para atualizar.');
+                showToast('🔄 Nova versão disponível — atualizando…');
+                setTimeout(function(){ location.reload(); }, 1500);
               }
             }
           });
         });
+        reg.update();
       })
       .catch(function(err){ console.warn('SW não registrado:', err); });
   });

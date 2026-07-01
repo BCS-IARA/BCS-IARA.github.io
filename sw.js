@@ -1,6 +1,6 @@
 // IARA BCS — Service Worker
 // Atualiza o número de versão a cada novo deploy para forçar refresh nos clientes
-const CACHE_NAME = 'iara-bcs-v98';
+const CACHE_NAME = 'iara-bcs-v104';
 
 // Arquivos essenciais para funcionar offline
 // HTMLs não entram no precache — sempre buscados da rede (nunca ficam presos)
@@ -76,7 +76,7 @@ self.addEventListener('fetch', function(event) {
 
 // ── Mensagem para forçar update manual ──────────────────────────────────────
 self.addEventListener('message', function(event) {
-  if (event.data === 'skipWaiting') {
+  if (event.data === 'skipWaiting' || (event.data && event.data.type === 'SKIP_WAITING')) {
     self.skipWaiting();
   }
 });
