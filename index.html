@@ -832,7 +832,9 @@ async function carregarDadosAppDoSheets(){
     var cargasSheets         = await lerDadoAppSheets("bcs_cargas_armamento");
     var invItensSheets       = await lerDadoAppSheets("bcs_inv_itens");
     var invMovSheets         = await lerDadoAppSheets("bcs_inv_mov");
-    var invConfSheets        = await lerDadoAppSheets("bcs_inv_conf");
+    // Conferências: buscar da aba dedicada (fonte canônica) para capturar itens marcados por outros aparelhos
+    var _rConf = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
+    var invConfSheets = (_rConf&&_rConf.ok&&Array.isArray(_rConf.dados))?_rConf.dados.map(function(x){if(typeof x.itens==="string"){try{x.itens=JSON.parse(x.itens);}catch(e){x.itens={};}}return x;}):null;
     var visEscSheets         = await lerDadoAppSheets("bcs_visitas_escolares");
     var candidaturasSheets   = await lerDadoAppSheets("bcs_candidaturas");
     var instrutoresSheets    = await lerDadoAppSheets("bcs_instrutores_cad");
