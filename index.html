@@ -23219,7 +23219,8 @@ function _invVerHistorico(itemId){
       html+="<div style='background:#EAD9B8;border:1px solid #A87B22;border-radius:6px;padding:8px;text-align:center'>";
       html+="<p style='color:#d4a87a;font-size:9px;font-weight:700;text-transform:uppercase;margin:0 0 5px'>🗝️ Autorizou</p>";
       if((m.autorizador_assinatura&&m.autorizador_assinatura!=="[assin_local]")||(m.assinatura&&m.assinatura!=="[assin_local]")){
-        html+="<img src='"+((m.autorizador_assinatura!=="[assin_local]"?m.autorizador_assinatura:null)||(m.assinatura!=="[assin_local]"?m.assinatura:null))+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #A87B22;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
+        var _assinSrcMov=(m.autorizador_assinatura&&m.autorizador_assinatura.indexOf("data:")===0?m.autorizador_assinatura:null)||(m.assinatura&&m.assinatura.indexOf("data:")===0?m.assinatura:null)||"";
+        if(_assinSrcMov) html+="<img src='"+_assinSrcMov+"' style='width:100%;max-height:55px;object-fit:contain;border:1px solid #A87B22;border-radius:4px;background:#fff;display:block;margin:0 auto 4px'>";
       } else {
         html+="<div style='height:40px;border-bottom:1px solid #A87B22;margin-bottom:4px'></div>";
       }
@@ -25721,8 +25722,9 @@ function _invGerarPDFConferencia(confId){
   ["1","2"].forEach(function(n){
     var resp=conf["responsavel"+n]||"";
     var assin=conf["assin"+n]||"";
+    var assinValida=assin&&assin.indexOf("data:")===0;
     h+="<div class='sig-area'>";
-    h+=assin?"<img src='"+assin+"' style='width:200px;height:60px;object-fit:contain'>":"<div style='width:200px;height:60px;border-bottom:1px solid #333'></div>";
+    h+=assinValida?"<img src='"+assin+"' style='width:200px;height:60px;object-fit:contain'>":"<div style='width:200px;height:60px;border-bottom:1px solid #333'></div>";
     h+="<div style='margin-top:6px;font-size:10px;font-weight:700'>"+esc(resp||"Responsável "+n)+"</div>";
     h+="</div>";
   });
