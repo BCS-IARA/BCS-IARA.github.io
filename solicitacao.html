@@ -502,34 +502,22 @@ function enviarSolicitacao(e){
     return;
   }
 
-  // Enviar via JSONP
-  var cbName = "cb_sol_"+Date.now();
-  var timeout = setTimeout(function(){
-    delete window[cbName];
-    var sc = document.getElementById("sc_sol");
-    if(sc) sc.remove();
-    mostrarSucesso(protocolo, dados); // Sucesso offline
-  }, 10000);
-
-  window[cbName] = function(resp){
-    clearTimeout(timeout);
-    delete window[cbName];
-    var sc = document.getElementById("sc_sol");
-    if(sc) sc.remove();
-    mostrarSucesso(protocolo, dados);
-  };
-
-  var payload = encodeURIComponent(JSON.stringify(dados));
-  var sc = document.createElement("script");
-  sc.id  = "sc_sol";
-  sc.src = SHEETS_URL+"?acao=salvar&tipo=solicitacao&token="+encodeURIComponent(TOKEN)+"&dados="+payload+"&callback="+cbName;
-  sc.onerror = function(){
-    clearTimeout(timeout);
-    delete window[cbName];
-    sc.remove();
-    mostrarSucesso(protocolo, dados);
-  };
-  document.head.appendChild(sc);
+  // Enviar via POST (a assinatura em base64 estoura o limite de URL do JSONP,
+  // fazendo a requisição falhar silenciosamente mesmo mostrando "sucesso")
+  var payload = JSON.stringify({token: TOKEN, tipo: "solicitacao", registro: dados});
+  fetch(SHEETS_URL, {method:"POST", headers:{"Content-Type":"text/plain"}, body: payload})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      try{
+        var j = JSON.parse(txt.replace(/^[^{[]*([{\[].*[}\]])[^}\]]*$/s,"$1"));
+        if(!j || !j.ok) console.warn("[SOL] Backend recusou:", j);
+      }catch(e){ console.warn("[SOL] Resposta inesperada:", e); }
+      mostrarSucesso(protocolo, dados);
+    })
+    .catch(function(e){
+      console.warn("[SOL] Envio falhou, mantendo apenas local:", e);
+      mostrarSucesso(protocolo, dados); // já salvo em localStorage como fallback
+    });
 }
 
 // ── Auto-cadastro de policial ─────────────────────────
