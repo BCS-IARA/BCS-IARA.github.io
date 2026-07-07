@@ -880,7 +880,6 @@ function doGet(e) {
     if(acao==="salvarDadoApp"){var ch=e.parameter.chave,vl=e.parameter.valor;if(!ch)return saida({ok:false,erro:"chave obrigatória"},cb);props().setProperty("app__"+ch,vl||"");return saida({ok:true},cb);}
     if(acao==="lerDadoApp"){var ch2=e.parameter.chave;if(!ch2)return saida({ok:false,erro:"chave obrigatória"},cb);var vl2=props().getProperty("app__"+ch2);return saida({ok:true,valor:vl2},cb);}
     if(acao==="editar"){var campos={};try{campos=JSON.parse(e.parameter.campos||"{}");}catch(ex){}return saida(editarOc(ss,e.parameter.id,campos),cb);}
-    if(acao==="deletar") return saida(deletarRegistro(ss,e.parameter.tipo,e.parameter.id),cb);
     if(acao==="deduplicar") return saida({ok:true,removidos:dedup(ss)},cb);
     if(acao==="lerAvisos") return saida({ok:true,avisos:lerAvisos(ss)},cb);
     if(acao==="excluirAviso"){if(e.parameter.id)excluirAviso(ss,e.parameter.id);return saida({ok:true},cb);}
@@ -921,9 +920,18 @@ function doGet(e) {
 
     // ── ENCAMINHAMENTOS ─────────────────────────────────────────────
     if(acao==="salvar"&&tipo==="encaminhamento"){var dENC={};try{dENC=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarEncaminhamento(ss,dENC),cb);}
+    if(acao==="salvarEncaminhamento"){var dENC2={};try{dENC2=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarEncaminhamento(ss,dENC2),cb);}
     if(acao==="listar"&&tipo==="encaminhamentos") return saida(listarEncaminhamentos(ss,e.parameter.vitima_id||""),cb);
     if(acao==="listar"&&tipo==="encaminhamentos_pendentes") return saida(listarEncaminhamentosPendentes(ss),cb);
-    if(acao==="atualizarEncaminhamento"){var camposEnc={};try{camposEnc=JSON.parse(e.parameter.campos||"{}");}catch(ex){}return saida(atualizarEncaminhamento(ss,e.parameter.id||"",camposEnc),cb);}
+    if(acao==="atualizarEncaminhamento"){
+      var camposEnc={};try{camposEnc=JSON.parse(e.parameter.campos||"{}");}catch(ex){}
+      if(!Object.keys(camposEnc).length){
+        ["status","relato_devolutiva","data_devolutiva","responsavel_devolutiva","vitima_id","data_envio"].forEach(function(k){
+          if(e.parameter[k]!==undefined&&e.parameter[k]!=="") camposEnc[k]=e.parameter[k];
+        });
+      }
+      return saida(atualizarEncaminhamento(ss,e.parameter.id||"",camposEnc),cb);
+    }
 
     // ── SITUAÇÃO DA OCORRÊNCIA (triagem) ────────────────────────────
     if(acao==="atualizarSituacaoOc") return saida(editarOc(ss,e.parameter.id||"",{situacao:e.parameter.situacao||"nova"}),cb);
@@ -964,6 +972,9 @@ function doGet(e) {
     if(acao==="salvar"&&tipo==="inv_item"){var dINV={};try{dINV=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInvItem(ss,dINV),cb);}
     if(acao==="listar"&&tipo==="inv_itens") return saida(listarInvItens(ss),cb);
     if(acao==="deletar"&&tipo==="inv_item") return saida(deletarInvItem(ss,e.parameter.id||""),cb);
+    // Fallback genérico de deletar — precisa vir DEPOIS de todos os handlers específicos acima,
+    // senão intercepta tudo antes deles serem alcançados (ex: inv_item nunca era atingido)
+    if(acao==="deletar") return saida(deletarRegistro(ss,e.parameter.tipo,e.parameter.id),cb);
     if(acao==="salvar"&&tipo==="inv_movimentacao"){var dMOV={};try{dMOV=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInvMovimentacao(ss,dMOV),cb);}
     if(acao==="listar"&&tipo==="inv_movimentacoes") return saida(listarInvMovimentacoes(ss),cb);
     if(acao==="salvar"&&tipo==="inv_conferencia"){var dCONF={};try{dCONF=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarInvConferencia(ss,dCONF),cb);}
