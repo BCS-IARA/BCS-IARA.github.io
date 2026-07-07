@@ -13151,8 +13151,9 @@ window._buildDossieCorpo = function(vitimaId, opts) {
   }
   var vit=(state.vitimas||[]).find(function(v){return v.id===vitimaId;});
   if(!vit) return null;
+  var _vitNomeLower=(vit.nome||"").trim().toLowerCase();
   var ocsVit=(state.db.ocorrencias||[]).filter(function(o){
-    return o.vitima_id===vitimaId||(!o.vitima_id&&o.vitima_nome===vit.nome);
+    return o.id===opts.ocIdHint||o.vitima_id===vitimaId||(!o.vitima_id&&(o.vitima_nome||"").trim().toLowerCase()===_vitNomeLower);
   }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
   var _ocsIds=ocsVit.map(function(o){return o.id;});
   if(opts.ocIdHint && _ocsIds.indexOf(opts.ocIdHint)<0) _ocsIds.push(opts.ocIdHint);
