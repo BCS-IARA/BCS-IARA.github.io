@@ -13014,6 +13014,8 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
     if(relato) html += "<p style='font-size:12px;color:#3a2818;margin-bottom:4px'>"+esc(relato)+"</p>";
     // Medidas da guarnição
     if(o.medidas) html += "<div class='sec-medidas'><strong>Medidas adotadas:</strong> "+esc(o.medidas)+"</div>";
+    // Resumo do atendimento (preenchido na Triagem)
+    if(o.resumo_atendimento) html += "<div class='sec-medidas'><strong>Resumo do atendimento"+(o.data_atendimento?" ("+_fmtD(o.data_atendimento)+")":"")+":</strong> "+esc(o.resumo_atendimento)+"</div>";
     // Efetivo/guarnição
     if(o.policiais) html += "<div style='font-size:11px;color:#5a2a0a;margin-top:4px'>👮 Guarnição: "+esc(o.policiais)+"</div>";
     // Registros de atendimento / complemento (Projeto Social)
@@ -13205,6 +13207,7 @@ window._buildDossieCorpo = function(vitimaId, opts) {
     if(telOc) h+="<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>📞 "+esc(telOc)+"</div>";
     if(relato) h+="<p style='font-size:12px;color:#3a2818;margin-bottom:4px'>"+esc(relato)+"</p>";
     if(o.medidas) h+="<div class='sec-medidas'><strong>Medidas adotadas:</strong> "+esc(o.medidas)+"</div>";
+    if(o.resumo_atendimento) h+="<div class='sec-medidas'><strong>Resumo do atendimento"+(o.data_atendimento?" ("+_fmtD(o.data_atendimento)+")":"")+":</strong> "+esc(o.resumo_atendimento)+"</div>";
     if(o.policiais) h+="<div style='font-size:11px;color:#5a2a0a;margin-top:4px'>👮 Guarnição: "+esc(o.policiais)+"</div>";
     if(o.situacao) h+="<div style='font-size:11px;color:#8a6a4a;margin-top:4px'>Situação: "+esc(o.situacao.replace(/_/g," "))+"</div>";
     if(o.ps_registros&&o.ps_registros.length){
