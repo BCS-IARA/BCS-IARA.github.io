@@ -12900,247 +12900,15 @@ window._dossieByOcId = function(ocId){
   _injetarDevolutivas(function(){ _gerarComDados(); });
 };
 
-window._gerarDossieByNome = function(nomeVitima, ocIdRef){
-  function _fmtD(d){
-    if(!d) return "—";
-    var s = String(d).trim();
-    if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
-    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if(iso) return iso[3]+"/"+iso[2]+"/"+iso[1];
-    var dt = new Date(s);
-    if(isNaN(dt.getTime())) return s.substring(0,10)||"—";
-    return dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"});
-  }
-  var nome = (nomeVitima||"").trim();
-  var nomeLower = nome.toLowerCase();
-  function _ocTemNome(o){
-    if(!nomeLower) return false;
-    if((o.vitima_nome||"").toLowerCase().indexOf(nomeLower)>=0) return true;
-    if((o.nome_vitima||"").toLowerCase().indexOf(nomeLower)>=0) return true;
-    if((o.vitimas||[]).some(function(v){return (v.nome||"").toLowerCase().indexOf(nomeLower)>=0;})) return true;
-    if(o.solicitante&&(o.solicitante.nome||"").toLowerCase().indexOf(nomeLower)>=0) return true;
-    return false;
-  }
-  var ocRef = (state.db.ocorrencias||[]).find(function(o){return o.id===ocIdRef;});
-  // Se o nome ainda é genérico, tenta extrair do ocRef
-  if((!nome||nome==="Vítima") && ocRef){
-    nome = ocRef.vitima_nome||ocRef.nome_vitima
-      ||(ocRef.vitimas&&ocRef.vitimas[0]?ocRef.vitimas[0].nome:"")
-      ||(ocRef.solicitante?ocRef.solicitante.nome:"")
-      ||"Vítima";
-    nomeLower = nome.toLowerCase();
-  }
-  // Sempre inclui a OC de origem; adiciona demais que tenham o nome
-  var ocsVit = (state.db.ocorrencias||[]).filter(function(o){
-    return o.id===ocIdRef || _ocTemNome(o);
-  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  var ocsIds = ocsVit.map(function(o){return o.id;});
-  var fridas = (state.db.frida||[]).filter(function(f){return ocsIds.indexOf(f.ocorrenciaId)>=0;})
-    .sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  var encs = (state.encaminhamentos||[]).filter(function(e){
-    return (e.vitima_nome||e.nome||e.vitima||e.vitimaNome||"").toLowerCase().indexOf(nomeLower)>=0
-        || (nomeLower && e.vitima_id && (state.vitimas||[]).some(function(v){return v.id===e.vitima_id&&(v.nome||"").toLowerCase().indexOf(nomeLower)>=0;}))
-        || ocsIds.indexOf(e.ocorrencia_id||e.ocorrenciaId||"")>=0;
-  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  var visitas = (state.db.visitas||[]).filter(function(v){
-    return (v.vitima_nome||v.nome||"").toLowerCase().indexOf(nomeLower)>=0
-        || ocsIds.indexOf(v.ocorrenciaId||"")>=0;
-  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  // Extrai dados da vítima do ocRef para a seção Identificação
-  var vTel="", vSexo="", vIdade="", vEnd="";
-  if(ocRef){
-    vTel  = ocRef.vitima_telefone||(ocRef.solicitante?ocRef.solicitante.telefone:"")||"";
-    vSexo = ocRef.vitima_sexo==="F"?"Feminino":ocRef.vitima_sexo==="M"?"Masculino":(ocRef.vitima_sexo||"");
-    vIdade= ocRef.vitima_idade?ocRef.vitima_idade+" anos":"";
-    vEnd  = ocRef.vitima_endereco||(ocRef.solicitante?ocRef.solicitante.endereco:"")||"";
-  }
-  var dataDossie = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
-  var html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Dossiê — "+esc(nome)+"</title><style>";
-  html += "*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;max-width:720px;margin:40px auto;color:#1a0e00;line-height:1.6;padding:0 20px}";
-  html += "h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a2a0a;margin:22px 0 8px;border-bottom:1px solid #e8d5b7;padding-bottom:5px}";
-  html += ".campo{display:grid;grid-template-columns:150px 1fr;gap:6px;margin-bottom:6px;font-size:13px}.label{color:#8a6a4a;font-weight:700}.valor{color:#1a0e00}";
-  html += ".oc-item{border:1px solid #e8d5b7;border-left:4px solid #5a2a0a;border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:12px}";
-  html += ".oc-meta{color:#8a6a4a;font-size:11px;margin-bottom:6px}";
-  html += ".enc-item{border:1px solid #e8d5b7;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:12px}";
-  html += ".badge-vd{background:#dc2626;color:#fff;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px}";
-  html += ".frida-badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px}";
-  html += ".frida-E{background:#dc2626;color:#fff}.frida-M{background:#f59e0b;color:#1a0e00}.frida-B{background:#22c55e;color:#fff}";
-  html += ".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e8d5b7;font-size:11px;color:#8a6a4a;display:flex;justify-content:space-between}";
-  html += ".sec-medidas{margin-top:6px;padding:6px 8px;background:#f5ede0;border-radius:4px;font-size:12px;color:#3a2818}";
-  html += "@media print{body{margin:20px;padding:0}button{display:none!important}}</style></head><body>";
-  html += "<div style='background:#1B3A6B;padding:14px 20px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:4px'>";
-  html += "<img src='"+BCS_LOGO_B64+"' style='width:60px;height:60px;border-radius:50%;object-fit:cover;flex-shrink:0'>";
-  html += "<div><div style='color:#fff;font-size:20px;font-weight:700;font-family:Georgia,serif'>Dossiê da Vítima</div>";
-  html += "<div style='color:#adc8ff;font-size:12px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
-  html += "<div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:11px'>Emitido em "+dataDossie+"<br><span style='color:#ff9999;font-weight:700'>CONFIDENCIAL</span></div></div>";
-  html += "<h2>Identificação</h2>";
-  html += "<div class='campo'><div class='label'>Nome</div><div class='valor'>"+esc(nome||"—")+"</div></div>";
-  if(vSexo) html += "<div class='campo'><div class='label'>Sexo</div><div class='valor'>"+esc(vSexo)+"</div></div>";
-  if(vIdade) html += "<div class='campo'><div class='label'>Idade</div><div class='valor'>"+esc(vIdade)+"</div></div>";
-  if(vTel) html += "<div class='campo'><div class='label'>Telefone</div><div class='valor'>"+esc(vTel)+"</div></div>";
-  if(vEnd) html += "<div class='campo'><div class='label'>Endereço</div><div class='valor'>"+esc(vEnd)+"</div></div>";
-  if(fridas.length){
-    html += "<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
-    fridas.forEach(function(f){
-      var nivelCls=f.nivel==="E"?"frida-E":f.nivel==="M"?"frida-M":"frida-B";
-      var nivelLabel=f.nivel==="E"?"ELEVADO":f.nivel==="M"?"MÉDIO":"BAIXO";
-      html += "<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+_fmtD(f.data)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio):"")+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
-    });
-  }
-  html += "<h2>Histórico de Ocorrências ("+ocsVit.length+")</h2>";
-  if(!ocsVit.length) html += "<p style='color:#8a6a4a;font-size:12px'>Nenhuma ocorrência localizada.</p>";
-  ocsVit.forEach(function(o){
-    var isVD=o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
-    var relato = o.descricao_dinamica||o.texto_original||o.narrativa||o.descricao||"";
-    html += "<div class='oc-item'>";
-    html += "<div style='display:flex;align-items:center;margin-bottom:4px'>";
-    html += "<strong style='font-size:13px'>"+esc(o.tipo||"—")+"</strong>";
-    if(isVD) html += "<span class='badge-vd'>VD</span>";
-    html += "</div>";
-    // Linha de metadados: data, hora, bairro, nº SIGESPOL
-    html += "<div class='oc-meta'>";
-    html += _fmtD(o.data);
-    if(o.hora) html += " · "+esc(o.hora);
-    if(o.bairro) html += " · "+esc(o.bairro);
-    if(o.numero) html += " · Nº "+esc(o.numero);
-    html += "</div>";
-    // Nome da vítima se diferente do nome principal
-    var nOc = o.vitima_nome||o.nome_vitima||(o.vitimas&&o.vitimas[0]?o.vitimas[0].nome:"")||(o.solicitante?o.solicitante.nome:"");
-    if(nOc && nOc.toLowerCase()!==nomeLower) html += "<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>👤 "+esc(nOc)+"</div>";
-    // Telefone da vítima nesta OC
-    var telOc = o.vitima_telefone||(o.solicitante?o.solicitante.telefone:"");
-    if(telOc) html += "<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>📞 "+esc(telOc)+"</div>";
-    // Relato completo
-    if(relato) html += "<p style='font-size:12px;color:#3a2818;margin-bottom:4px'>"+esc(relato)+"</p>";
-    // Medidas da guarnição
-    if(o.medidas) html += "<div class='sec-medidas'><strong>Medidas adotadas:</strong> "+esc(o.medidas)+"</div>";
-    // Resumo do atendimento (preenchido na Triagem)
-    if(o.resumo_atendimento) html += "<div class='sec-medidas'><strong>Resumo do atendimento"+(o.data_atendimento?" ("+_fmtD(o.data_atendimento)+")":"")+":</strong> "+esc(o.resumo_atendimento)+"</div>";
-    // Efetivo/guarnição
-    if(o.policiais) html += "<div style='font-size:11px;color:#5a2a0a;margin-top:4px'>👮 Guarnição: "+esc(o.policiais)+"</div>";
-    // Registros de atendimento / complemento (Projeto Social)
-    if(o.ps_registros&&o.ps_registros.length){
-      html += "<div style='margin-top:6px;padding:6px 8px;background:#f5f0e8;border-radius:4px'>";
-      html += "<strong style='font-size:11px;color:#5a2a0a'>Atendimentos registrados ("+o.ps_registros.length+")</strong>";
-      o.ps_registros.slice().reverse().forEach(function(r){
-        var partes=[];
-        if(r.pessoas) partes.push(r.pessoas+" pessoas");
-        if(r.alimentos_kg) partes.push(r.alimentos_kg+"kg alimentos");
-        if(r.itens) partes.push(r.itens);
-        html += "<p style='font-size:11px;color:#3a2818;margin-top:4px'>"+_fmtD(r.data)+(r.hora?" · "+esc(r.hora):"")+(partes.length?" — "+esc(partes.join(", ")):"")+(r.complemento?"<br>"+esc(r.complemento):"")+"</p>";
-      });
-      html += "</div>";
-    }
-    html += "</div>";
-  });
-  if(visitas.length){
-    html += "<h2>Visitas Realizadas ("+visitas.length+")</h2>";
-    visitas.forEach(function(v){
-      html += "<div class='enc-item'><strong>"+(v.tipo||"Visita")+"</strong>";
-      html += "<span style='margin-left:12px;font-size:11px;color:#8a6a4a'>"+_fmtD(v.data)+(v.hora?" · "+esc(v.hora):"")+(v.endereco?" · "+esc(v.endereco):"")+"</span>";
-      if(v.resultado) html += "<p style='font-size:12px;color:#3a2818;margin-top:4px'>"+esc(v.resultado)+"</p>";
-      html += "</div>";
-    });
-  }
-  html += "<h2>Encaminhamentos ("+encs.length+")</h2>";
-  if(!encs.length) html += "<p style='color:#8a6a4a;font-size:12px'>Nenhum encaminhamento registrado.</p>";
-  encs.forEach(function(e){
-    var stLabel={pendente:"Pendente",enviado:"Enviado",aguardando_devolutiva:"Aguard. resposta",concluido:"Concluído"};
-    html += "<div class='enc-item'><div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>";
-    html += "<strong>"+esc(e.destino||e.orgao||e.tipo||"—")+"</strong>";
-    html += "<span style='background:#f5ede0;border:1px solid #e8d5b7;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:#5a2a0a'>"+(stLabel[e.status]||e.status||"—")+"</span>";
-    html += "<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(e.data)+"</span></div>";
-    if(e.descricao) html += "<p style='font-size:12px;color:#3a2818'>"+esc(e.descricao)+"</p>";
-    if(e.relato_devolutiva) html += "<p style='font-size:12px;color:#1a4a1a;margin-top:4px;padding:6px 8px;background:#f0fff0;border-radius:4px'>Devolutiva: "+esc(e.relato_devolutiva)+"</p>";
-    html += "</div>";
-  });
-  html += "<div class='footer'><span>77ª CIPM BCS — Sistema IARA</span><span>Emitido em "+dataDossie+"</span></div>";
-  html += "<br><button onclick='window.print()' style='padding:10px 24px;font-size:14px;cursor:pointer;background:#3c1810;color:#f5ede0;border:none;border-radius:6px;font-weight:700'>⬇ Imprimir / Salvar PDF</button>";
-  html += "</body></html>";
-  var win = window.open("","_blank");
-  win.document.write(html);
-  win.document.close();
-};
-
-// Dossiê a partir de uma OC quando não há ficha formal de vítima
-function _buildDossieCorpoDeOc(oc, nomeVit){
-  if(!oc) return null;
-  function _fmtD(d){
-    if(!d) return "—";
-    var s=String(d).trim();
-    if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
-    var iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if(iso) return iso[3]+"/"+iso[2]+"/"+iso[1];
-    return s.substring(0,10)||"—";
-  }
-  var dataDossie=new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
-  var relato=oc.descricao_dinamica||oc.texto_original||oc.narrativa||oc.descricao||"";
-  var fridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===oc.id;})
-    .sort(function(a,b){return (b.data||"").localeCompare(a.data||"");});
-  var encsOc=(state.encaminhamentos||[]).filter(function(enc){return enc.ocorrencia_id===oc.id;});
-  // Atendimentos vinculados (atendimentos da auxiliar/gestor)
-  var atends=(state.db.atendimentos||[]).filter(function(a){
-    return a.ocorrenciaId===oc.id || (nomeVit&&nomeVit!=="—"&&(a.nome||"").toLowerCase()===nomeVit.toLowerCase());
-  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  var h="";
-  h+="<h2>Identificação</h2>";
-  var telOc=oc.vitima_telefone||(oc.solicitante?oc.solicitante.telefone:"")||"";
-  var campos=[["Nome",nomeVit],["Bairro",oc.bairro||""],["Telefone",telOc]];
-  campos.forEach(function(c){if(c[1]&&c[1]!=="—") h+="<div class='campo'><div class='label'>"+c[0]+"</div><div class='valor'>"+esc(c[1])+"</div></div>";});
-  if(fridas.length){
-    h+="<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
-    fridas.forEach(function(f){
-      var nivelCls=f.nivel==="E"?"frida-E":f.nivel==="M"?"frida-M":"frida-B";
-      var nivelLabel=f.nivel==="E"?"ELEVADO":f.nivel==="M"?"MÉDIO":"BAIXO";
-      h+="<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+_fmtD(f.data)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio):"")+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
-    });
-  }
-  h+="<h2>Ocorrência de Origem</h2>";
-  h+="<div class='oc-item'>";
-  var isVD=oc.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(oc.tipo||"");
-  h+="<div style='display:flex;align-items:center;margin-bottom:4px'><strong style='font-size:13px'>"+esc(oc.tipo||"—")+"</strong>";
-  if(isVD) h+="<span class='badge-vd'>VD</span>";
-  h+="</div><div class='oc-meta'>"+_fmtD(oc.data);
-  if(oc.hora) h+=" · "+esc(oc.hora);
-  if(oc.bairro) h+=" · "+esc(oc.bairro);
-  if(oc.numero) h+=" · Nº "+esc(oc.numero);
-  h+="</div>";
-  if(relato) h+="<p style='font-size:12px;color:#3a2818;margin-top:6px'>"+esc(relato)+"</p>";
-  if(oc.medidas) h+="<div class='sec-medidas'><strong>Medidas adotadas:</strong> "+esc(oc.medidas)+"</div>";
-  if(oc.policiais) h+="<div style='font-size:11px;color:#5a2a0a;margin-top:4px'>👮 Guarnição: "+esc(oc.policiais)+"</div>";
-  if(oc.resumo_atendimento) h+="<div style='margin-top:8px;padding:6px 10px;background:#f5f0e8;border-radius:4px;font-size:12px;color:#3a2818'><strong>Resumo do atendimento:</strong> "+esc(oc.resumo_atendimento)+"</div>";
-  h+="</div>";
-  if(atends.length){
-    h+="<h2>Atendimentos Registrados ("+atends.length+")</h2>";
-    atends.forEach(function(a){
-      h+="<div class='enc-item'><div style='display:flex;gap:8px;align-items:center;margin-bottom:4px'>";
-      h+="<strong>"+esc(a.tipo||"Atendimento")+"</strong>";
-      h+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(a.data)+(a.hora?" · "+a.hora:"")+"</span></div>";
-      if(a.descricao) h+="<p style='font-size:12px;color:#3a2818'>"+esc(a.descricao)+"</p>";
-      if(a.encaminhamento) h+="<p style='font-size:11px;color:#5a2a0a;margin-top:4px'>📤 "+esc(a.encaminhamento)+"</p>";
-      h+="</div>";
-    });
-  }
-  if(encsOc.length){
-    h+="<h2>Encaminhamentos ("+encsOc.length+")</h2>";
-    var stLabel={pendente:"Pendente",aguardando_devolutiva:"Aguardando resposta",concluido:"Concluído"};
-    encsOc.forEach(function(enc){
-      h+="<div class='enc-item'><div style='display:flex;gap:8px;align-items:center;margin-bottom:4px'>";
-      h+="<strong>"+esc(enc.tipo||enc.orgao||"—")+"</strong>";
-      h+="<span style='background:#f5ede0;border:1px solid #e8d5b7;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:#5a2a0a'>"+(stLabel[enc.status]||enc.status||"—")+"</span>";
-      h+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(enc.data)+"</span></div>";
-      if(enc.descricao) h+="<p style='font-size:12px;color:#3a2818'>"+esc(enc.descricao)+"</p>";
-      if(enc.relato_devolutiva) h+="<p style='font-size:12px;color:#1a4a1a;margin-top:4px;padding:6px 8px;background:#f0fff0;border-radius:4px'>Devolutiva: "+esc(enc.relato_devolutiva)+"</p>";
-      h+="</div>";
-    });
-  }
-  h+="<div class='footer'><span>77ª CIPM BCS — Sistema IARA</span><span>Emitido em "+dataDossie+"</span></div>";
-  return {html:h, nome:nomeVit};
-}
-
-// Constrói o conteúdo HTML do dossiê (sem a tag <html> externa) — reutilizável no ofício
-window._buildDossieCorpo = function(vitimaId, opts) {
-  opts = opts||{};
+// ── Dossiê unificado ──────────────────────────────────────────────────────
+// Único ponto de verdade para montar o corpo do dossiê (HTML sem <html>
+// externa), a partir de um cadastro formal de vítima OU de um nome +
+// ocorrência de referência (quando não há cadastro formal — ex: Projeto
+// Social). Usado por TODOS os pontos que geram dossiê/PDF no sistema:
+// Ocorrências, Histórico e o anexo do Ofício de Encaminhamento — para não
+// haver divergência de conteúdo entre eles.
+window._buildDossieCorpo = function(identidade, opts) {
+  identidade = identidade||{}; opts = opts||{};
   function _fmtD(d){
     if(!d) return "—";
     var s=String(d).trim();
@@ -13151,22 +12919,87 @@ window._buildDossieCorpo = function(vitimaId, opts) {
     if(isNaN(dt.getTime())) return s.substring(0,10)||"—";
     return dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"});
   }
-  var vit=(state.vitimas||[]).find(function(v){return v.id===vitimaId;});
-  if(!vit) return null;
-  var _vitNomeLower=(vit.nome||"").trim().toLowerCase();
-  var ocsVit=(state.db.ocorrencias||[]).filter(function(o){
-    return o.id===opts.ocIdHint||o.vitima_id===vitimaId||(!o.vitima_id&&(o.vitima_nome||"").trim().toLowerCase()===_vitNomeLower);
-  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  var _ocsIds=ocsVit.map(function(o){return o.id;});
-  if(opts.ocIdHint && _ocsIds.indexOf(opts.ocIdHint)<0) _ocsIds.push(opts.ocIdHint);
-  var _nomeVitLower=(vit.nome||"").toLowerCase();
-  var encs=(state.encaminhamentos||[]).filter(function(e){
-    return e.vitima_id===vitimaId
-      || _ocsIds.indexOf(e.ocorrencia_id||e.ocorrenciaId||"")>=0
-      || (_nomeVitLower && (e.vitima_nome||"").toLowerCase()===_nomeVitLower);
-  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
-  var fridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId&&ocsVit.some(function(o){return o.id===f.ocorrenciaId;});})
+
+  var nome="", sexo="", idade="", telefone="", endereco="", ocIdHint=null, ocsVit, vit=null;
+
+  if(identidade.vitimaId){
+    vit=(state.vitimas||[]).find(function(v){return v.id===identidade.vitimaId;});
+    if(!vit) return null;
+    nome=(vit.nome||"").replace(/,?\s*sexo\s+\w+\s*/i,"").replace(/,?\s*idade\s+\d+\s*anos?\s*/i,"").replace(/,\s*$/,"").trim()||"—";
+    sexo=vit.sexo==="F"?"Feminino":vit.sexo==="M"?"Masculino":vit.sexo||"";
+    if(!sexo){var _sm=(vit.nome||"").match(/sexo\s+(Feminino|Masculino)/i);if(_sm) sexo=_sm[1];}
+    idade=vit.idade?vit.idade+" anos":"";
+    telefone=vit.telefone||"";
+    endereco=vit.endereco||"";
+    ocIdHint=opts.ocIdHint||null;
+  } else {
+    nome=(identidade.nome||"").trim()||"Vítima";
+    ocIdHint=identidade.ocIdRef||null;
+    var ocRef = ocIdHint?(state.db.ocorrencias||[]).find(function(o){return o.id===ocIdHint;}):null;
+    if((!identidade.nome||identidade.nome==="Vítima") && ocRef){
+      nome = ocRef.vitima_nome||ocRef.nome_vitima
+        ||(ocRef.vitimas&&ocRef.vitimas[0]?ocRef.vitimas[0].nome:"")
+        ||(ocRef.solicitante?ocRef.solicitante.nome:"")
+        ||"Vítima";
+    }
+    if(ocRef){
+      telefone = ocRef.vitima_telefone||(ocRef.solicitante?ocRef.solicitante.telefone:"")||"";
+      sexo = ocRef.vitima_sexo==="F"?"Feminino":ocRef.vitima_sexo==="M"?"Masculino":(ocRef.vitima_sexo||"");
+      idade= ocRef.vitima_idade?ocRef.vitima_idade+" anos":"";
+      endereco = ocRef.vitima_endereco||(ocRef.solicitante?ocRef.solicitante.endereco:"")||"";
+    }
+  }
+  var nomeLower=(nome||"").trim().toLowerCase();
+
+  if(identidade.vitimaId){
+    // Cadastro formal: só casa por vitima_id, ou por nome exato quando a OC não tem vitima_id
+    // (evita puxar ocorrências de outra pessoa por coincidência de nome).
+    ocsVit=(state.db.ocorrencias||[]).filter(function(o){
+      return o.id===ocIdHint||o.vitima_id===identidade.vitimaId||(!o.vitima_id&&(o.vitima_nome||"").trim().toLowerCase()===nomeLower);
+    }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  } else {
+    // Sem cadastro formal: casa por substring do nome em qualquer campo de nome da OC.
+    function _ocTemNome(o){
+      if(!nomeLower) return false;
+      if((o.vitima_nome||"").toLowerCase().indexOf(nomeLower)>=0) return true;
+      if((o.nome_vitima||"").toLowerCase().indexOf(nomeLower)>=0) return true;
+      if((o.vitimas||[]).some(function(v){return (v.nome||"").toLowerCase().indexOf(nomeLower)>=0;})) return true;
+      if(o.solicitante&&(o.solicitante.nome||"").toLowerCase().indexOf(nomeLower)>=0) return true;
+      return false;
+    }
+    ocsVit=(state.db.ocorrencias||[]).filter(function(o){
+      return o.id===ocIdHint||_ocTemNome(o);
+    }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  }
+  var ocsIds=ocsVit.map(function(o){return o.id;});
+
+  var encs;
+  if(identidade.vitimaId){
+    encs=(state.encaminhamentos||[]).filter(function(e){
+      return e.vitima_id===identidade.vitimaId
+        || ocsIds.indexOf(e.ocorrencia_id||e.ocorrenciaId||"")>=0
+        || (nomeLower && (e.vitima_nome||"").toLowerCase()===nomeLower);
+    }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  } else {
+    encs=(state.encaminhamentos||[]).filter(function(e){
+      return (e.vitima_nome||e.nome||e.vitima||e.vitimaNome||"").toLowerCase().indexOf(nomeLower)>=0
+          || (nomeLower && e.vitima_id && (state.vitimas||[]).some(function(v){return v.id===e.vitima_id&&(v.nome||"").toLowerCase().indexOf(nomeLower)>=0;}))
+          || ocsIds.indexOf(e.ocorrencia_id||e.ocorrenciaId||"")>=0;
+    }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  }
+
+  var fridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId&&ocsIds.indexOf(f.ocorrenciaId)>=0;})
     .sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+
+  var visitas=(state.db.visitas||[]).filter(function(v){
+    return (v.vitima_nome||v.nome||"").toLowerCase().indexOf(nomeLower)>=0
+        || ocsIds.indexOf(v.ocorrenciaId||"")>=0;
+  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+
+  var atendGerais=(state.db.atendimentos||[]).filter(function(a){
+    return ocsIds.indexOf(a.ocorrenciaId||"")>=0 || (nomeLower&&(a.nome||"").toLowerCase()===nomeLower);
+  }).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+
   var dataDossie=new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   var h="";
   if(!opts.semCabecalho){
@@ -13176,12 +13009,10 @@ window._buildDossieCorpo = function(vitimaId, opts) {
     h+="<div style='color:#adc8ff;font-size:12px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
     h+="<div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:11px'>Emitido em "+dataDossie+"<br><span style='color:#ff9999;font-weight:700'>CONFIDENCIAL</span></div></div>";
   }
-  var _nomeClean=(vit.nome||"").replace(/,?\s*sexo\s+\w+\s*/i,"").replace(/,?\s*idade\s+\d+\s*anos?\s*/i,"").replace(/,\s*$/,"").trim()||"—";
-  var _sexoDisplay=vit.sexo==="F"?"Feminino":vit.sexo==="M"?"Masculino":vit.sexo||"";
-  if(!_sexoDisplay){var _sm=(vit.nome||"").match(/sexo\s+(Feminino|Masculino)/i);if(_sm) _sexoDisplay=_sm[1];}
   h+="<h2>Identificação</h2>";
-  var idCampos=[["Nome",_nomeClean],["Sexo",_sexoDisplay],["Idade",vit.idade?vit.idade+" anos":""],["Telefone",vit.telefone||""],["Endereço",vit.endereco||""]];
+  var idCampos=[["Nome",nome],["Sexo",sexo],["Idade",idade],["Telefone",telefone],["Endereço",endereco]];
   idCampos.forEach(function(c){if(c[1]&&c[1]!=="—") h+="<div class='campo'><div class='label'>"+c[0]+"</div><div class='valor'>"+esc(c[1])+"</div></div>";});
+
   if(fridas.length){
     h+="<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
     fridas.forEach(function(f){
@@ -13190,6 +13021,7 @@ window._buildDossieCorpo = function(vitimaId, opts) {
       h+="<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+_fmtD(f.data)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio):"")+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
     });
   }
+
   h+="<h2>Histórico de Ocorrências ("+ocsVit.length+")</h2>";
   if(!ocsVit.length) h+="<p style='color:#8a6a4a;font-size:12px'>Nenhuma ocorrência vinculada.</p>";
   ocsVit.forEach(function(o){
@@ -13203,6 +13035,8 @@ window._buildDossieCorpo = function(vitimaId, opts) {
     if(o.bairro) h+=" · "+esc(o.bairro);
     if(o.numero) h+=" · Nº "+esc(o.numero);
     h+="</div>";
+    var nOc=o.vitima_nome||o.nome_vitima||(o.vitimas&&o.vitimas[0]?o.vitimas[0].nome:"")||(o.solicitante?o.solicitante.nome:"");
+    if(nOc && nOc.trim().toLowerCase()!==nomeLower) h+="<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>👤 "+esc(nOc)+"</div>";
     var telOc=o.vitima_telefone||(o.solicitante?o.solicitante.telefone:"");
     if(telOc) h+="<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>📞 "+esc(telOc)+"</div>";
     if(relato) h+="<p style='font-size:12px;color:#3a2818;margin-bottom:4px'>"+esc(relato)+"</p>";
@@ -13224,27 +13058,49 @@ window._buildDossieCorpo = function(vitimaId, opts) {
     }
     h+="</div>";
   });
+
+  if(visitas.length){
+    h+="<h2>Visitas Realizadas ("+visitas.length+")</h2>";
+    visitas.forEach(function(v){
+      h+="<div class='enc-item'><strong>"+(v.tipo||"Visita")+"</strong>";
+      h+="<span style='margin-left:12px;font-size:11px;color:#8a6a4a'>"+_fmtD(v.data)+(v.hora?" · "+esc(v.hora):"")+(v.endereco?" · "+esc(v.endereco):"")+"</span>";
+      if(v.resultado) h+="<p style='font-size:12px;color:#3a2818;margin-top:4px'>"+esc(v.resultado)+"</p>";
+      h+="</div>";
+    });
+  }
+
+  if(atendGerais.length){
+    h+="<h2>Atendimentos Registrados ("+atendGerais.length+")</h2>";
+    atendGerais.forEach(function(a){
+      h+="<div class='enc-item'><div style='display:flex;gap:8px;align-items:center;margin-bottom:4px'>";
+      h+="<strong>"+esc(a.tipo||"Atendimento")+"</strong>";
+      h+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(a.data)+(a.hora?" · "+a.hora:"")+"</span></div>";
+      if(a.descricao) h+="<p style='font-size:12px;color:#3a2818'>"+esc(a.descricao)+"</p>";
+      if(a.encaminhamento) h+="<p style='font-size:11px;color:#5a2a0a;margin-top:4px'>📤 "+esc(a.encaminhamento)+"</p>";
+      h+="</div>";
+    });
+  }
+
   h+="<h2>Encaminhamentos ("+encs.length+")</h2>";
   if(!encs.length) h+="<p style='color:#8a6a4a;font-size:12px'>Nenhum encaminhamento registrado.</p>";
   encs.forEach(function(e){
     var stLabel={pendente:"Pendente",enviado:"Enviado",aguardando_devolutiva:"Aguardando resposta",concluido:"Concluído",encerrado:"Encerrado"};
     h+="<div class='enc-item'><div style='display:flex;align-items:center;gap:8px;margin-bottom:4px'>";
-    h+="<strong>"+esc(e.tipo||e.orgao||"—")+"</strong>";
+    h+="<strong>"+esc(e.tipo||e.orgao||e.destino||"—")+"</strong>";
     h+="<span style='background:#f5ede0;border:1px solid #e8d5b7;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:#5a2a0a'>"+(stLabel[e.status]||e.status||"—")+"</span>";
     h+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>"+_fmtD(e.data)+"</span></div>";
     if(e.descricao) h+="<p style='font-size:12px;color:#3a2818'>"+esc(e.descricao)+"</p>";
     if(e.relato_devolutiva) h+="<p style='font-size:12px;color:#1a4a1a;margin-top:4px;padding:6px 8px;background:#f0fff0;border-radius:4px'>Devolutiva: "+esc(e.relato_devolutiva)+"</p>";
     h+="</div>";
   });
-  h+="<div class='footer'><span>77ª CIPM BCS — Sistema IARA</span><span>Dossiê emitido em "+dataDossie+"</span></div>";
-  return {html:h, nome:_nomeClean};
+  h+="<div class='footer'><span>77ª CIPM BCS — Sistema IARA</span><span>Emitido em "+dataDossie+"</span></div>";
+  return {html:h, nome:nome};
 };
 
-window._gerarDossie = function(vitimaId, opts){
-  var vit=(state.vitimas||[]).find(function(v){return v.id===vitimaId;});
-  if(!vit){showToast("Vítima não encontrada","error");return;}
-  var corpo=_buildDossieCorpo(vitimaId, opts);
-  if(!corpo){showToast("Erro ao gerar dossiê","error");return;}
+// Abre o dossiê (fragmento retornado por _buildDossieCorpo) numa nova aba,
+// já com o documento HTML completo e o botão de impressão/PDF.
+function _abrirDossieDoc(corpo){
+  if(!corpo){ showToast("Erro ao gerar dossiê","error"); return; }
   var css="*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;max-width:720px;margin:40px auto;color:#1a0e00;line-height:1.6;padding:0 20px}";
   css+=".campo{display:grid;grid-template-columns:150px 1fr;gap:6px;margin-bottom:6px;font-size:13px}.label{color:#8a6a4a;font-weight:700}.valor{color:#1a0e00}";
   css+="h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#5a2a0a;margin:22px 0 8px;border-bottom:1px solid #e8d5b7;padding-bottom:5px}";
@@ -13256,13 +13112,24 @@ window._gerarDossie = function(vitimaId, opts){
   css+=".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e8d5b7;font-size:11px;color:#8a6a4a;display:flex;justify-content:space-between}";
   css+=".oc-meta{color:#8a6a4a;font-size:11px;margin-bottom:6px}.sec-medidas{margin-top:6px;padding:6px 8px;background:#f5ede0;border-radius:4px;font-size:12px;color:#3a2818}";
   css+="@media print{body{margin:20px;padding:0}button{display:none!important}}";
-  var html="<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Dossiê — "+esc(vit.nome)+"</title><style>"+css+"</style></head><body>";
+  var html="<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Dossiê — "+esc(corpo.nome)+"</title><style>"+css+"</style></head><body>";
   html+=corpo.html;
   html+="<br><button onclick='window.print()' style='padding:10px 24px;font-size:14px;cursor:pointer;background:#3c1810;color:#f5ede0;border:none;border-radius:6px;font-weight:700'>⬇ Imprimir / Salvar PDF</button>";
   html+="</body></html>";
   var win=window.open("","_blank");
   win.document.write(html);
   win.document.close();
+}
+
+window._gerarDossie = function(vitimaId, opts){
+  var corpo=_buildDossieCorpo({vitimaId:vitimaId}, opts);
+  if(!corpo){showToast("Vítima não encontrada","error");return;}
+  _abrirDossieDoc(corpo);
+};
+
+window._gerarDossieByNome = function(nomeVitima, ocIdRef){
+  var corpo=_buildDossieCorpo({nome:nomeVitima, ocIdRef:ocIdRef}, {});
+  _abrirDossieDoc(corpo);
 };
 
 window._concluirEnc = function(encId, vitimaId) {
@@ -14417,7 +14284,10 @@ window._gerarPdfEncaminhamento = function(encId) {
     if(_vitMatch) _vitIdParaDossie = _vitMatch.id;
   }
   if(typeof _buildDossieCorpo === "function"){
-    var _dc = _vitIdParaDossie ? _buildDossieCorpo(_vitIdParaDossie) : _buildDossieCorpoDeOc(oc, nomeVit);
+    var _dc = _buildDossieCorpo(
+      _vitIdParaDossie ? {vitimaId:_vitIdParaDossie} : {nome:nomeVit, ocIdRef: oc?oc.id:null},
+      {semCabecalho:true}
+    );
     if(_dc){
       html += "<div style='page-break-before:always'></div>";
       html += "<div style='background:#1B3A6B;padding:10px 16px;display:flex;align-items:center;gap:10px;margin-bottom:8px'>";
