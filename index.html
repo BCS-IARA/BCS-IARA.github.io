@@ -307,6 +307,16 @@ const CONCEITO_VISITA = {"Visita Solidária":"🤝 Apoio emocional e orientaçã
 // ══════════════════════════════════════════════════
 // PERSISTÊNCIA LOCAL
 // ══════════════════════════════════════════════════
+// Une dois arrays de registros (ex: ps_registros) sem duplicar — usado para
+// mesclar dados do mesmo campo vindos de aparelhos diferentes.
+function _unirRegistros(a, b){
+  a = a||[]; b = b||[];
+  var vistos = {};
+  a.forEach(function(x){ vistos[JSON.stringify(x)]=true; });
+  var extras = b.filter(function(x){ return !vistos[JSON.stringify(x)]; });
+  return a.concat(extras);
+}
+
 // Salva mapa separado de campos críticos dos módulos — imune ao sync do Sheets
 function _salvarModulos(){
   try{
@@ -316,7 +326,8 @@ function _salvarModulos(){
       var k=String(o.id).trim();
       if(o.classificacao||o.escolaNome||o.escolaId||
          (o.esc_registros&&o.esc_registros.length)||
-         (o.ps_registros&&o.ps_registros.length)){
+         (o.ps_registros&&o.ps_registros.length)||
+         o.resumo_atendimento){
         m[k]={
           classificacao:o.classificacao||"",
           escolaNome:o.escolaNome||"",
@@ -324,7 +335,9 @@ function _salvarModulos(){
           tipoOcEscola:o.tipoOcEscola||"",
           tipoViolenciaEscola:o.tipoViolenciaEscola||"",
           esc_registros:o.esc_registros||[],
-          ps_registros:o.ps_registros||[]
+          ps_registros:o.ps_registros||[],
+          resumo_atendimento:o.resumo_atendimento||"",
+          data_atendimento:o.data_atendimento||""
         };
       }
     });
@@ -348,8 +361,10 @@ function _restaurarModulos(ocs){
       if(saved.escolaId     && !o.escolaId)       o.escolaId=saved.escolaId;
       if(saved.tipoOcEscola && !o.tipoOcEscola)   o.tipoOcEscola=saved.tipoOcEscola;
       if(saved.tipoViolenciaEscola && !o.tipoViolenciaEscola) o.tipoViolenciaEscola=saved.tipoViolenciaEscola;
-      if(saved.esc_registros&&saved.esc_registros.length&&(!o.esc_registros||!o.esc_registros.length)) o.esc_registros=saved.esc_registros;
-      if(saved.ps_registros &&saved.ps_registros.length &&(!o.ps_registros ||!o.ps_registros.length))  o.ps_registros =saved.ps_registros;
+      if(saved.resumo_atendimento && !o.resumo_atendimento) o.resumo_atendimento=saved.resumo_atendimento;
+      if(saved.data_atendimento   && !o.data_atendimento)   o.data_atendimento=saved.data_atendimento;
+      if(saved.esc_registros&&saved.esc_registros.length) o.esc_registros=_unirRegistros(o.esc_registros,saved.esc_registros);
+      if(saved.ps_registros &&saved.ps_registros.length)  o.ps_registros =_unirRegistros(o.ps_registros, saved.ps_registros);
     });
   }catch(e){}
 }
@@ -510,7 +525,7 @@ function carregarLocal() {
         (db.ocorrencias||[]).forEach(function(o){
           if(!o.id) return;
           var k=String(o.id).trim();
-          if(o.classificacao||o.escolaNome||o.escolaId||(o.esc_registros&&o.esc_registros.length)||(o.ps_registros&&o.ps_registros.length)){
+          if(o.classificacao||o.escolaNome||o.escolaId||(o.esc_registros&&o.esc_registros.length)||(o.ps_registros&&o.ps_registros.length)||o.resumo_atendimento){
             _rebuilt[k]={
               classificacao:o.classificacao||"",
               escolaNome:o.escolaNome||"",
@@ -518,7 +533,9 @@ function carregarLocal() {
               tipoOcEscola:o.tipoOcEscola||"",
               tipoViolenciaEscola:o.tipoViolenciaEscola||"",
               esc_registros:o.esc_registros||[],
-              ps_registros:o.ps_registros||[]
+              ps_registros:o.ps_registros||[],
+              resumo_atendimento:o.resumo_atendimento||"",
+              data_atendimento:o.data_atendimento||""
             };
           }
         });
@@ -1060,12 +1077,27 @@ async function carregarDadosAppDoSheets(){
     localStorage.setItem("bcs_conselho_associados",JSON.stringify(state.conselho_associados||[]));
     localStorage.setItem("bcs_conselho_diretoria", JSON.stringify(state.conselho_diretoria||[]));
 
-    // 🏫 Restaurar classificacao/escolaNome de outros dispositivos via Sheets
+    // 🏫 Restaurar classificacao/escolaNome/ps_registros/resumo_atendimento de outros dispositivos via Sheets
     try{
       var _localMods=JSON.parse(localStorage.getItem("bcs_oc_modulos")||"{}");
       if(ocModulosSheets && typeof ocModulosSheets==="object" && !Array.isArray(ocModulosSheets)){
-        // Sheets tem dados → mesclar (local prevalece por ser mais recente)
-        var _mergedMods=Object.assign({},ocModulosSheets,_localMods);
+        // Sheets tem dados → mesclar por chave (campo a campo, não sobrescrever o registro inteiro)
+        var _mergedMods={};
+        Object.keys(ocModulosSheets).concat(Object.keys(_localMods)).forEach(function(k){
+          if(_mergedMods[k]) return;
+          var rem=ocModulosSheets[k]||{}, loc=_localMods[k]||{};
+          _mergedMods[k]={
+            classificacao:loc.classificacao||rem.classificacao||"",
+            escolaNome:loc.escolaNome||rem.escolaNome||"",
+            escolaId:loc.escolaId||rem.escolaId||"",
+            tipoOcEscola:loc.tipoOcEscola||rem.tipoOcEscola||"",
+            tipoViolenciaEscola:loc.tipoViolenciaEscola||rem.tipoViolenciaEscola||"",
+            resumo_atendimento:loc.resumo_atendimento||rem.resumo_atendimento||"",
+            data_atendimento:loc.data_atendimento||rem.data_atendimento||"",
+            esc_registros:_unirRegistros(loc.esc_registros,rem.esc_registros),
+            ps_registros:_unirRegistros(loc.ps_registros,rem.ps_registros)
+          };
+        });
         localStorage.setItem("bcs_oc_modulos",JSON.stringify(_mergedMods));
         _restaurarModulos(state.db.ocorrencias); // aplica classificacao/escolaNome em memória
       } else if(ocModulosSheets===null && Object.keys(_localMods).length>0){
@@ -10403,6 +10435,7 @@ function abrirRegistroPS(ocId){
     if(!oc.ps_registros) oc.ps_registros=[];
     oc.ps_registros.push(reg);
     salvarLocal();
+    agendarSyncSheets();
     showToast("✓ Registro salvo com sucesso!");
     modal.remove();
     renderProjetosSociais(document.getElementById("main")||document.getElementById("main-content"));
@@ -14783,6 +14816,7 @@ window._salvarTriagem = function(ocId) {
   oc._triadoEm = new Date().toISOString();
 
   salvarLocal();
+  agendarSyncSheets();
   _sheetsGet({acao:"atualizarSituacaoOc", id:ocId, situacao:situacao}).catch(function(){});
   enviarSheets("ocorrencias", oc);
 
