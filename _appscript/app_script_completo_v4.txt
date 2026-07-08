@@ -726,8 +726,59 @@ function salvar(ss, tipo, reg) {
   if (key==="vi") l=[reg.id||"",agora,reg.data||"",reg.tipo||"",reg.vitima_nome||"",reg.endereco||"",reg.resultado||"",reg.proxima_acao||""];
   if (key==="fr") l=[reg.id||"",reg.ocorrenciaId||"",reg.data||"",reg.vitima_nome||"",reg.nivel||"",reg.sim||0,reg.naoSabe||0,reg.respostas||"[]",reg.relatorio||"",reg.responsavel||"",reg.anexo_nome||"",reg.anexo_tipo||"",reg.anexo_b64||""];
   if (!l) return {ok:false, erro:"Tipo não mapeado: "+key};
+  // Upsert por id — evita duplicar a linha quando o mesmo registro é reenviado
+  // (ex: botão "Sincronizar tudo com a planilha" chamado mais de uma vez).
+  if (aba.getLastRow()>=2) {
+    var idsExist = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+    for (var iu=0; iu<idsExist.length; iu++) {
+      if (String(idsExist[iu][0]).trim()===String(reg.id).trim()) {
+        var nu = iu+2;
+        aba.getRange(nu,1,1,l.length).setValues([l]);
+        return {ok:true, id:reg.id, acao:"atualizado"};
+      }
+    }
+  }
   aba.appendRow(l);
   return {ok:true, id:reg.id, acao:"inserido"};
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  LIMPEZA — remove linhas duplicadas por id (rodar manualmente 1x
+//  no editor do Apps Script, apos o bug de duplicacao no salvar() ser
+//  corrigido, para remover as duplicatas ja gravadas na planilha)
+// ══════════════════════════════════════════════════════════════════
+function dedupAbaPorId(key) {
+  var ss = getSS();
+  var aba = getAba(ss, key);
+  if (!aba || aba.getLastRow()<2) return {ok:false, erro:"Aba vazia ou inexistente: "+key};
+  var nCols = aba.getLastColumn();
+  var rows = aba.getRange(2,1,aba.getLastRow()-1,nCols).getValues();
+  var vistos = {};
+  var linhasFinais = [];
+  var duplicatas = 0;
+  // Mantem a ULTIMA ocorrencia de cada id (mais recente costuma vir depois)
+  for (var i=rows.length-1; i>=0; i--) {
+    var id = String(rows[i][0]).trim();
+    if (!id || vistos[id]) { duplicatas++; continue; }
+    vistos[id] = true;
+    linhasFinais.unshift(rows[i]);
+  }
+  aba.getRange(2,1,rows.length,nCols).clearContent();
+  if (linhasFinais.length>0) aba.getRange(2,1,linhasFinais.length,nCols).setValues(linhasFinais);
+  return {ok:true, aba:key, totalAntes:rows.length, totalDepois:linhasFinais.length, duplicatasRemovidas:duplicatas};
+}
+
+// Roda a limpeza nas abas mais propensas a duplicacao (ag=agendamentos, at=atendimentos, vi=visitas).
+// Para executar: selecione esta funcao no editor do Apps Script e clique em "Executar".
+// Ver o resultado em "Ver" > "Registros de execucao" (Logs).
+function dedupAgendamentosAtendimentosVisitas() {
+  var resAg = dedupAbaPorId("ag");
+  var resAt = dedupAbaPorId("at");
+  var resVi = dedupAbaPorId("vi");
+  Logger.log("agendamentos: " + JSON.stringify(resAg));
+  Logger.log("atendimentos: " + JSON.stringify(resAt));
+  Logger.log("visitas: " + JSON.stringify(resVi));
+  return {agendamentos:resAg, atendimentos:resAt, visitas:resVi};
 }
 
 // ══════════════════════════════════════════════════════════════════
