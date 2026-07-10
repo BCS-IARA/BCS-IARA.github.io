@@ -882,11 +882,33 @@ function editarOc(ss, id, campos) {
         var val=campos[campo]; if(typeof val==="boolean") val=val?"Sim":"Não";
         aba.getRange(linha,col).setValue(val);
       });
+      // Atualiza a coluna 2 (marca de tempo da ultima escrita) — usada pelo
+      // frontend para detectar que este registro mudou em outro aparelho.
+      aba.getRange(linha,2).setValue(Utilities.formatDate(new Date(),"America/Bahia","dd/MM/yyyy HH:mm:ss"));
       registrarLog(ss,"editar","oc","ID:"+id+" | "+Object.keys(campos).join(", "));
       return {ok:true,id:id};
     }
   }
   return {ok:false,erro:"ID não encontrado: "+id};
+}
+
+// Retorna so id/situacao/marca-de-tempo de TODAS as ocorrencias — leve, usado
+// para detectar mudanca de situacao feita em outro aparelho (nao inclui
+// narrativa/vitima/etc para manter a resposta pequena e nao repetir o
+// erro 400 do proxy do Apps Script em respostas grandes).
+function lerOcsResumo(ss) {
+  var aba = getAba(ss, "oc");
+  if (!aba || aba.getLastRow()<2) return [];
+  var n = aba.getLastRow()-1;
+  var ids   = aba.getRange(2,1,n,1).getValues();
+  var datas = aba.getRange(2,2,n,1).getValues();
+  var sits  = aba.getRange(2,27,n,1).getValues();
+  var out = [];
+  for (var i=0;i<n;i++) {
+    if (!ids[i][0]) continue;
+    out.push({id:String(ids[i][0]), dataLancamento:String(datas[i][0]||""), situacao:String(sits[i][0]||"nova")});
+  }
+  return out;
 }
 
 function deletarRegistro(ss, tipo, id) {
@@ -986,6 +1008,7 @@ function doGet(e) {
 
     // ── SITUAÇÃO DA OCORRÊNCIA (triagem) ────────────────────────────
     if(acao==="atualizarSituacaoOc") return saida(editarOc(ss,e.parameter.id||"",{situacao:e.parameter.situacao||"nova"}),cb);
+    if(acao==="listar"&&tipo==="ocorrencias_resumo") return saida({ok:true,dados:lerOcsResumo(ss)},cb);
 
     // ── PROJETOS SOCIAIS ────────────────────────────────────────────
     if(acao==="salvar"&&tipo==="projeto_social"){var dPS={};try{dPS=JSON.parse(e.parameter.dados||"{}");}catch(ex){}return saida(salvarProjetoSocial(ss,dPS),cb);}

@@ -878,9 +878,44 @@ function _salvarLocalSemSync(){
   }catch(e){ console.error("[BCS] _salvarLocalSemSync:",e); }
 }
 
+// Sincroniza a SITUAÇÃO das ocorrências entre aparelhos.
+// Não existe (ainda) um pull completo de ocorrências do Sheets — cada
+// aparelho só empurra o que cria/edita localmente. Isso fazia mudanças de
+// situação (ex: enviar da Triagem, reabrir do Histórico) feitas num
+// aparelho nunca aparecerem nos outros. Esta função busca só um resumo
+// leve (id + situação + marca de tempo) de TODAS as ocorrências — nunca
+// a narrativa/vítima/etc — para não repetir o erro de payload grande.
+async function _sincronizarSituacoesOc(){
+  if(!SHEETS_URL) return;
+  try{
+    var r = await _sheetsGet({acao:"listar", tipo:"ocorrencias_resumo"});
+    if(!r || !r.ok || !Array.isArray(r.dados)) return;
+    var vistos = {};
+    try{ vistos = JSON.parse(localStorage.getItem("bcs_oc_ts_vistos")||"{}"); }catch(e0){}
+    var ocsPorId = {};
+    (state.db.ocorrencias||[]).forEach(function(o){ if(o.id) ocsPorId[String(o.id)]=o; });
+    var mudou = false;
+    r.dados.forEach(function(rem){
+      var loc = ocsPorId[rem.id];
+      if(!loc) return; // registro só existe no Sheets — fora do escopo desta correção
+      var tsVisto = vistos[rem.id];
+      if(rem.dataLancamento && rem.dataLancamento!==tsVisto){
+        vistos[rem.id] = rem.dataLancamento;
+        if(rem.situacao && rem.situacao!==loc.situacao){
+          loc.situacao = rem.situacao;
+          mudou = true;
+        }
+      }
+    });
+    localStorage.setItem("bcs_oc_ts_vistos", JSON.stringify(vistos));
+    if(mudou){ salvarLocal(); render(); console.log("[BCS] Situações de ocorrências atualizadas via Sheets"); }
+  }catch(e){ console.log("[BCS] Erro ao sincronizar situações de ocorrências:", e); }
+}
+
 async function carregarDadosAppDoSheets(){
   if(!SHEETS_URL) return;
   try{
+    _sincronizarSituacoesOc();
     var projetos          = await lerDadoAppSheets("bcs_projetos");
     // Carrega eventos avulsos da aba da planilha (fonte primária) + ScriptProperties (fallback)
     var _evAba = await _sheetsGet({acao:"listar",tipo:"eventos_avulsos"});
