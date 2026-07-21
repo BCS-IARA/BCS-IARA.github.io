@@ -23882,6 +23882,22 @@ function _invConfAtualizarBarra(){
   if(barLbl) barLbl.textContent=done+"/"+total+" itens · "+pct+"%";
 }
 
+// Atualiza os status dos itens já renderizados (ex: marcados por outro aparelho) SEM
+// remontar a lista inteira — remontar recalcula os itens válidos a partir de state.invItens,
+// e uma sincronização de fundo nesse meio-tempo podia fazer um item sumir da tela por um instante.
+function _invConfAtualizarSilencioso(){
+  var conf=window._invConfAtual;
+  if(!conf||!document.getElementById("modal-inv-conf")) return;
+  document.querySelectorAll(".inv-conf-item").forEach(function(el){
+    var iid=el.id.replace("inv-ci-","");
+    var raw=conf.itens?conf.itens[iid]:null;
+    var status=(raw&&typeof raw==="object")?(raw.status||"pendente"):(raw||"pendente");
+    _invConfAtualizarBotoes(iid,status);
+  });
+  _invConfAtualizarBarra();
+  if(typeof _invConfFiltrar==="function") _invConfFiltrar();
+}
+
 function _invConfSelecionarCat(itemId, cat){
   var conf=window._invConfAtual; if(!conf) return;
   var cur=conf.itens[itemId]||{};
@@ -24502,13 +24518,14 @@ function renderInventario(main){
     if(state.tela!=="inventario"){ clearInterval(state._invPollTimer); return; }
     state._invLastSync=0;
     _invSincronizarDoSheets().then(function(){
+      // Se a conferência estiver aberta, NÃO remonta a lista (evita item sumir da tela
+      // por causa da sincronização de fundo) — só atualiza os status já visíveis.
+      if(document.getElementById("modal-inv-conf")){
+        _invConfAtualizarSilencioso();
+        return;
+      }
       var m=document.getElementById("main-content")||document.getElementById("main");
       if(m&&state.tela==="inventario") renderInventario(m);
-      var modalAberto=document.getElementById("modal-inv-conf");
-      if(modalAberto&&window._invConfAtual){
-        modalAberto.remove();
-        _invRenderConferencia(window._invConfAtual);
-      }
     });
   },30000);
 
