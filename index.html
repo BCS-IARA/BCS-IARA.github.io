@@ -24116,6 +24116,12 @@ function _invSalvarConferencia(confId, concluir){
   if(main) renderInventario(main);
 }
 
+function _invFiltroSecaoOnChange(val){
+  var partes=(val||"").split("|||");
+  state._invFiltLoc=partes[0]||"";
+  state._invFiltSubLoc=partes[1]||"";
+  _invAplicarFiltros();
+}
 function _invAplicarFiltros(resetPage){
   if(resetPage!==false) state._invPage=0;
   var main=document.getElementById("main-content")||document.getElementById("main");
@@ -24531,7 +24537,7 @@ function renderInventario(main){
   h+="<button onclick='_invAbrirImport()' title='Importar Lista' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#a07c58;padding:8px 12px;font-size:13px;cursor:pointer'>📤</button>";
   if((state.invItens||[]).length) h+="<button onclick='_invLimparTodos()' title='Limpar Tudo' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#A8492E;padding:8px 12px;font-size:13px;cursor:pointer'>🗑</button>";
   h+="<button onclick='_invGerarPDF()' title='Exportar PDF' style='background:transparent;border:none;color:#a07c58;padding:8px 12px;font-size:13px;cursor:pointer'>📄</button>";
-  if(state._invFiltLoc) h+="<button onclick='_invGerarPDFSecao(\""+esc(state._invFiltLoc)+"\")' title='PDF da Seção' style='background:transparent;border:none;border-left:1px solid #5e4636;color:#6E8F52;padding:8px 12px;border-radius:7px;font-size:13px;cursor:pointer'>📄+</button>";
+  if(state._invFiltLoc) h+="<button onclick='_invGerarPDFSecao(\""+esc(state._invFiltLoc)+"\",\""+esc(state._invFiltSubLoc||"")+"\")' title='PDF da "+(state._invFiltSubLoc?"Sublocalização":"Seção")+"' style='background:transparent;border:none;border-left:1px solid #5e4636;color:#6E8F52;padding:8px 12px;border-radius:7px;font-size:13px;cursor:pointer'>📄+</button>";
   h+="</div>";
   h+="<button onclick='_invExportarConferenciasLocais()' title='Exportar conferências salvas neste celular (sem sincronizar)' style='background:rgba(110,143,82,0.12);border:1.5px solid #6E8F52;color:#6E8F52;padding:8px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer'>📋 Exportar Local</button>";
   h+="<button onclick='_invAbrirItem(null)' style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>+ Novo Item</button>";
@@ -24609,20 +24615,33 @@ function renderInventario(main){
     Object.keys(INV_ESTADOS).forEach(function(k){h+="<option value='"+k+"'"+(filtEst===k?" selected":"")+">"+INV_ESTADOS[k].label+"</option>";});
     h+="</select>";
     var filtLoc=state._invFiltLoc||"";
-    var _locsUsadas=[];var _locsSet={};
-    (itens).forEach(function(x){var l=x.localizacao||"";if(l&&!_locsSet[l]){_locsSet[l]=1;_locsUsadas.push(l);}});
+    var filtSubLoc=state._invFiltSubLoc||"";
+    var _locSubMap={};var _locsUsadas=[];
+    (itens).forEach(function(x){
+      var l=x.localizacao||""; if(!l) return;
+      if(!_locSubMap[l]){_locSubMap[l]=[];_locsUsadas.push(l);}
+      var s=x.sublocalizacao||"";
+      if(s && _locSubMap[l].indexOf(s)<0) _locSubMap[l].push(s);
+    });
     _locsUsadas.sort();
-    h+="<select onchange='state._invFiltLoc=this.value;_invAplicarFiltros()' style='background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:7px;font-size:13px'>";
+    h+="<select onchange='_invFiltroSecaoOnChange(this.value)' style='background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:7px;font-size:13px'>";
     h+="<option value=''>Todas as seções</option>";
-    _locsUsadas.forEach(function(l){h+="<option value='"+esc(l)+"'"+(filtLoc===l?" selected":"")+">"+esc(l)+"</option>";});
+    _locsUsadas.forEach(function(l){
+      h+="<option value='"+esc(l)+"'"+(filtLoc===l&&!filtSubLoc?" selected":"")+">"+esc(l)+"</option>";
+      _locSubMap[l].sort().forEach(function(s){
+        h+="<option value='"+esc(l)+"|||"+esc(s)+"'"+(filtLoc===l&&filtSubLoc===s?" selected":"")+">"+"   › "+esc(s)+"</option>";
+      });
+    });
     h+="</select>";
     h+="</div>";
 
     var filtLoc=state._invFiltLoc||"";
+    var filtSubLoc=state._invFiltSubLoc||"";
     var filtered=itens.filter(function(x){
       if(filtCat && x.categoria!==filtCat) return false;
       if(filtEst && x.estado!==filtEst) return false;
       if(filtLoc && (x.localizacao||"")!==filtLoc) return false;
+      if(filtSubLoc && (x.sublocalizacao||"")!==filtSubLoc) return false;
       if(filtBusca){
         var hay=(x.descricao||"")+" "+(x.tombamento||"")+" "+(x.marca||"")+" "+(x.modelo||"")+" "+(x.localizacao||"")+" "+(x.sublocalizacao||"")+" "+(x.numero_serie||"");
         if(hay.toLowerCase().indexOf(filtBusca)<0) return false;
@@ -25433,10 +25452,13 @@ function _invGerarPDF(){
   if(w){ w.document.write(h); w.document.close(); setTimeout(function(){w.print();},500); }
 }
 
-function _invGerarPDFSecao(secao){
-  var itens=(state.invItens||[]).filter(function(x){return x.ativo!==false && (x.localizacao||"")=== secao;});
+function _invGerarPDFSecao(secao, sublocal){
+  var itens=(state.invItens||[]).filter(function(x){
+    return x.ativo!==false && (x.localizacao||"")===secao && (!sublocal || (x.sublocalizacao||"")===sublocal);
+  });
+  var tituloSecao = sublocal ? (secao+" › "+sublocal) : secao;
   var dt=new Date().toLocaleString("pt-BR");
-  var h="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Inventário — "+secao+"</title><style>";
+  var h="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Inventário — "+esc(tituloSecao)+"</title><style>";
   h+="body{font-family:Arial,sans-serif;font-size:10px;color:#111;margin:0;padding:16px}";
   h+="h1{font-size:16px;color:#1a3a1a;margin-bottom:2px}";
   h+=".header{border-bottom:2px solid #1a3a1a;padding-bottom:8px;margin-bottom:14px}";
@@ -25449,7 +25471,7 @@ function _invGerarPDFSecao(secao){
   h+="@media print{body{padding:6px}@page{margin:1cm}}";
   h+="</style></head><body>";
   h+="<div class='header'>";
-  h+="<h1>📦 Inventário — Seção: "+esc(secao)+"</h1>";
+  h+="<h1>📦 Inventário — Seção: "+esc(tituloSecao)+"</h1>";
   h+="<div style='color:#555;font-size:9px'>77ª CIPM BCS &nbsp;|&nbsp; Gerado em: "+dt+" &nbsp;|&nbsp; Total: <b>"+itens.length+"</b> itens</div>";
   h+="</div>";
   // Agrupa por categoria
@@ -25457,7 +25479,7 @@ function _invGerarPDFSecao(secao){
     var ci=itens.filter(function(x){return x.categoria===cat;});
     if(!ci.length) return;
     h+="<div class='cat-title'>"+INV_CATS[cat].icon+" "+INV_CATS[cat].label+" ("+ci.length+")</div>";
-    h+="<table><tr><th>#</th><th>Tombamento</th><th>Descrição</th><th>Marca/Modelo</th><th>Estado</th><th class='emp'>Responsável</th></tr>";
+    h+="<table><tr><th>#</th><th>Tombamento</th><th>Descrição</th><th>Marca/Modelo</th><th>Estado</th>"+(sublocal?"":"<th>Sublocal</th>")+"<th class='emp'>Responsável</th></tr>";
     ci.forEach(function(item,i){
       var est=INV_ESTADOS[item.estado]||{label:item.estado||"—"};
       var emprego="—";
@@ -25468,11 +25490,11 @@ function _invGerarPDFSecao(secao){
       }
       h+="<tr><td>"+(i+1)+"</td><td>"+esc(item.tombamento||"—")+"</td><td><b>"+esc(item.descricao||"—")+"</b>"+(item.numero_serie?"<br><small>Série: "+esc(item.numero_serie)+"</small>":"")+"</td>";
       h+="<td>"+esc([item.marca,item.modelo].filter(Boolean).join(" ")||"—")+"</td>";
-      h+="<td>"+esc(est.label)+"</td><td class='emp'>"+esc(emprego)+"</td></tr>";
+      h+="<td>"+esc(est.label)+"</td>"+(sublocal?"":"<td>"+esc(item.sublocalizacao||"—")+"</td>")+"<td class='emp'>"+esc(emprego)+"</td></tr>";
     });
     h+="</table>";
   });
-  h+="<div class='tot'>Total: "+itens.length+" item(ns) na seção <b>"+esc(secao)+"</b></div>";
+  h+="<div class='tot'>Total: "+itens.length+" item(ns) na seção <b>"+esc(tituloSecao)+"</b></div>";
   h+="</body></html>";
   var w=window.open("","_blank");
   if(w){ w.document.write(h); w.document.close(); setTimeout(function(){w.print();},500); }
