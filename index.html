@@ -15552,6 +15552,9 @@ function renderTela() {
       // ── Restaurar rascunho se saiu sem salvar ──
       (function(){
         var r=state._rascOcForm;
+        if(!r){
+          try{ var _raw=localStorage.getItem("bcs_rasc_oc_form"); if(_raw) r=JSON.parse(_raw); }catch(e){}
+        }
         if(!r) return;
         var ids=["oc-numero","oc-relatorio","oc-posto","oc-tipo","oc-data","oc-hora","oc-zona",
                  "oc-local","oc-referencia","oc-bairro","oc-municipio",
@@ -15615,7 +15618,7 @@ function renderTela() {
 
       // Botões
       document.getElementById("btn-cancelar-lancar").onclick=function(){
-        state._rascOcForm = null;
+        _limparRascOcForm();
         var retorno = state._lancarRetornoGestor;
         state._lancarRetornoGestor = false;
         state.tela = retorno ? "ocorrencias" : "dashboard";
@@ -15691,7 +15694,7 @@ function renderTela() {
           enviarSheets("ocorrencias",oc);
           salvarLocal();
           window._vitimaIdSelecionada = null;
-          state._rascOcForm = null;
+          _limparRascOcForm();
           showToast("✓ Ocorrência lançada com sucesso!");
           var retorno = state._lancarRetornoGestor;
           state._lancarRetornoGestor = false;
@@ -16756,12 +16759,37 @@ function _salvarRascOcForm(){
   r._pols=pols;
   if(Object.keys(r).some(function(k){ return k!=="oc-data"&&k!=="oc-hora"&&k!=="oc-posto"&&k!=="oc-municipio"&&k!=="oc-zona"&&r[k]; })){
     state._rascOcForm=r;
+    try{ localStorage.setItem("bcs_rasc_oc_form", JSON.stringify(r)); }catch(e){}
   }
+}
+function _limparRascOcForm(){
+  state._rascOcForm=null;
+  try{ localStorage.removeItem("bcs_rasc_oc_form"); }catch(e){}
 }
 function setTela(t){
   if(state.tela==="lancar") _salvarRascOcForm();
   state.tela=t; closeSidebar(); render();
 }
+// Salva o rascunho automaticamente enquanto o formulário de ocorrência está aberto —
+// protege contra perda de dados ao minimizar o app/aba (o navegador pode descartar
+// a página por falta de memória) e não apenas ao navegar dentro do app.
+(function(){
+  var _rascOcSaveT=null;
+  document.addEventListener("input", function(e){
+    if(state.tela!=="lancar") return;
+    clearTimeout(_rascOcSaveT);
+    _rascOcSaveT=setTimeout(_salvarRascOcForm, 600);
+  });
+  document.addEventListener("change", function(e){
+    if(state.tela==="lancar") _salvarRascOcForm();
+  });
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState==="hidden" && state.tela==="lancar") _salvarRascOcForm();
+  });
+  window.addEventListener("pagehide", function(){
+    if(state.tela==="lancar") _salvarRascOcForm();
+  });
+})();
 
 function updateNavBtns(){
   document.querySelectorAll(".nav-btn").forEach(b=>{
@@ -22354,7 +22382,7 @@ async function _invUploadFoto(itemId, base64, nomeItem){
 
 // Salva item e envia foto para Drive em background
 function _invEnviarFotoEAtualizarItem(item){
-  if(!item.foto||item.foto.startsWith("http")||item.foto==="[foto_local]") return;
+  if(!item.foto||item.foto.startsWith("http")||item.foto==="[foto_local]"||item.foto==="[foto_drive]") return;
   _invUploadFoto(item.id, item.foto, item.descricao).then(function(url){
     if(!url) return;
     var idx=(state.invItens||[]).findIndex(function(x){return x.id===item.id;});
@@ -22616,13 +22644,34 @@ function _invAtualizarSublocais(){
   if(!loc||!sl) return;
   var locObj=(_invGetLocaisObj()).find(function(o){return o.nome===loc.value;})||{sublocais:[]};
   var subs=locObj.sublocais||[];
-  if(subs.length===0){
-    sl.innerHTML="<option value=''>— Nenhuma sublocalização —</option>";
-    sl.disabled=true; sl.style.opacity="0.5";
-  } else {
-    sl.innerHTML="<option value=''>— Nenhuma —</option>"+subs.map(function(s){return "<option value='"+esc(s)+"'>"+esc(s)+"</option>";}).join("");
-    sl.disabled=false; sl.style.opacity="1";
+  sl.innerHTML="<option value=''>— Nenhuma —</option>"+subs.map(function(s){return "<option value='"+esc(s)+"'>"+esc(s)+"</option>";}).join("");
+  sl.disabled=false; sl.style.opacity="1";
+  var addRow=document.getElementById("inv-sublocal-add");
+  if(addRow){
+    addRow.setAttribute("data-locid", locObj.id||"");
+    addRow.style.display = subs.length===0?"flex":"none";
+    var addInput=document.getElementById("inv-novosub-item");
+    if(addInput){ addInput.value=""; addInput.placeholder="Nova sublocalização em "+loc.value; }
   }
+}
+function _invAddSublocalNoItem(){
+  var locSel=document.getElementById("inv-local");
+  var input=document.getElementById("inv-novosub-item");
+  if(!locSel||!input) return;
+  var n=input.value.trim();
+  if(!n){showToast("Digite o nome da sublocalização","error");return;}
+  var locs=_invGetLocaisObj();
+  var loc=locs.find(function(l){return l.nome===locSel.value;});
+  if(!loc){showToast("Selecione a localização primeiro","error");return;}
+  if(!loc.sublocais) loc.sublocais=[];
+  if(loc.sublocais.indexOf(n)>=0){showToast("Sublocalização já existe","error");return;}
+  loc.sublocais.push(n);
+  state.invLocais=locs;
+  _invSalvarLocal();
+  _invAtualizarSublocais();
+  var sl=document.getElementById("inv-sublocal");
+  if(sl) sl.value=n;
+  showToast("Sublocalização \""+n+"\" criada","success");
 }
 
 function _invSetTipoCarga(tipo){
@@ -22660,7 +22709,7 @@ function _invAbrirItem(id){
   if(_subAtual&&!(_locSelObj.sublocais||[]).includes(_subAtual)){
     sublocOpts="<option value='"+esc(_subAtual)+"' selected style='color:#e87c23'>"+esc(_subAtual)+" ⚠</option>"+sublocOpts;
   }
-  var sublocDisabled=(_locSelObj.sublocais||[]).length===0&&!_subAtual?"disabled":"";
+  var sublocSemCadastro=(_locSelObj.sublocais||[]).length===0;
   var stOpts = Object.keys(INV_ESTADOS).map(function(k){return "<option value='"+k+"'"+(item&&item.estado===k?" selected":"")+((!item)&&k==="bom"?" selected":"")+">"+INV_ESTADOS[k].label+"</option>";}).join("");
   var subOpts = subs.map(function(s){return "<option"+(item&&item.subcategoria===s?" selected":"")+">"+s+"</option>";}).join("");
   var tipoCarga = item?(item.tipo_carga||"none"):"none";
@@ -22703,7 +22752,11 @@ function _invAbrirItem(id){
   html += "<div><label style='color:#6B5236;font-size:11px'>Localização*</label><select id='inv-local' onchange='_invAtualizarSublocais()' style='"+ISm+"'>"+locOpts+"</select></div>";
   html += "</div>";
   html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
-  html += "<div><label style='color:#6B5236;font-size:11px'>Sublocalização</label><select id='inv-sublocal' "+sublocDisabled+" style='"+ISm+(sublocDisabled?" opacity:0.5":"")+"'><option value=''>— Nenhuma —</option>"+sublocOpts+"</select></div>";
+  html += "<div><label style='color:#6B5236;font-size:11px'>Sublocalização</label><select id='inv-sublocal' style='"+ISm+"'><option value=''>— Nenhuma —</option>"+sublocOpts+"</select>";
+  html += "<div id='inv-sublocal-add' data-locid='"+esc(_locSelObj.id||"")+"' style='display:"+(sublocSemCadastro?"flex":"none")+";gap:6px;margin-top:6px'>";
+  html += "<input id='inv-novosub-item' placeholder='Nova sublocalização em "+esc(_locSelNome)+"' style='flex:1;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:6px;border-radius:6px;font-size:12px'>";
+  html += "<button type='button' onclick='_invAddSublocalNoItem()' style='background:#2a1c10;border:1px solid #A87B22;color:#D9A53C;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap'>+ Sub</button>";
+  html += "</div></div>";
   html += "<div><label style='color:#6B5236;font-size:11px'>Data Aquisição</label><input id='inv-dtaq' type='date' value='"+(item?item.data_aquisicao||"":"")+"' style='"+ISm+"'></div>";
   html += "</div>";
 
@@ -23899,19 +23952,24 @@ function _invConfExpandir(itemId){
 
 function _invConfFoto(itemId, input){
   if(!input.files||!input.files[0]) return;
-  _invComprimirFoto(input.files[0], function(blob){
-    _invUploadFoto(blob, "conf_"+itemId, function(link){
-      if(!link) return;
-      _invConfDetalhe(itemId,"foto_link",link);
-      var panel=document.getElementById("inv-ci-det-"+itemId);
-      if(panel){
-        var old=panel.querySelector("a[href]");
-        var lbl='<a href="'+link+'" target="_blank" style="color:#D9A53C;font-size:11px">📷 Ver foto</a>';
-        if(old) old.outerHTML=lbl; else panel.insertAdjacentHTML("beforeend",lbl);
-      }
-      showToast("✓ Foto anexada!");
+  var file=input.files[0];
+  var reader=new FileReader();
+  reader.onload=function(e){
+    _invComprimirFoto(e.target.result, function(compressed){
+      _invUploadFoto(itemId, compressed, "conf_"+itemId).then(function(link){
+        if(!link){ showToast("Falha ao enviar foto","error"); return; }
+        _invConfDetalhe(itemId,"foto_link",link);
+        var panel=document.getElementById("inv-ci-det-"+itemId);
+        if(panel){
+          var old=panel.querySelector("a[href]");
+          var lbl='<a href="'+link+'" target="_blank" style="color:#D9A53C;font-size:11px">📷 Ver foto</a>';
+          if(old) old.outerHTML=lbl; else panel.insertAdjacentHTML("beforeend",lbl);
+        }
+        showToast("✓ Foto anexada!");
+      });
     });
-  });
+  };
+  reader.readAsDataURL(file);
 }
 
 function _invGerarFIBM(confId){
@@ -24063,6 +24121,20 @@ function _invAplicarFiltros(resetPage){
   var main=document.getElementById("main-content")||document.getElementById("main");
   if(main) renderInventario(main);
 }
+
+// Busca de itens — debounce para não travar a cada tecla, e restaura foco/cursor após o re-render
+window._invBuscaOnInput=function(el){
+  state._invFiltBusca=el.value;
+  state._invPage=0;
+  var pos=el.selectionStart;
+  clearTimeout(window._invBuscaT);
+  window._invBuscaT=setTimeout(function(){
+    var main=document.getElementById("main-content")||document.getElementById("main");
+    if(main) renderInventario(main);
+    var novo=document.getElementById("inv-busca-itens");
+    if(novo){ novo.focus(); try{ novo.setSelectionRange(pos,pos); }catch(e){} }
+  }, el.value ? 350 : 0);
+};
 
 window._invSyncListaConferencias=function(silencioso){
   var btn=document.getElementById("btn-conf-sync-lista");
@@ -24527,7 +24599,7 @@ function renderInventario(main){
   if(tab==="itens"){
     // Filtros
     h+="<div style='display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center'>";
-    h+="<input oninput='state._invFiltBusca=this.value;clearTimeout(window._invBuscaT);window._invBuscaT=setTimeout(_invAplicarFiltros,350)' value='"+esc(state._invFiltBusca||"")+"' placeholder='🔍 Buscar...' style='flex:1;min-width:140px;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px 10px;border-radius:7px;font-size:13px'>";
+    h+="<input id='inv-busca-itens' oninput='_invBuscaOnInput(this)' value='"+esc(state._invFiltBusca||"")+"' placeholder='🔍 Buscar...' style='flex:1;min-width:140px;background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px 10px;border-radius:7px;font-size:13px'>";
     h+="<select onchange='state._invFiltCat=this.value;_invAplicarFiltros()' style='background:#1a1a1a;border:1px solid #333;color:#e8e0d0;padding:8px;border-radius:7px;font-size:13px'>";
     h+="<option value=''>Todas categorias</option>";
     Object.keys(INV_CATS).forEach(function(k){h+="<option value='"+k+"'"+(filtCat===k?" selected":"")+">"+INV_CATS[k].label+"</option>";});
