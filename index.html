@@ -23455,9 +23455,11 @@ function _invAbrirConferencia(confId){
   _invAbrirConferencia2(confLocal, true /* sincronizar do Sheets ao abrir */);
 }
 function _invAbrirConferencia2(conf, sincronizar){
-  // Se sincronizar=true: busca dados frescos do Sheets e mescla antes de abrir o modal
+  // Se sincronizar=true: busca dados frescos do Sheets EM PARALELO enquanto o
+  // policial escolhe o nome — o modal abre na hora, sem esperar a rede
+  var _syncPromise=null;
   if(sincronizar){
-    _sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(r){
+    _syncPromise=_sheetsGet({acao:"listar",tipo:"inv_conferencias"}).then(function(r){
       if(r&&r.ok&&Array.isArray(r.dados)){
         r.dados.forEach(function(c){
           if(typeof c.itens==="string"){try{c.itens=JSON.parse(c.itens);}catch(e){c.itens={};}}
@@ -23489,11 +23491,10 @@ function _invAbrirConferencia2(conf, sincronizar){
           _invConfEnviarItemSheets(conf.id, iid, _itensAbs[iid]);
         });
         if(Object.keys(_itensAbs).length) console.log("[INV] "+Object.keys(_itensAbs).length+" itens absorvidos e enviados ao Sheets");
-        conf=confAtualizada;
+        return confAtualizada;
       }
-      _invAbrirConferencia2(conf, false);
-    }).catch(function(){ _invAbrirConferencia2(conf, false); });
-    return;
+      return conf;
+    }).catch(function(){ return conf; });
   }
   // Sempre pede quem está conferindo (não persiste — sempre pergunta ao abrir)
   function _polAtivos(){
@@ -23501,6 +23502,10 @@ function _invAbrirConferencia2(conf, sincronizar){
       .sort(function(a,b){return (a.nome||"").localeCompare(b.nome||"");});
   }
   var polOpts=_polAtivos();
+  function _polAssinatura(lista){
+    return lista.map(function(p){return String(p.matricula)+"|"+(p.nome||"")+"|"+(p.posto||"");}).join(";");
+  }
+  var _polAssinAtual=_polAssinatura(polOpts);
   var IS="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:9px;border-radius:6px;font-size:13px;box-sizing:border-box;min-height:42px";
   var mc=document.createElement("div");
   mc.id="modal-inv-conferente";
@@ -23515,7 +23520,7 @@ function _invAbrirConferencia2(conf, sincronizar){
     "<p id='conf-pol-status' style='color:#a07c58;font-size:10px;margin:6px 0 0;text-align:center'>Atualizando lista…</p>" +
     "<div style='margin-top:14px;display:flex;gap:10px;justify-content:center'>" +
     "<button onclick='document.getElementById(\"modal-inv-conferente\").remove()' style='background:transparent;border:1px solid #DBC79E;color:#6B5236;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>" +
-    "<button onclick='_invConfirmarConferente()' style='background:#1a3a1a;border:2px solid #3a7a4a;color:#a0d0a0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;min-height:42px'>Confirmar</button>" +
+    "<button id='btn-conf-conferente' onclick='_invConfirmarConferente()' style='background:#1a3a1a;border:2px solid #3a7a4a;color:#a0d0a0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;min-height:42px'>Confirmar</button>" +
     "</div></div>";
   document.body.appendChild(mc);
 
@@ -23529,7 +23534,12 @@ function _invAbrirConferencia2(conf, sincronizar){
       if(selEl){
         var valorAtual=selEl.value;
         polOpts=_polAtivos();
-        selEl.innerHTML="<option value=''>— selecione —</option>"+polOpts.map(function(p){return "<option value='"+esc(p.matricula)+"'"+(p.matricula===valorAtual?" selected":"")+">"+esc((p.posto?p.posto+" ":"")+p.nome+" ("+p.matricula+")")+"</option>";}).join("");
+        // Só reconstruir se a lista realmente mudou — reconstruir fecha o dropdown nativo no celular e perde a seleção
+        var novaAssin=_polAssinatura(polOpts);
+        if(novaAssin!==_polAssinAtual){
+          _polAssinAtual=novaAssin;
+          selEl.innerHTML="<option value=''>— selecione —</option>"+polOpts.map(function(p){return "<option value='"+esc(p.matricula)+"'"+(String(p.matricula)===String(valorAtual)?" selected":"")+">"+esc((p.posto?p.posto+" ":"")+p.nome+" ("+p.matricula+")")+"</option>";}).join("");
+        }
       }
     }
     if(statusEl) statusEl.remove();
@@ -23538,11 +23548,22 @@ function _invAbrirConferencia2(conf, sincronizar){
   var _confRef=conf;
   window._invConfirmarConferente=function(){
     var mat=document.getElementById("sel-conferente").value;
-    var pol=polOpts.find(function(p){return p.matricula===mat;});
+    // String() dos dois lados: a matrícula vinda do Sheets pode chegar como número,
+    // e o value do <select> é sempre texto — igualdade estrita falhava e travava aqui
+    var pol=polOpts.find(function(p){return String(p.matricula)===String(mat);});
     if(!pol){showToast("Selecione o conferente","error");return;}
-    window._invConferenteAtual={nome:pol.nome,matricula:pol.matricula,posto:pol.posto||""};
-    mc.remove();
-    _invRenderConferencia(_confRef);
+    window._invConferenteAtual={nome:pol.nome,matricula:String(pol.matricula),posto:pol.posto||""};
+    if(_syncPromise){
+      var btnC=document.getElementById("btn-conf-conferente");
+      if(btnC){btnC.disabled=true;btnC.textContent="🔄 Carregando…";}
+      _syncPromise.then(function(confAtual){
+        mc.remove();
+        _invRenderConferencia(confAtual||_confRef);
+      });
+    } else {
+      mc.remove();
+      _invRenderConferencia(_confRef);
+    }
   };
 }
 function _invRenderConferencia(conf){
