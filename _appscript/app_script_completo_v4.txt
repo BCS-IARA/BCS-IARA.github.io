@@ -238,6 +238,50 @@ function registrarLog(ss, acao, entidade, detalhe) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  ARMAZENAMENTO GENÉRICO (chave/valor) — aba "app_kv"
+//  Substitui PropertiesService (limite fixo de ~500 KB, estourava com
+//  os blobs bcs_* fatiados). A planilha não tem esse teto.
+//  kvGet cai para PropertiesService se a chave ainda não foi migrada.
+// ══════════════════════════════════════════════════════════════════
+function _kvAba(ss) {
+  var aba = ss.getSheetByName("app_kv");
+  if (!aba) {
+    aba = ss.insertSheet("app_kv");
+    aba.getRange(1,1,1,3).setValues([["chave","valor","atualizadoEm"]])
+       .setFontWeight("bold").setBackground("#0a1a28").setFontColor("#38bdf8");
+    aba.setFrozenRows(1);
+  }
+  return aba;
+}
+
+function kvSet(ss, chave, valor) {
+  var aba = _kvAba(ss);
+  var linha = -1;
+  if (aba.getLastRow() >= 2) {
+    var chaves = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
+    for (var i = 0; i < chaves.length; i++) {
+      if (String(chaves[i][0]) === String(chave)) { linha = i+2; break; }
+    }
+  }
+  var agora = new Date().toISOString();
+  if (linha > 0) aba.getRange(linha,2,1,2).setValues([[valor||"", agora]]);
+  else aba.appendRow([chave, valor||"", agora]);
+  return { ok: true };
+}
+
+function kvGet(ss, chave) {
+  var aba = _kvAba(ss);
+  if (aba.getLastRow() >= 2) {
+    var rows = aba.getRange(2,1,aba.getLastRow()-1,2).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(chave)) return String(rows[i][1]||"");
+    }
+  }
+  var antigo = props().getProperty("app__"+chave); // dados salvos antes da migração
+  return antigo !== null ? antigo : null;
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  CARGA DE ARMAMENTO
 // ══════════════════════════════════════════════════════════════════
 function salvarCargaArmamento(ss, dados) {
@@ -950,8 +994,8 @@ function doGet(e) {
 
     if(acao==="ping"){var a=getAba(ss,"oc");return saida({ok:true,total:a?a.getLastRow()-1:0},cb);}
     if(acao==="info"){return saida({ok:true,url:getSS().getUrl(),id:getSS().getId()},cb);}
-    if(acao==="salvarDadoApp"){var ch=e.parameter.chave,vl=e.parameter.valor;if(!ch)return saida({ok:false,erro:"chave obrigatória"},cb);props().setProperty("app__"+ch,vl||"");return saida({ok:true},cb);}
-    if(acao==="lerDadoApp"){var ch2=e.parameter.chave;if(!ch2)return saida({ok:false,erro:"chave obrigatória"},cb);var vl2=props().getProperty("app__"+ch2);return saida({ok:true,valor:vl2},cb);}
+    if(acao==="salvarDadoApp"){var ch=e.parameter.chave,vl=e.parameter.valor;if(!ch)return saida({ok:false,erro:"chave obrigatória"},cb);kvSet(ss,ch,vl||"");return saida({ok:true},cb);}
+    if(acao==="lerDadoApp"){var ch2=e.parameter.chave;if(!ch2)return saida({ok:false,erro:"chave obrigatória"},cb);var vl2=kvGet(ss,ch2);return saida({ok:true,valor:vl2},cb);}
     if(acao==="editar"){var campos={};try{campos=JSON.parse(e.parameter.campos||"{}");}catch(ex){}return saida(editarOc(ss,e.parameter.id,campos),cb);}
     if(acao==="deduplicar") return saida({ok:true,removidos:dedup(ss)},cb);
     if(acao==="lerAvisos") return saida({ok:true,avisos:lerAvisos(ss)},cb);
