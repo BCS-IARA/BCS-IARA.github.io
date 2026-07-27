@@ -12815,6 +12815,7 @@ function renderFichaVitima(main, vitimaId) {
   } else {
     encs.forEach(function(e){
       var pend = e.status !== "concluido";
+      var aguardando = e.status === "aguardando_devolutiva";
       h += "<div class='card' style='margin-bottom:8px;border-left:3px solid "+(pend?"var(--ambar)":"var(--verde)")+";padding:12px 16px'>";
       h += "<div style='display:flex;align-items:flex-start;gap:10px'>";
       h += "<div style='flex:1'>";
@@ -12822,7 +12823,10 @@ function renderFichaVitima(main, vitimaId) {
       if(e.descricao) h += "<p style='font-size:12px;color:var(--tinta-2);margin:0 0 4px'>"+esc(e.descricao)+"</p>";
       h += "<p style='font-size:11px;color:var(--tinta-2);margin:0'>"+esc(e.data||"")+(e.prazo?" · prazo: "+esc(e.prazo):"")+" · <b style='color:"+(pend?"var(--ambar)":"var(--verde)")+"'>"+esc((e.status||"pendente").replace(/_/g," "))+"</b></p>";
       h += "</div>";
-      if(pend) h += "<button onclick='_concluirEnc(\""+esc(e.id)+"\",\""+esc(vitimaId||"")+"\")' style='background:var(--verde);color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0'>✓ Concluído</button>";
+      if(pend){
+        if(aguardando) h += "<button onclick='_concluirEnc(\""+esc(e.id)+"\",\""+esc(vitimaId||"")+"\")' style='background:var(--verde);color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0'>✓ Concluir</button>";
+        else h += "<button onclick='_concluirEnc(\""+esc(e.id)+"\",\""+esc(vitimaId||"")+"\")' style='background:var(--ambar);color:var(--madeira-3);border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0'>📤 Marcar enviado</button>";
+      }
       h += "</div></div>";
     });
   }
@@ -12859,6 +12863,7 @@ window._salvarEncaminhamento = function(vitimaId) {
     id: "enc_"+Date.now(),
     vitima_id: vitimaId,
     tipo: tipo,
+    orgao: tipo,
     descricao: desc,
     prazo: prazo,
     data: hoje(),
@@ -13203,11 +13208,19 @@ window._gerarDossieByNome = function(nomeVitima, ocIdRef){
 window._concluirEnc = function(encId, vitimaId) {
   var idx = (state.encaminhamentos||[]).findIndex(function(e){ return e.id===encId; });
   if(idx<0) return;
-  state.encaminhamentos[idx].status = "concluido";
+  var enc = state.encaminhamentos[idx];
+  // Fluxo: pendente/enviado → aguardando_devolutiva → concluido (mesmo da Fila de Encaminhamentos)
+  var novoStatus;
+  if(enc.status === "aguardando_devolutiva" || enc.status === "concluido"){
+    novoStatus = "concluido";
+  } else {
+    novoStatus = "aguardando_devolutiva";
+  }
+  enc.status = novoStatus;
   localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos));
   salvarLocal();
-  _sheetsGet({acao:"atualizarEncaminhamento", id:encId, campos:JSON.stringify({status:"concluido"})}).catch(function(){});
-  showToast("✓ Encaminhamento concluído");
+  _sheetsGet({acao:"atualizarEncaminhamento", id:encId, campos:JSON.stringify({status:novoStatus})}).catch(function(){});
+  showToast(novoStatus==="aguardando_devolutiva" ? "✓ Enviado — aguardando devolutiva" : "✓ Encaminhamento concluído");
   var main = document.getElementById("main");
   if(main) renderFichaVitima(main, vitimaId);
 };
@@ -14736,6 +14749,7 @@ window._salvarTriagem = function(ocId) {
       vitima_nome: oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||"",
       ocorrencia_id: ocId,
       tipo:"Conselho Tutelar",
+      orgao:"Conselho Tutelar",
       descricao:"Encaminhamento automático — menor envolvido",
       data: hoje(),
       status:"pendente",
@@ -14757,6 +14771,7 @@ window._salvarTriagem = function(ocId) {
         vitima_nome: oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||"",
         ocorrencia_id: ocId,
         tipo: cb.value,
+        orgao: cb.value,
         descricao:"",
         data: hoje(),
         status:"pendente",

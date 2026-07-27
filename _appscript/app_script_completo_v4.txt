@@ -1539,7 +1539,7 @@ function salvarEncaminhamento(ss, dados) {
     }
   }
   aba.appendRow([dados.id, dados.vitima_id||"", dados.ocorrencia_id||"",
-    dados.orgao||"", dados.situacao||"a_encaminhar",
+    dados.orgao||dados.tipo||"", dados.situacao||dados.status||"a_encaminhar",
     dados.data_envio||"", dados.data_devolutiva||"",
     dados.relato_devolutiva||"", dados.responsavel||"", dados.criadoEm||agora]);
   registrarLog(ss,"encaminhamento",dados.id,dados.orgao+" | "+dados.situacao);
