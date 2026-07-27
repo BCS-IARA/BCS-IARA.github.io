@@ -1570,7 +1570,10 @@ try{ var _plEx=localStorage.getItem("bcs_pol_excluidos"); state._deletedPolIds=_
 // ── Arquivar automaticamente OCs anteriores a maio/2025 ──
 function _arquivarOcsAntigas() {
   var CORTE = "2026-06-15"; // zerar fila — só contar registros novos daqui pra frente
-  var PENDENTES = ["nova", "em_triagem", "em_acompanhamento"];
+  // "em_acompanhamento" NÃO entra aqui: é um estado ativo escolhido pelo usuário e não
+  // pode ser revertido para "historico" automaticamente a cada sync, senão o caso some
+  // da fila de Acompanhamento mesmo quando a ocorrência (data do fato) é antiga.
+  var PENDENTES = ["nova", "em_triagem"];
   // Parser inline — _pdLocal pode não estar definido ainda na inicialização
   function _toISO(s) {
     if(!s) return null;
@@ -13090,8 +13093,32 @@ window._buildDossieCorpo = function(identidade, opts) {
     h+="<h2>Avaliações FRIDA ("+fridas.length+")</h2>";
     fridas.forEach(function(f){
       var nivelCls=f.nivel==="E"?"frida-E":f.nivel==="M"?"frida-M":"frida-B";
-      var nivelLabel=f.nivel==="E"?"ELEVADO":f.nivel==="M"?"MÉDIO":"BAIXO";
-      h+="<div class='enc-item'><span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span><strong>"+_fmtD(f.data)+"</strong>"+(f.relatorio?" — "+esc(f.relatorio):"")+(f.observacao?" — "+esc(f.observacao):"")+"</div>";
+      var nivelLabel=f.nivel==="E"?"RISCO ELEVADO":f.nivel==="M"?"RISCO MÉDIO":"RISCO BAIXO";
+      var respArr=[]; try{ respArr=JSON.parse(f.respostas||"[]"); }catch(ex){}
+      h+="<div class='enc-item' style='page-break-inside:avoid'>";
+      h+="<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px'>";
+      h+="<span class='frida-badge "+nivelCls+"'>"+nivelLabel+"</span>";
+      h+="<strong>"+_fmtD(f.data)+"</strong>";
+      if(f.sim!==undefined) h+="<span style='font-size:11px;color:#5a2a0a'>"+esc(String(f.sim))+" SIM · "+esc(String(f.naoSabe||0))+" N.SABE</span>";
+      if(f.responsavel) h+="<span style='margin-left:auto;font-size:11px;color:#8a6a4a'>👮 "+esc(f.responsavel)+"</span>";
+      h+="</div>";
+      if(f.relatorio) h+="<p style='font-size:12px;color:#3a2818;margin-bottom:6px'>"+esc(f.relatorio)+"</p>";
+      if(f.observacao) h+="<p style='font-size:12px;color:#3a2818;margin-bottom:6px'>"+esc(f.observacao)+"</p>";
+      if(respArr.length){
+        h+="<table style='width:100%;border-collapse:collapse;font-size:11px;margin-top:4px'>";
+        respArr.forEach(function(resp,qi){
+          if(qi>=FRIDA_PERGUNTAS.length) return;
+          var rLabel=resp==="sim"?"SIM":resp==="nao"?"NÃO":resp==="nao_sabe"?"N.SABE":"N/A";
+          var rCor=resp==="sim"?"#8b0000":resp==="nao"?"#1a4a1a":resp==="nao_sabe"?"#b45700":"#888";
+          h+="<tr style='border-bottom:1px solid #eee'>";
+          h+="<td style='padding:3px 6px 3px 0;color:#888;font-size:10px;font-weight:700;white-space:nowrap;vertical-align:top'>"+(qi+1)+".</td>";
+          h+="<td style='padding:3px 8px 3px 0;color:#3a2818;line-height:1.5;vertical-align:top'>"+esc(FRIDA_PERGUNTAS[qi])+"</td>";
+          h+="<td style='padding:3px 0;white-space:nowrap;vertical-align:top;color:"+rCor+";font-weight:700;font-size:10px'>"+rLabel+"</td>";
+          h+="</tr>";
+        });
+        h+="</table>";
+      }
+      h+="</div>";
     });
   }
 
