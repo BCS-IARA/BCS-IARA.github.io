@@ -1211,7 +1211,9 @@ function uploadFotoInventario(itemId, fotoBase64, nomeItem) {
     file.setName("inv_"+itemId+".jpg");
     file.setDescription((nomeItem||itemId)+" — 77ª CIPM BCS");
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    var url="https://drive.google.com/uc?export=view&id="+file.getId();
+    // "thumbnail" embute em <img> de outra origem; "uc?export=view" só funciona
+    // navegando direto, fica com icone quebrado quando embutido cross-origin.
+    var url="https://drive.google.com/thumbnail?id="+file.getId()+"&sz=w1000";
     return { ok: true, url: url, fileId: file.getId(), itemId: itemId };
   } catch(e) { return { ok: false, erro: e.toString() }; }
 }

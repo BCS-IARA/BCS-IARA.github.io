@@ -22397,6 +22397,16 @@ function _invGetLocaisObj(){
   return state.invLocais;
 }
 
+// Normaliza URL do Drive pro formato que embute em <img> de outra origem.
+// "uc?export=view" carrega ao navegar direto mas o Google bloqueia como
+// subrecurso cross-origin (fica com ícone quebrado) — "thumbnail" funciona.
+function _invFotoUrl(url){
+  if(!url) return url;
+  var m = url.match(/[?&]id=([^&]+)/);
+  if(m && url.indexOf("/uc?")>=0) return "https://drive.google.com/thumbnail?id="+m[1]+"&sz=w1000";
+  return url;
+}
+
 // ── Upload de foto do item para Google Drive ───────────────────
 async function _invUploadFoto(itemId, base64, nomeItem){
   if(!SHEETS_URL||!base64||base64==="[foto_local]"||base64.startsWith("http")) return null;
@@ -22836,7 +22846,7 @@ function _invAbrirItem(id){
   html += "<div>";
   html += "<label style='color:#6B5236;font-size:11px'>Foto do Item</label>";
   html += "<div style='display:flex;align-items:center;gap:10px;margin-top:4px'>";
-  var _fotoPrevSrc = item&&item.foto_url ? item.foto_url : (item&&item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]" ? item.foto : null);
+  var _fotoPrevSrc = item&&item.foto_url ? _invFotoUrl(item.foto_url) : (item&&item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]" ? item.foto : null);
   if(_fotoPrevSrc){
     html += "<img id='inv-foto-prev' src='"+esc(_fotoPrevSrc)+"' style='width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #DBC79E'>";
   } else {
@@ -23706,7 +23716,7 @@ function _invRenderConferencia(conf){
       var det=(raw&&typeof raw==="object")?raw:{status:raw||"pendente"};
       var status=det.status||"pendente";
       var iid=item.id;
-      var _ciFoto=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
+      var _ciFoto=_invFotoUrl(item.foto_url)||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
       var _ciStat={ok:"#3a7a4a",divergencia:"#f59e0b",ausente:"#ef4444",pendente:"#5e4636"}[status]||"#5e4636";
       var _ciMarcado=(status==="ok"||status==="divergencia"||status==="ausente");
       html+="<div class='inv-conf-item' id='inv-ci-"+iid+"' data-busca='"+esc((item.descricao||"")+" "+(item.tombamento||"")+" "+(item.numero_serie||"")+" "+(cat||"")).toLowerCase()+"' data-status='"+status+"' style='border-bottom:1px solid #DBC79E;overflow:hidden;opacity:"+(_ciMarcado?"0.65":"1")+";transition:opacity 0.2s;border-left:4px solid "+_ciStat+";background:"+(_ciMarcado?"#EDE4CE":"#F2E4C8")+"'>";
@@ -23742,7 +23752,7 @@ function _invRenderConferencia(conf){
       html+="</select></div>";
       html+="<div><label style='color:#6B5236;font-size:10px'>Observações</label><input id='inv-ci-obs-"+iid+"' value='"+esc(det.observacoes||"")+"' placeholder='Observações, desgastes, irregularidades…' oninput='_invConfDetalhe(\""+iid+"\",\"observacoes\",this.value)' style='"+ISci+"'></div>";
       // foto
-      var _fotoItemSrc=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
+      var _fotoItemSrc=_invFotoUrl(item.foto_url)||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
       html+="<div style='display:flex;align-items:center;gap:10px;flex-wrap:wrap'>";
       if(_fotoItemSrc){
         html+="<img src='"+_fotoItemSrc+"' title='Foto cadastrada do item' onclick=\"window.open('"+_fotoItemSrc+"','_blank')\" style='width:54px;height:42px;object-fit:cover;border-radius:6px;border:1px solid #A87B22;cursor:pointer;flex-shrink:0'>";
@@ -24802,7 +24812,7 @@ function renderInventario(main){
           // ── Linha principal ────────────────────────────────────────────
           h+="<div style='display:flex;gap:0'>";
           // Foto / ícone
-          var _fotoSrc=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
+          var _fotoSrc=_invFotoUrl(item.foto_url)||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
           if(_fotoSrc){
             h+="<img src='"+_fotoSrc+"' style='width:80px;min-height:80px;object-fit:cover;flex-shrink:0;border-right:1px solid #DBC79E' onerror=\"this.parentNode.querySelector('.inv-icon-fb').style.display='flex';this.style.display='none'\">";
             h+="<div class='inv-icon-fb' style='display:none;width:80px;min-height:80px;background:#EAD9B8;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;border-right:1px solid #DBC79E'>"+INV_CATS[cat].icon+"</div>";
@@ -25000,7 +25010,7 @@ function _invRenderPoliciais(itens){
       var est=INV_ESTADOS[item.estado]||{label:item.estado,cor:"#888"};
       var dt=item.carga_data?new Date(item.carga_data).toLocaleDateString("pt-BR"):"—";
       h+="<div style='display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #DBC79E'>";
-      var _fp=item.foto_url||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
+      var _fp=_invFotoUrl(item.foto_url)||(item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]"?item.foto:null);
       if(_fp) h+="<img src='"+_fp+"' style='width:40px;height:30px;object-fit:cover;border-radius:4px;flex-shrink:0' onerror=\"this.style.display='none'\">";
       else h+="<span style='font-size:18px;flex-shrink:0'>"+(INV_CATS[item.categoria]||{icon:"📦"}).icon+"</span>";
       h+="<div style='flex:1;min-width:0'>";
