@@ -22836,8 +22836,9 @@ function _invAbrirItem(id){
   html += "<div>";
   html += "<label style='color:#6B5236;font-size:11px'>Foto do Item</label>";
   html += "<div style='display:flex;align-items:center;gap:10px;margin-top:4px'>";
-  if(item&&item.foto){
-    html += "<img id='inv-foto-prev' src='"+item.foto+"' style='width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #DBC79E'>";
+  var _fotoPrevSrc = item&&item.foto_url ? item.foto_url : (item&&item.foto&&item.foto!=="[foto_drive]"&&item.foto!=="[foto_local]" ? item.foto : null);
+  if(_fotoPrevSrc){
+    html += "<img id='inv-foto-prev' src='"+esc(_fotoPrevSrc)+"' style='width:80px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #DBC79E'>";
   } else {
     html += "<div id='inv-foto-prev' style='width:80px;height:60px;background:#EAD9B8;border:1px dashed #A87B22;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#a07c58;font-size:10px'>Sem foto</div>";
   }
