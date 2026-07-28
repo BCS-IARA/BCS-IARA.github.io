@@ -22438,6 +22438,15 @@ function _invEnviarFotoEAtualizarItem(item){
   });
 }
 
+// Reenvia fotos que ficaram só no aparelho de origem por falha anterior no upload
+// (ex.: permissão do Drive não concedida na implantação do Apps Script).
+// _invEnviarFotoEAtualizarItem já ignora itens sem foto pendente, sem custo de rechecar aqui.
+function _invReenviarFotosPendentes(){
+  (state.invItens||[]).forEach(function(item){
+    _invEnviarFotoEAtualizarItem(item);
+  });
+}
+
 // ── Sync inventário → Sheets (JSONP, fire-and-forget) ──────────
 function _invEnviarSheets(tipo, dados){
   if(!SHEETS_URL) return;
@@ -24574,6 +24583,12 @@ function renderInventario(main){
       var m=document.getElementById("main-content")||document.getElementById("main");
       if(m&&state.tela==="inventario") renderInventario(m);
     });
+  }
+  // Reenvio de fotos pendentes (falhas anteriores de upload) — no máximo a cada 5 min
+  var _agFoto=state._invLastRetryFotos||0;
+  if(Date.now()-_agFoto > 300000){
+    state._invLastRetryFotos=Date.now();
+    _invReenviarFotosPendentes();
   }
   // Polling a cada 30s enquanto a tela inventário estiver aberta
   if(state._invPollTimer) clearInterval(state._invPollTimer);
