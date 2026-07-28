@@ -1216,6 +1216,14 @@ function uploadFotoInventario(itemId, fotoBase64, nomeItem) {
   } catch(e) { return { ok: false, erro: e.toString() }; }
 }
 
+// Rode esta função manualmente no editor (▶️ Executar) para forçar a tela de
+// autorização do Drive — uploadFotoInventario() sem argumentos falha antes de
+// chegar no DriveApp e por isso nunca pede a permissão sozinha.
+function _testarPermissaoDrive(){
+  var pastas = DriveApp.getFoldersByName("IARA-Inventario");
+  Logger.log(pastas.hasNext());
+}
+
 // ══════════════════════════════════════════════════════════════════
 //  PROXY IA
 // ══════════════════════════════════════════════════════════════════
