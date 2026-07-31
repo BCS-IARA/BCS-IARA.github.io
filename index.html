@@ -13139,6 +13139,22 @@ window._buildDossieCorpo = function(identidade, opts) {
     if(nOc && nOc.trim().toLowerCase()!==nomeLower) h+="<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>👤 "+esc(nOc)+"</div>";
     var telOc=o.vitima_telefone||(o.solicitante?o.solicitante.telefone:"");
     if(telOc) h+="<div style='font-size:11px;color:#5a2a0a;margin-bottom:4px'>📞 "+esc(telOc)+"</div>";
+    var autoresOc=(o.autores&&o.autores.length)?o.autores:(o.suspeito_nome?[{nome:o.suspeito_nome,apelido:o.suspeito_apelido,sexo:o.suspeito_sexo,idade:o.suspeito_idade,endereco:o.suspeito_endereco,caracteristicas:o.suspeito_caracteristicas}]:[]);
+    autoresOc=autoresOc.filter(function(a){return a&&a.nome&&!/não identificado|nao identificado/i.test(a.nome);});
+    if(autoresOc.length){
+      h+="<div class='sec-autor'><strong>"+(autoresOc.length>1?"Autores":"Autor/Suspeito")+":</strong> ";
+      h+=autoresOc.map(function(a){
+        var det=[];
+        if(a.apelido) det.push("\""+esc(a.apelido)+"\"");
+        if(a.sexo) det.push(({F:"Feminino",M:"Masculino"}[a.sexo]||a.sexo));
+        if(a.idade) det.push(a.idade+" anos");
+        var linha=esc(a.nome)+(det.length?" ("+det.join(", ")+")":"");
+        if(a.endereco) linha+="<br><span style='font-size:11px;color:#8a6a4a'>Endereço: "+esc(a.endereco)+"</span>";
+        if(a.caracteristicas) linha+="<br><span style='font-size:11px;color:#8a6a4a'>Características: "+esc(a.caracteristicas)+"</span>";
+        return linha;
+      }).join("<br><br>");
+      h+="</div>";
+    }
     if(relato) h+="<p style='font-size:12px;color:#3a2818;margin-bottom:4px'>"+esc(relato)+"</p>";
     if(o.medidas) h+="<div class='sec-medidas'><strong>Medidas adotadas:</strong> "+esc(o.medidas)+"</div>";
     if(o.resumo_atendimento) h+="<div class='sec-medidas'><strong>Resumo do atendimento"+(o.data_atendimento?" ("+_fmtD(o.data_atendimento)+")":"")+":</strong> "+esc(o.resumo_atendimento)+"</div>";
@@ -13211,6 +13227,7 @@ function _abrirDossieDoc(corpo){
   css+=".frida-E{background:#dc2626;color:#fff}.frida-M{background:#f59e0b;color:#1a0e00}.frida-B{background:#22c55e;color:#fff}";
   css+=".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e8d5b7;font-size:11px;color:#8a6a4a;display:flex;justify-content:space-between}";
   css+=".oc-meta{color:#8a6a4a;font-size:11px;margin-bottom:6px}.sec-medidas{margin-top:6px;padding:6px 8px;background:#f5ede0;border-radius:4px;font-size:12px;color:#3a2818}";
+  css+=".sec-autor{margin-bottom:4px;padding:6px 8px;background:#fef3e8;border-left:3px solid #8b4000;border-radius:4px;font-size:12px;color:#5a2a0a}";
   css+="@media print{body{margin:20px;padding:0}button{display:none!important}}";
   var html="<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Dossiê — "+esc(corpo.nome)+"</title><style>"+css+"</style></head><body>";
   html+=corpo.html;
