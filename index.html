@@ -936,11 +936,86 @@ async function carregarDadosAppDoSheets(){
   if(!SHEETS_URL) return;
   try{
     _sincronizarSituacoesOc();
-    var projetos          = await lerDadoAppSheets("bcs_projetos");
-    // Carrega eventos avulsos da aba da planilha (fonte primária) + ScriptProperties (fallback)
-    var _evAba = await _sheetsGet({acao:"listar",tipo:"eventos_avulsos"});
+    // As ~30 leituras abaixo são independentes entre si (nenhuma usa o resultado de outra) —
+    // antes rodavam em await sequencial, cada uma esperando a anterior terminar (até 20s de
+    // timeout cada), o que podia levar minutos pra alcançar chaves no fim da lista (ex.:
+    // Acompanhamento) numa sessão nova. Promise.all roda tudo em paralelo — cada _sheetsGet já
+    // usa um callback JSONP próprio (contador incremental), então não há risco de colisão.
+    var _results = await Promise.all([
+      lerDadoAppSheets("bcs_projetos"),
+      // Eventos avulsos: aba da planilha (fonte primária) + ScriptProperties (fallback)
+      _sheetsGet({acao:"listar",tipo:"eventos_avulsos"}),
+      lerDadoAppSheets("bcs_eventos_avulsos"),
+      lerDadoAppSheets("bcs_alertas_projetos"),
+      lerDadoAppSheets("bcs_agendamentos"),
+      lerDadoAppSheets("bcs_visitas"),
+      lerDadoAppSheets("bcs_atendimentos"),
+      lerDadoAppSheets("bcs_escolas"),
+      lerDadoAppSheets("bcs_atividades_esc"),
+      lerDadoAppSheets("bcs_oc_modulos"),
+      lerDadoAppSheets("bcs_projetos_sociais"),
+      lerDadoAppSheets("bcs_inscricoes_proj"),
+      lerDadoAppSheets("bcs_policiais"),
+      lerDadoAppSheets("bcs_vcm_casos"),
+      lerDadoAppSheets("bcs_acompanhamentos"),
+      lerDadoAppSheets("bcs_chamadas"),
+      lerDadoAppSheets("bcs_cargas_armamento"),
+      lerDadoAppSheets("bcs_inv_itens"),
+      lerDadoAppSheets("bcs_inv_mov"),
+      // Conferências: buscar da aba dedicada (fonte canônica) para capturar itens marcados por outros aparelhos
+      _sheetsGet({acao:"listar",tipo:"inv_conferencias"}),
+      lerDadoAppSheets("bcs_visitas_escolares"),
+      lerDadoAppSheets("bcs_candidaturas"),
+      lerDadoAppSheets("bcs_instrutores_cad"),
+      lerDadoAppSheets("bcs_oc_complementos"),
+      lerDadoAppSheets("bcs_oc_pendentes"),
+      lerDadoAppSheets("bcs_oc_arquivadas"),
+      lerDadoAppSheets("bcs_oc_encerradas"),
+      lerDadoAppSheets("bcs_alertas_graves"),
+      lerDadoAppSheets("bcs_devolutivas_crav_blob"),
+      lerDadoAppSheets("bcs_encaminhamentos"),
+      lerDadoAppSheets("bcs_fila_pendente"),
+      lerDadoAppSheets("bcs_conselho_atas"),
+      lerDadoAppSheets("bcs_conselho_associados"),
+      lerDadoAppSheets("bcs_conselho_diretoria")
+    ]);
+    var _i=0;
+    var projetos              = _results[_i++];
+    var _evAba                = _results[_i++];
+    var _evProps               = _results[_i++];
+    var alertas                = _results[_i++];
+    var agendamentos            = _results[_i++];
+    var visitas                 = _results[_i++];
+    var atendimentos            = _results[_i++];
+    var escolasSheets           = _results[_i++];
+    var atividEscSheets         = _results[_i++];
+    var ocModulosSheets         = _results[_i++];
+    var projSociaisSheets       = _results[_i++];
+    var inscricoesSheets        = _results[_i++];
+    var policiaisSheets         = _results[_i++];
+    var vcmCasosSheets          = _results[_i++];
+    var acompanhamentosSheets   = _results[_i++];
+    var chamadasSheets          = _results[_i++];
+    var cargasSheets            = _results[_i++];
+    var invItensSheets          = _results[_i++];
+    var invMovSheets            = _results[_i++];
+    var _rConf                  = _results[_i++];
+    var visEscSheets            = _results[_i++];
+    var candidaturasSheets      = _results[_i++];
+    var instrutoresSheets       = _results[_i++];
+    var ocComplSheets           = _results[_i++];
+    var ocPendSheets            = _results[_i++];
+    var ocArqSheets             = _results[_i++];
+    var ocEncSheets             = _results[_i++];
+    var alertasGravesSheets     = _results[_i++];
+    var devolutivasSheets       = _results[_i++];
+    var encaminhamientosSheets  = _results[_i++];
+    var filaPendenteSheets      = _results[_i++];
+    var conselhoAtasSheets      = _results[_i++];
+    var conselhoAssocSheets     = _results[_i++];
+    var conselhoDirSheets       = _results[_i++];
+
     var _evAbaArr = (_evAba && _evAba.ok && Array.isArray(_evAba.dados) && _evAba.dados.length > 0) ? _evAba.dados : null;
-    var _evProps = await lerDadoAppSheets("bcs_eventos_avulsos");
     var eventos = _evAbaArr || _evProps;
     // Normalizar data/hora vindas da planilha (Google Sheets devolve Date em ISO)
     if(eventos && Array.isArray(eventos)){
@@ -950,39 +1025,7 @@ async function carregarDadosAppDoSheets(){
         return e;
       });
     }
-    var alertas           = await lerDadoAppSheets("bcs_alertas_projetos");
-    var agendamentos      = await lerDadoAppSheets("bcs_agendamentos");
-    var visitas           = await lerDadoAppSheets("bcs_visitas");
-    var atendimentos      = await lerDadoAppSheets("bcs_atendimentos");
-    var escolasSheets     = await lerDadoAppSheets("bcs_escolas");
-    var atividEscSheets   = await lerDadoAppSheets("bcs_atividades_esc");
-    var ocModulosSheets   = await lerDadoAppSheets("bcs_oc_modulos");
-    var projSociaisSheets = await lerDadoAppSheets("bcs_projetos_sociais");
-    var inscricoesSheets  = await lerDadoAppSheets("bcs_inscricoes_proj");
-    var policiaisSheets   = await lerDadoAppSheets("bcs_policiais");
-    var vcmCasosSheets       = await lerDadoAppSheets("bcs_vcm_casos");
-    var acompanhamentosSheets = await lerDadoAppSheets("bcs_acompanhamentos");
-    var chamadasSheets       = await lerDadoAppSheets("bcs_chamadas");
-    var cargasSheets         = await lerDadoAppSheets("bcs_cargas_armamento");
-    var invItensSheets       = await lerDadoAppSheets("bcs_inv_itens");
-    var invMovSheets         = await lerDadoAppSheets("bcs_inv_mov");
-    // Conferências: buscar da aba dedicada (fonte canônica) para capturar itens marcados por outros aparelhos
-    var _rConf = await _sheetsGet({acao:"listar",tipo:"inv_conferencias"});
     var invConfSheets = (_rConf&&_rConf.ok&&Array.isArray(_rConf.dados))?_rConf.dados.map(function(x){if(typeof x.itens==="string"){try{x.itens=JSON.parse(x.itens);}catch(e){x.itens={};}}return x;}):null;
-    var visEscSheets         = await lerDadoAppSheets("bcs_visitas_escolares");
-    var candidaturasSheets   = await lerDadoAppSheets("bcs_candidaturas");
-    var instrutoresSheets    = await lerDadoAppSheets("bcs_instrutores_cad");
-    var ocComplSheets        = await lerDadoAppSheets("bcs_oc_complementos");
-    var ocPendSheets         = await lerDadoAppSheets("bcs_oc_pendentes");
-    var ocArqSheets          = await lerDadoAppSheets("bcs_oc_arquivadas");
-    var ocEncSheets          = await lerDadoAppSheets("bcs_oc_encerradas");
-    var alertasGravesSheets  = await lerDadoAppSheets("bcs_alertas_graves");
-    var devolutivasSheets    = await lerDadoAppSheets("bcs_devolutivas_crav_blob");
-    var encaminhamientosSheets = await lerDadoAppSheets("bcs_encaminhamentos");
-    var filaPendenteSheets   = await lerDadoAppSheets("bcs_fila_pendente");
-    var conselhoAtasSheets   = await lerDadoAppSheets("bcs_conselho_atas");
-    var conselhoAssocSheets  = await lerDadoAppSheets("bcs_conselho_associados");
-    var conselhoDirSheets    = await lerDadoAppSheets("bcs_conselho_diretoria");
 
     var localProj  = state.projetos||[];
     var localEv    = state.eventosAvulsos||[];
