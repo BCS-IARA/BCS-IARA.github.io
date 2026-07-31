@@ -674,7 +674,23 @@ function _sheetsGet(params){
 
 async function salvarDadoAppSheets(chave, valor){
   if(!SHEETS_URL) return;
-  var json=JSON.stringify(valor);
+  // Merge com o que já está gravado no Sheets antes de sobrescrever — sem isso, um
+  // aparelho que ainda não recarregou apaga (com o array local desatualizado dele)
+  // o que outro aparelho gravou nesse meio-tempo. sincronizarSheets() roda ~2.5s
+  // depois de QUALQUER alteração no app (agendarSyncSheets → salvarLocal), então
+  // essa colisão acontecia o tempo todo, não só em Acompanhamento.
+  var paraSalvar = valor;
+  if(Array.isArray(valor) || (valor && typeof valor==="object")){
+    try{
+      var remoto = await lerDadoAppSheets(chave);
+      if(Array.isArray(valor) && Array.isArray(remoto)){
+        paraSalvar = _mergeById(valor, remoto);
+      } else if(!Array.isArray(valor) && remoto && typeof remoto==="object" && !Array.isArray(remoto)){
+        paraSalvar = Object.assign({}, remoto, valor); // local vence em conflito, chaves só do remoto são preservadas
+      }
+    }catch(e){ /* leitura falhou: grava só o local mesmo, como antes */ }
+  }
+  var json=JSON.stringify(paraSalvar);
   // Chunking: se o JSON for grande, dividir em partes de 4000 chars
   var CHUNK=4000;
   var chunks=[];

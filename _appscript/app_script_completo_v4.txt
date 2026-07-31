@@ -29,7 +29,7 @@ var NOME = {
 
 var HDRS = {
   oc: [
-    "ID","Data Lançamento","Nº BO","Data","Hora","Tipo",
+    "ID","Data Lançamento","Nº Ocorrência/BO","Data","Hora","Tipo",
     "Bairro","Município",
     "Vítima Nome","Vítima Idade","Vítima Sexo",
     "Vítima Telefone","Vítima Endereço","Vítima CPF",
