@@ -974,6 +974,11 @@ async function carregarDadosAppDoSheets(){
       lerDadoAppSheets("bcs_alertas_graves"),
       lerDadoAppSheets("bcs_devolutivas_crav_blob"),
       lerDadoAppSheets("bcs_encaminhamentos"),
+      // Aba dedicada "encaminhamentos" (fonte canônica) — o blob acima só reflete o que
+      // cada aparelho tinha localmente na última sincronização; encaminhamentos criados
+      // num aparelho e nunca vistos por outro (que nunca teve o id localmente) ficavam
+      // invisíveis pra sempre na Fila de Encaminhamentos. sem vitima_id retorna tudo.
+      _sheetsGet({acao:"listar",tipo:"encaminhamentos"}),
       lerDadoAppSheets("bcs_fila_pendente"),
       lerDadoAppSheets("bcs_conselho_atas"),
       lerDadoAppSheets("bcs_conselho_associados"),
@@ -1010,6 +1015,7 @@ async function carregarDadosAppDoSheets(){
     var alertasGravesSheets     = _results[_i++];
     var devolutivasSheets       = _results[_i++];
     var encaminhamientosSheets  = _results[_i++];
+    var _rEncTabela              = _results[_i++];
     var filaPendenteSheets      = _results[_i++];
     var conselhoAtasSheets      = _results[_i++];
     var conselhoAssocSheets     = _results[_i++];
@@ -1133,6 +1139,19 @@ async function carregarDadosAppDoSheets(){
     state.alertasGraves       = _mergeById(state.alertasGraves||[],       alertasGravesSheets);
     state.devolutivasCrav     = _mergeById(state.devolutivasCrav||[],     devolutivasSheets);
     state.encaminhamentos     = _mergeByIdTimestamp(state.encaminhamentos||[], encaminhamientosSheets);
+    // Mescla com a aba dedicada — normaliza os campos que a tela usa (status/tipo/data),
+    // já que essa aba grava como "situacao" e (para registros criados antes deste fix)
+    // não tem tipo/data/prazo/descricao — cai no orgao/criadoEm como aproximação razoável.
+    if(_rEncTabela && _rEncTabela.ok && Array.isArray(_rEncTabela.dados)){
+      var _encTabNorm = _rEncTabela.dados.map(function(e){
+        return Object.assign({}, e, {
+          status: e.status||e.situacao||"a_encaminhar",
+          tipo: e.tipo||e.orgao||"",
+          data: e.data||(e.criadoEm||"").slice(0,10)
+        });
+      });
+      state.encaminhamentos = _mergeByIdTimestamp(state.encaminhamentos, _encTabNorm);
+    }
     // Fila de triagem: sobrescrever (ordem-dependente, sem merge)
     if(filaPendenteSheets && Array.isArray(filaPendenteSheets)){
       state.filaPendente = filaPendenteSheets;

@@ -1530,7 +1530,8 @@ function atualizarVitima(ss, id, campos) {
 //  ENCAMINHAMENTOS — Fase 1
 // ══════════════════════════════════════════════════════════════════
 var ENC_HDRS = ["id","vitima_id","ocorrencia_id","orgao","situacao",
-                "data_envio","data_devolutiva","relato_devolutiva","responsavel","criadoEm"];
+                "data_envio","data_devolutiva","relato_devolutiva","responsavel","criadoEm",
+                "tipo","descricao","data","prazo"];
 
 function _garantirAbaEnc(ss) {
   var aba = ss.getSheetByName("encaminhamentos");
@@ -1556,7 +1557,8 @@ function salvarEncaminhamento(ss, dados) {
   aba.appendRow([dados.id, dados.vitima_id||"", dados.ocorrencia_id||"",
     dados.orgao||dados.tipo||"", dados.situacao||dados.status||"a_encaminhar",
     dados.data_envio||"", dados.data_devolutiva||"",
-    dados.relato_devolutiva||"", dados.responsavel||"", dados.criadoEm||agora]);
+    dados.relato_devolutiva||"", dados.responsavel||"", dados.criadoEm||agora,
+    dados.tipo||dados.orgao||"", dados.descricao||"", dados.data||"", dados.prazo||""]);
   registrarLog(ss,"encaminhamento",dados.id,dados.orgao+" | "+dados.situacao);
   return { ok: true, id: dados.id, acao: "inserido" };
 }
@@ -1593,7 +1595,7 @@ function atualizarEncaminhamento(ss, id, campos) {
   try {
     var aba = ss.getSheetByName("encaminhamentos");
     if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
-    var mapa={vitima_id:2,orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9};
+    var mapa={vitima_id:2,orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9,tipo:11,descricao:12,data:13,prazo:14};
     var ids = aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
     for (var i = 0; i < ids.length; i++) {
       if (String(ids[i][0]) === String(id)) {
@@ -1611,7 +1613,7 @@ function atualizarEncaminhamentoPorOcId(ss, ocId, campos) {
   try {
     var aba = ss.getSheetByName("encaminhamentos");
     if (!aba || aba.getLastRow() < 2) return { ok: false, erro: "Aba não encontrada" };
-    var mapa={vitima_id:2,orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9};
+    var mapa={vitima_id:2,orgao:4,situacao:5,status:5,data_envio:6,data_devolutiva:7,relato_devolutiva:8,responsavel:9,responsavel_devolutiva:9,tipo:11,descricao:12,data:13,prazo:14};
     // Coluna ocorrenciaId — índice 2 (0-based) = coluna 3 (1-based)
     var rows = aba.getRange(2,1,aba.getLastRow()-1,10).getValues();
     var found = false;
