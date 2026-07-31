@@ -458,7 +458,11 @@ function carregarLocal() {
   try {
     localStorage.removeItem("bcs_db");
     const saved=localStorage.getItem("bcs_db_light");
-    const db = {ocorrencias:[],atendimentos:[],visitas:[],agendamentos:[],avisos:JSON.parse(localStorage.getItem("bcs_db_avisos")||"[]")};
+    const db = {ocorrencias:[],atendimentos:[],visitas:[],agendamentos:[],avisos:JSON.parse(localStorage.getItem("bcs_db_avisos")||"[]"),
+      // salvarLocal() já gravava "bcs_acompanhamentos" há tempos, mas carregarLocal() nunca lia de
+      // volta — toda vez que a página recarregava, a fila de Acompanhamento começava vazia e só
+      // reaparecia depois que a leitura assíncrona do Sheets terminasse (ou nunca, se ela falhasse).
+      acompanhamentos: JSON.parse(localStorage.getItem("bcs_acompanhamentos")||"[]")};
     // Ler das chaves separadas (novo formato) — fallback para bcs_db_light (formato antigo)
     var _oc  = localStorage.getItem("bcs_db_oc");
     var _at  = localStorage.getItem("bcs_db_at");
