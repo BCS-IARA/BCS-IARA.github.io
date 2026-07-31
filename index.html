@@ -1467,7 +1467,7 @@ async function carregarDoSheets() {
     await carregarDadosAppDoSheets();
     // Re-renderizar telas que dependem dos dados carregados
     var mRe=document.getElementById("main");
-    if(mRe&&(state.tela==="projetos"||state.tela==="dashprojetos"||state.tela==="calendario"||state.tela==="escolas"||state.tela==="inventario")) renderTela();
+    if(mRe&&(state.tela==="projetos"||state.tela==="dashprojetos"||state.tela==="calendario"||state.tela==="escolas"||state.tela==="inventario"||state.tela==="fila_auxiliar")) renderTela();
     // Atualizar calendário diretamente se estiver visível
     if(state.tela==="calendario" && document.getElementById("cal-container")) renderCalendar();
 
