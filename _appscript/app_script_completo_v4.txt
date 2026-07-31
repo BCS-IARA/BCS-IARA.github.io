@@ -40,7 +40,8 @@ var HDRS = {
     "Dinâmica dos fatos", // col 24
     "Medidas adotadas",   // col 25
     "Vítima ID",          // col 26 — FK → vitimas.id
-    "Situação"            // col 27 — nova|em_triagem|em_acompanhamento|encerrada|historico
+    "Situação",           // col 27 — nova|em_triagem|em_acompanhamento|encerrada|historico
+    "Policiais"           // col 28 — efetivo empregado
   ],
   at: ["ID","Data Lançamento","Data","Hora","Nome","Telefone","Tipo","Descrição","Encaminhamento"],
   ag: ["ID","Data Lançamento","Data","Hora","Tipo Visita","Nome/Local","Endereço","Responsável","Objetivo","Status"],
@@ -751,6 +752,7 @@ function salvar(ss, tipo, reg) {
           aba.getRange(n,1,1,25).setValues([linha.slice(0,25)]);
           aba.getRange(n,26).setValue(reg.vitima_id||"");
           aba.getRange(n,27).setValue(reg.situacao||"nova");
+          aba.getRange(n,28).setValue(reg.policiais||"");   // NOVO
           if (reg.reincidente) aba.getRange(n,1,1,27).setBackground("#3d1a00").setFontColor("#ffaa44");
           return {ok:true, id:reg.id, acao:"atualizado"};
         }
@@ -760,6 +762,7 @@ function salvar(ss, tipo, reg) {
     var nL = aba.getLastRow();
     aba.getRange(nL,24).setValue(narrativa);
     aba.getRange(nL,25).setValue(medidas);
+    aba.getRange(nL,28).setValue(reg.policiais||"");        // NOVO
     if (reg.reincidente) aba.getRange(nL,1,1,27).setBackground("#3d1a00").setFontColor("#ffaa44");
     return {ok:true, id:reg.id, acao:"inserido"};
   }
@@ -842,7 +845,7 @@ function fmtDataBR(v){
 function lerOcs(ss, pag, tam) {
   var aba = getAba(ss,"oc");
   if (!aba||aba.getLastRow()<2) return {total:0,dados:[],temMais:false};
-  var nCols = Math.max(27, aba.getLastColumn());
+  var nCols = Math.max(28, aba.getLastColumn());
   var total = aba.getLastRow()-1;
   var ini   = 2+pag*tam;
   if (ini>aba.getLastRow()) return {total:total,dados:[],temMais:false};
@@ -865,7 +868,8 @@ function lerOcs(ss, pag, tam) {
       medidas:String(r[24]||""),
       texto_original:String(r[23]||r[22]||""),
       vitima_id:String(r[25]||""),    // col 26
-      situacao:String(r[26]||"nova")  // col 27
+      situacao:String(r[26]||"nova"), // col 27
+      policiais:String(r[27]||"")     // col 28
     });
   }
   return {total:total, dados:dados, temMais:(ini+qtd-1)<total};
@@ -915,7 +919,8 @@ function editarOc(ss, id, campos) {
     suspeito_nome:15,suspeito_apelido:16,suspeito_caracteristicas:17,
     veiculo:18,medida_protetiva:19,violencia_domestica:20,requer_visita:21,reincidente:22,
     descricao:23,descricao_dinamica:24,medidas:25,
-    vitima_id:26, situacao:27  // novos
+    vitima_id:26, situacao:27,  // novos
+    policiais:28
   };
   var ids=aba.getRange(2,1,aba.getLastRow()-1,1).getValues();
   for (var i=0;i<ids.length;i++) {

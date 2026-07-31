@@ -20885,7 +20885,12 @@ function renderOcorrenciasGestor(el, perfil_atual){
             medidas:ocM.medidas,
             policiais:ocM.policiais
           };
-          var payloadEdit = JSON.stringify({token:BCS_TOKEN, tipo:"ocorrencias", registro:Object.assign({id:ocM.id}, camposObj)});
+          // acao:"editar" -> editarOc() faz patch célula-a-célula só nos campos enviados.
+          // Antes ia como {tipo:"ocorrencias",registro:{...}} pro salvar() genérico, que
+          // reconstrói a linha inteira a partir de reg.*||"" — qualquer campo ausente do
+          // camposObj (vitima_id, situacao, reincidente, suspeito_apelido/caracteristicas,
+          // municipio, vitima_cpf, veiculo) era zerado/resetado a cada edição.
+          var payloadEdit = JSON.stringify({token:BCS_TOKEN, acao:"editar", id:ocM.id, campos:camposObj});
           fetch(SHEETS_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body:payloadEdit})
             .then(function(){
               // Re-busca no array atual (pode ter sido substituído pelo sync durante o fetch)
