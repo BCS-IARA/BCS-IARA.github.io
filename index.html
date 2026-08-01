@@ -12976,6 +12976,13 @@ window._dossieByOcId = function(ocId){
 
   function _gerarComDados(){
     var vitimaId = oc.vitima_id;
+    // Se a ocorrência tem vitima_id mas esse cadastro não existe em state.vitimas (sync
+    // incompleto, cadastro apagado, etc.), cai pro mesmo fallback por nome usado quando não
+    // há vitima_id nenhum — sem isso o dossiê falhava com "Vítima não encontrada" mesmo
+    // tendo o nome disponível na própria ocorrência.
+    if(vitimaId && !(state.vitimas||[]).some(function(v){return v.id===vitimaId;})){
+      vitimaId = null;
+    }
     if(!vitimaId && nomeVitima){
       var nomeBusca = nomeVitima.trim().toLowerCase();
       var vit = (state.vitimas||[]).find(function(v){
