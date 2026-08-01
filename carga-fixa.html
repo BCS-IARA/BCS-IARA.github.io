@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Carga Fixa — 77ª CIPM BCS</title>
+<style>
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ background:#1a120a; color:#F2E4C8; font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; }
+.topo{ background:#2a1c10; border-bottom:2px solid #5e4636; padding:16px 20px; text-align:center; }
+.topo-titulo{ color:#D9A53C; font-size:13px; font-weight:700; letter-spacing:2px; text-transform:uppercase; }
+.topo-sub{ color:#a07c58; font-size:11px; margin-top:2px; }
+.card{ background:#F2E4C8; color:#3D2B1A; border:2px solid #5e4636; border-radius:16px; max-width:480px; margin:20px auto; padding:22px; }
+label.campo{ display:block; margin-bottom:14px; }
+label.campo span{ color:#6B5236; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; display:block; margin-bottom:5px; }
+label.campo span em{ color:#c0392b; font-style:normal; }
+input[type=text]{
+  width:100%; background:#EAD9B8; border:1px solid #A87B22; color:#3D2B1A;
+  padding:10px 12px; border-radius:8px; font-size:14px; font-family:inherit; outline:none;
+}
+input:focus{ border-color:#D9A53C; }
+.row3{ display:grid; grid-template-columns:100px 1fr 140px; gap:8px; }
+.item-info{ background:#EAD9B8; border:1px solid #DBC79E; border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+.item-info .tag{ display:inline-block; background:#2a1c10; color:#D9A53C; font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; margin-bottom:6px; }
+.item-info .desc{ font-size:15px; font-weight:700; color:#3D2B1A; margin-bottom:2px; }
+.item-info .meta{ font-size:11px; color:#6B5236; }
+.secao{ background:#EAD9B8; border:1px solid #5e4636; border-radius:10px; padding:14px; margin-bottom:14px; }
+.secao-titulo{ color:#3a7a4a; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; }
+.secao-titulo.libera{ color:#6B5236; }
+.assin-box{ border:2px solid #A87B22; border-radius:10px; background:#fff; position:relative; overflow:hidden; }
+.assin-box canvas{ display:block; width:100%; touch-action:none; cursor:crosshair; }
+.assin-label{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#bbb; font-size:12px; pointer-events:none; text-align:center; white-space:nowrap; transition:opacity .3s; }
+.assin-actions{ display:flex; gap:8px; margin-top:8px; align-items:center; }
+.btn-limpar{ background:none; border:1px solid #A87B22; color:#6B5236; padding:6px 12px; border-radius:7px; font-size:11px; cursor:pointer; }
+.erro-msg{ color:#c0392b; font-size:11px; margin-top:5px; display:none; }
+.btn-enviar{ width:100%; background:linear-gradient(135deg,#2a1c10,#3a2818); border:2px solid #C8A84B; color:#f5ede0; padding:14px; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer; margin-top:8px; letter-spacing:.5px; }
+.btn-enviar:disabled{ opacity:.5; cursor:not-allowed; }
+.pol-status{ display:none; align-items:center; padding:0 10px; border-radius:8px; font-size:11px; font-weight:700; white-space:nowrap; }
+.pol-info{ display:none; margin-top:5px; background:#F2E4C8; border:1px solid #A87B22; border-radius:7px; padding:7px 10px; font-size:11px; color:#6B5236; }
+.sucesso{ text-align:center; padding:40px 16px; display:none; }
+.sucesso .icon{ font-size:60px; margin-bottom:14px; }
+.sucesso h2{ color:#3a7a4a; font-size:20px; margin-bottom:8px; }
+.sucesso p{ color:#6B5236; font-size:13px; line-height:1.7; }
+.carregando{ text-align:center; padding:40px 16px; color:#a07c58; font-size:13px; }
+.erro-item{ text-align:center; padding:40px 16px; color:#c0392b; font-size:13px; display:none; }
+@media(max-width:500px){ .card{ margin:10px; padding:16px; } }
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <div class="topo-titulo">77ª CIPM — BCS</div>
+  <div class="topo-sub">Termo de Carga Fixa de Item</div>
+</div>
+
+<div class="card" id="card-carregando">
+  <div class="carregando" id="msg-carregando">⏳ Buscando o item…</div>
+  <div class="erro-item" id="msg-erro-item">⚠️ Item não encontrado. Confirme o link com quem te enviou.</div>
+</div>
+
+<div class="card" id="card-form" style="display:none">
+  <div class="item-info">
+    <span class="tag" id="item-tag">ITEM</span>
+    <div class="desc" id="item-desc"></div>
+    <div class="meta" id="item-meta"></div>
+  </div>
+
+  <form id="form-fixa" onsubmit="enviarCargaFixa(event)">
+
+    <div class="secao">
+      <div class="secao-titulo">👮 Policial que Recebe a Carga</div>
+      <div class="row3" style="margin-bottom:10px">
+        <label class="campo" style="margin:0"><span>Graduação</span><input type="text" id="f-grad" placeholder="Ex: 3°Sgt"/></label>
+        <label class="campo" style="margin:0">
+          <span>Matrícula <em>*</em></span>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="f-mat" placeholder="Nº matrícula" required oninput="buscarPolicial(this.value)" style="flex:1"/>
+          </div>
+        </label>
+        <label class="campo" style="margin:0"><span>&nbsp;</span><span class="pol-status" id="pol-status"></span></label>
+      </div>
+      <label class="campo">
+        <span>Nome completo <em>*</em></span>
+        <input type="text" id="f-nome" placeholder="Preenchido automaticamente ou digite" required/>
+        <div class="pol-info" id="pol-info"></div>
+      </label>
+      <div class="campo" style="margin-bottom:0">
+        <span style="color:#6B5236;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px">✍ Assinatura de quem recebe <em style="color:#c0392b">*</em></span>
+        <div class="assin-box" id="box-recebe">
+          <canvas id="cv-recebe" height="130"></canvas>
+          <div class="assin-label" id="lbl-recebe">Assine aqui com o dedo</div>
+        </div>
+        <div class="assin-actions">
+          <button type="button" class="btn-limpar" onclick="limparAssin('recebe')">🗑 Limpar</button>
+        </div>
+        <div class="erro-msg" id="erro-assin-recebe">Assinatura obrigatória</div>
+      </div>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo libera">🗝️ Responsável que Libera a Carga</div>
+      <div class="row3" style="margin-bottom:10px">
+        <label class="campo" style="margin:0"><span>Graduação</span><input type="text" id="f-lib-grad" placeholder="Ex: Sgt"/></label>
+        <label class="campo" style="margin:0">
+          <span>Matrícula</span>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="f-lib-mat" placeholder="Nº matrícula" oninput="buscarLiberador(this.value)" style="flex:1"/>
+          </div>
+        </label>
+        <label class="campo" style="margin:0"><span>&nbsp;</span><span class="pol-status" id="lib-status"></span></label>
+      </div>
+      <label class="campo">
+        <span>Nome completo <em>*</em></span>
+        <input type="text" id="f-lib-nome" placeholder="Nome do responsável" required/>
+        <div class="pol-info" id="lib-info"></div>
+      </label>
+      <div class="campo" style="margin-bottom:0">
+        <span style="color:#6B5236;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px">✍ Assinatura de quem libera <em style="color:#c0392b">*</em></span>
+        <div class="assin-box" id="box-libera">
+          <canvas id="cv-libera" height="130"></canvas>
+          <div class="assin-label" id="lbl-libera">Responsável assina aqui</div>
+        </div>
+        <div class="assin-actions">
+          <button type="button" class="btn-limpar" onclick="limparAssin('libera')">🗑 Limpar</button>
+        </div>
+        <div class="erro-msg" id="erro-assin-libera">Assinatura obrigatória</div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-enviar" id="btn-enviar">✅ Registrar Carga Fixa</button>
+  </form>
+
+  <div class="sucesso" id="bloco-sucesso">
+    <div class="icon">✅</div>
+    <h2>Carga Fixa registrada!</h2>
+    <p id="msg-sucesso">O item ficou sob a responsabilidade formal do policial.</p>
+    <p style="color:#a07c58;font-size:11px;margin-top:16px">Pode fechar esta página.</p>
+  </div>
+</div>
+
+<script>
+// ── Parâmetros da URL ──────────────────────────────────────
+var params = new URLSearchParams(location.search);
+var ITEM_ID = params.get("item") || "";
+var _urlLocal = "";
+try{ _urlLocal = localStorage.getItem("bcs_sheets_url")||""; }catch(e){}
+var SHEETS_URL = params.get("sheets") || _urlLocal || "https://script.google.com/macros/s/AKfycbxKZVJcjgBSVUK7MXcH1ZuKY8-YhmidlTN-olcmLJ0T4ar9fPE05-iZbqJ4KUfHMgovRA/exec";
+var TOKEN = params.get("token") || "bcs-token-secreto-2025";
+
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+// ── Cache de policiais (mesmo padrão do Livro de Parte) ─────
+var POLICIAIS_CACHE = [];
+var _policiaisCarregados = false;
+(function(){
+  try{
+    var local = JSON.parse(localStorage.getItem("bcs_policiais")||"[]");
+    if(local.length > 0){
+      POLICIAIS_CACHE = local.filter(function(p){ return (p.status||"ativo").toLowerCase()==="ativo"; });
+      _policiaisCarregados = true;
+    }
+  }catch(e){}
+})();
+function carregarPoliciais(tentativa){
+  if(!SHEETS_URL) return;
+  tentativa = tentativa || 1;
+  var cbName = "cb_pol_"+Date.now();
+  var tmout = setTimeout(function(){ delete window[cbName]; if(tentativa<3) carregarPoliciais(tentativa+1); }, 10000);
+  window[cbName] = function(resp){
+    clearTimeout(tmout); delete window[cbName];
+    if(resp && resp.ok && Array.isArray(resp.dados) && resp.dados.length > 0){
+      var ids = resp.dados.map(function(p){ return p.id; });
+      var soLocal = POLICIAIS_CACHE.filter(function(p){ return ids.indexOf(p.id)===-1; });
+      POLICIAIS_CACHE = resp.dados.filter(function(p){ return (p.status||"ativo").toLowerCase()==="ativo"; }).concat(soLocal);
+      _policiaisCarregados = true;
+    }
+  };
+  var sc = document.createElement("script");
+  sc.src = SHEETS_URL+"?acao=listar&tipo=policiais&token="+encodeURIComponent(TOKEN)+"&callback="+cbName;
+  sc.onerror = function(){ clearTimeout(tmout); delete window[cbName]; };
+  document.head.appendChild(sc);
+}
+carregarPoliciais();
+
+function _buscarNaLista(mat, statusId, infoId, nomeId, timer){
+  var el = document.getElementById(statusId);
+  var inf = document.getElementById(infoId);
+  el.style.display = "none";
+  inf.style.display = "none";
+  if(!mat || mat.length < 3) return;
+  clearTimeout(timer);
+  return setTimeout(function(){
+    if(!_policiaisCarregados && POLICIAIS_CACHE.length === 0){
+      el.style.cssText = "display:flex;align-items:center;padding:0 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;background:#3a6ae822;color:#8a6a4a;border:1px solid #A87B2244";
+      el.textContent = "⏳";
+      var _retry = setTimeout(function(){ _buscarNaLista(mat, statusId, infoId, nomeId, null); }, 2000);
+      return;
+    }
+    var p = POLICIAIS_CACHE.find(function(x){ return (x.matricula||"").toLowerCase() === mat.trim().toLowerCase(); });
+    if(p){
+      document.getElementById(nomeId).value = p.posto ? p.posto+" "+p.nome : p.nome;
+      el.style.cssText = "display:flex;align-items:center;padding:0 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;background:#22c55e22;color:#1a7a3a;border:1px solid #22c55e44";
+      el.textContent = "✅";
+      inf.style.display = "block";
+      inf.innerHTML = "👮 "+esc(p.posto||"")+" "+esc(p.nome)+(p.turno?" · "+esc(p.turno):"");
+    } else if(POLICIAIS_CACHE.length > 0){
+      el.style.cssText = "display:flex;align-items:center;padding:0 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;background:#f59e0b22;color:#a06a10;border:1px solid #f59e0b44";
+      el.textContent = "⚠️";
+    }
+  }, 400);
+}
+var _polTimer = null, _libTimer = null;
+function buscarPolicial(mat){ _polTimer = _buscarNaLista(mat,"pol-status","pol-info","f-nome",_polTimer); }
+function buscarLiberador(mat){ _libTimer = _buscarNaLista(mat,"lib-status","lib-info","f-lib-nome",_libTimer); }
+
+// ── Busca o item completo na aba real do inventário ──────────
+// Precisa do objeto INTEIRO (não só id+campos de carga): salvarInvItem() sobrescreve
+// a linha inteira com JSON.stringify(dados) — mandar um objeto parcial apagaria
+// descrição, categoria, foto etc. desse item.
+var ITEM_ATUAL = null;
+function buscarItem(tentativa){
+  tentativa = tentativa || 1;
+  if(!ITEM_ID){
+    document.getElementById("msg-carregando").style.display = "none";
+    document.getElementById("msg-erro-item").style.display = "block";
+    return;
+  }
+  var cbName = "cb_item_"+Date.now();
+  var tmout = setTimeout(function(){
+    delete window[cbName];
+    if(tentativa < 3) buscarItem(tentativa+1);
+    else { document.getElementById("msg-carregando").style.display="none"; document.getElementById("msg-erro-item").style.display="block"; }
+  }, 12000);
+  window[cbName] = function(resp){
+    clearTimeout(tmout); delete window[cbName];
+    if(resp && resp.ok && Array.isArray(resp.dados)){
+      var item = resp.dados.find(function(x){ return x.id===ITEM_ID; });
+      if(item){ ITEM_ATUAL = item; mostrarItem(item); return; }
+    }
+    document.getElementById("msg-carregando").style.display = "none";
+    document.getElementById("msg-erro-item").style.display = "block";
+  };
+  var sc = document.createElement("script");
+  sc.src = SHEETS_URL+"?acao=listar&tipo=inv_itens&token="+encodeURIComponent(TOKEN)+"&callback="+cbName;
+  sc.onerror = function(){ clearTimeout(tmout); delete window[cbName]; };
+  document.head.appendChild(sc);
+}
+function mostrarItem(item){
+  document.getElementById("card-carregando").style.display = "none";
+  document.getElementById("card-form").style.display = "block";
+  document.getElementById("item-tag").textContent = item.tombamento ? "Nº "+item.tombamento : "SEM TOMBAMENTO";
+  document.getElementById("item-desc").textContent = item.descricao || "(sem descrição)";
+  var meta = [item.categoria, item.marca, item.modelo, item.localizacao].filter(Boolean).join(" · ");
+  document.getElementById("item-meta").textContent = meta;
+}
+buscarItem();
+
+// ── Assinaturas digitais (canvas) ────────────────────────────
+function criarCanvas(canvasId, boxId, labelId){
+  var cv = document.getElementById(canvasId);
+  var desenhando = false, temAssin = false, _dataURL = null;
+  function _ctx(){ return cv.getContext("2d"); }
+  function _initCtx(){
+    var ctx = _ctx();
+    ctx.strokeStyle = "#3D2B1A"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  }
+  function initCanvas(){
+    var box = document.getElementById(boxId);
+    var w = (box && box.clientWidth > 50) ? box.clientWidth : 400;
+    cv.width = w; cv.height = 130; cv.style.height = "130px";
+    _initCtx();
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", initCanvas);
+  else setTimeout(initCanvas, 50);
+  function pos(e){
+    var rect = cv.getBoundingClientRect();
+    var src = e.touches ? e.touches[0] : e;
+    return { x:(src.clientX-rect.left)*(cv.width/rect.width), y:(src.clientY-rect.top)*(cv.height/rect.height) };
+  }
+  function atualizarPrevia(){ _dataURL = cv.toDataURL("image/jpeg", 0.85); }
+  function iniciarTraco(e){ desenhando = true; var ctx=_ctx(); ctx.beginPath(); var p=pos(e); ctx.moveTo(p.x,p.y); }
+  function continuarTraco(e){
+    if(!desenhando) return;
+    var ctx=_ctx(), p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); temAssin=true;
+    var lbl=document.getElementById(labelId); if(lbl) lbl.style.opacity="0";
+  }
+  function finalizarTraco(){ if(!desenhando) return; desenhando=false; if(temAssin) atualizarPrevia(); }
+  cv.addEventListener("mousedown", iniciarTraco);
+  cv.addEventListener("mousemove", continuarTraco);
+  cv.addEventListener("mouseup", finalizarTraco);
+  cv.addEventListener("mouseleave", finalizarTraco);
+  cv.addEventListener("touchstart", function(e){ e.preventDefault(); iniciarTraco(e); }, {passive:false});
+  cv.addEventListener("touchmove", function(e){ e.preventDefault(); continuarTraco(e); }, {passive:false});
+  cv.addEventListener("touchend", function(e){ e.preventDefault(); finalizarTraco(); }, {passive:false});
+  return {
+    temAssin: function(){ return temAssin; },
+    limpar: function(){
+      cv.width = cv.width; _initCtx(); temAssin = false; _dataURL = null;
+      var lbl = document.getElementById(labelId); if(lbl) lbl.style.opacity = "1";
+    },
+    toDataURL: function(){ if(temAssin && !_dataURL) atualizarPrevia(); return _dataURL || cv.toDataURL("image/jpeg", 0.85); }
+  };
+}
+var ASSIN_RECEBE = criarCanvas("cv-recebe", "box-recebe", "lbl-recebe");
+var ASSIN_LIBERA = criarCanvas("cv-libera", "box-libera", "lbl-libera");
+function limparAssin(quem){
+  if(quem==="libera"){ ASSIN_LIBERA.limpar(); document.getElementById("erro-assin-libera").style.display="none"; }
+  else { ASSIN_RECEBE.limpar(); document.getElementById("erro-assin-recebe").style.display="none"; }
+}
+
+// ── Envio ─────────────────────────────────────────────────
+function enviarCargaFixa(e){
+  e.preventDefault();
+  if(!ITEM_ATUAL){ alert("Item ainda não carregado, aguarde."); return; }
+  if(!ASSIN_RECEBE.temAssin()){
+    document.getElementById("erro-assin-recebe").style.display = "block";
+    document.getElementById("box-recebe").scrollIntoView({behavior:"smooth"});
+    return;
+  }
+  document.getElementById("erro-assin-recebe").style.display = "none";
+  if(!ASSIN_LIBERA.temAssin()){
+    document.getElementById("erro-assin-libera").style.display = "block";
+    document.getElementById("box-libera").scrollIntoView({behavior:"smooth"});
+    return;
+  }
+  document.getElementById("erro-assin-libera").style.display = "none";
+
+  var btn = document.getElementById("btn-enviar");
+  btn.disabled = true; btn.textContent = "Enviando...";
+
+  // Objeto COMPLETO do item (nunca parcial) — só os campos de carga são alterados,
+  // tudo mais (descrição, categoria, foto, localização...) vem intacto do que já buscamos.
+  var item = Object.assign({}, ITEM_ATUAL, {
+    tipo_carga: "fixa",
+    carga_responsavel_grad: (document.getElementById("f-grad")||{}).value||"",
+    carga_responsavel_nome: (document.getElementById("f-nome")||{}).value||"",
+    carga_responsavel_matricula: (document.getElementById("f-mat")||{}).value||"",
+    carga_assinatura: ASSIN_RECEBE.toDataURL(),
+    carga_liberador_grad: (document.getElementById("f-lib-grad")||{}).value||"",
+    carga_liberador_nome: (document.getElementById("f-lib-nome")||{}).value||"",
+    carga_liberador_matricula: (document.getElementById("f-lib-mat")||{}).value||"",
+    carga_liberador_assinatura: ASSIN_LIBERA.toDataURL(),
+    carga_localizacao: "",
+    carga_data: new Date().toISOString(),
+    atualizadoEm: new Date().toISOString()
+  });
+
+  var cb = "cb_env_"+Date.now();
+  var falhou = false;
+  var tmout = setTimeout(function(){ falhou=true; delete window[cb]; onFalha(); }, 15000);
+  window[cb] = function(resp){
+    if(falhou) return;
+    clearTimeout(tmout); delete window[cb];
+    if(resp && resp.ok){ registrarMovimentacao(item); onSucesso(); }
+    else onFalha();
+  };
+  var sc = document.createElement("script");
+  sc.src = SHEETS_URL+"?acao=salvar&tipo=inv_item&dados="+encodeURIComponent(JSON.stringify(item))+"&token="+encodeURIComponent(TOKEN)+"&callback="+cb;
+  sc.onerror = function(){ if(!falhou){ falhou=true; clearTimeout(tmout); delete window[cb]; onFalha(); } };
+  document.head.appendChild(sc);
+
+  function onSucesso(){
+    document.getElementById("form-fixa").style.display = "none";
+    document.getElementById("bloco-sucesso").style.display = "block";
+    var nome1 = (item.carga_responsavel_nome||"").split(" ")[0]||"Policial";
+    document.getElementById("msg-sucesso").innerHTML =
+      "<strong>"+esc(nome1)+"</strong> ficou responsável por:<br>"+esc(item.descricao||"")+
+      (item.tombamento?"<br>Nº "+esc(item.tombamento):"");
+  }
+  function onFalha(){
+    btn.disabled = false; btn.textContent = "✅ Registrar Carga Fixa";
+    alert("Não foi possível enviar. Confira a internet e tente de novo.");
+  }
+}
+
+// Registra a movimentação de entrega — mesmo padrão usado dentro do app (index.html)
+// quando a Carga Fixa é atribuída pela tela de edição do item.
+function registrarMovimentacao(item){
+  var mov = {
+    id: "mc"+Date.now(),
+    itemId: item.id,
+    tipo: "entrega",
+    modalidade: "individual",
+    responsavel: (item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+item.carga_responsavel_nome+(item.carga_responsavel_matricula?" ("+item.carga_responsavel_matricula+")":""),
+    assinatura: item.carga_assinatura||"",
+    dataHora: new Date().toISOString(),
+    observacao: "Carga fixa registrada via link (preenchida pelo próprio policial)"
+  };
+  var cb = "cb_mov_"+Date.now();
+  window[cb] = function(){ delete window[cb]; };
+  var sc = document.createElement("script");
+  sc.src = SHEETS_URL+"?acao=salvar&tipo=inv_movimentacao&dados="+encodeURIComponent(JSON.stringify(mov))+"&token="+encodeURIComponent(TOKEN)+"&callback="+cb;
+  sc.onerror = function(){ delete window[cb]; };
+  document.head.appendChild(sc);
+}
+</script>
+</body>
+</html>
