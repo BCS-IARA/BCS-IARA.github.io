@@ -15907,7 +15907,6 @@ function renderTela() {
             objetos:(document.getElementById("oc-objetos")||{value:""}).value.trim(),
             descricao:dinamica.slice(0,150),
             descricao_dinamica:dinamica,
-            medidas:"",
             policiais:policiaisTexto,
             escolaId:(_det.escolaId||""), escolaNome:(_det.escolaNome||""),
             tipoOcEscola:(_det.tipoOcEscola||""),
@@ -20856,7 +20855,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
       mh.push("</div>");
       mh.push("<div style='display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px'>");
       mh.push("<div><label style='"+mLS+"'>Tipo *</label><input id='ed-tipo' type='text' value='"+esc(ocM.tipo||"")+"' style='"+mIS+"'></div>");
-      mh.push("<div><label style='"+mLS+"'>Data</label><input id='ed-data' type='date' value='"+esc(ocM.data||"")+"' style='"+mIS+"'></div>");
+      mh.push("<div><label style='"+mLS+"'>Data</label><input id='ed-data' type='date' value='"+esc(normData(ocM.data||""))+"' style='"+mIS+"'></div>");
       mh.push("<div><label style='"+mLS+"'>Hora</label><input id='ed-hora' type='time' value='"+esc(ocM.hora||"")+"' style='"+mIS+"'></div>");
       mh.push("<div><label style='"+mLS+"'>Zona</label><select id='ed-zona' style='"+mIS+"'><option"+(ocM.zona!=="Rural"?" selected":"")+" value='Urbana'>Urbana</option><option"+(ocM.zona==="Rural"?" selected":"")+" value='Rural'>Rural</option></select></div>");
       mh.push("</div>");
@@ -20990,7 +20989,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
         ocM.tipo    = document.getElementById("ed-tipo").value.trim();
         var _novaData = document.getElementById("ed-data").value;
         ocM.data    = _novaData || ocM.data || hoje(); // preserva data original se campo vazio
-        ocM.hora    = document.getElementById("ed-hora").value;
+        ocM.hora    = document.getElementById("ed-hora").value || ocM.hora || "";
         ocM.zona    = document.getElementById("ed-zona").value;
         var localVal = document.getElementById("ed-local").value.trim();
         ocM.local   = localVal;
@@ -21024,7 +21023,6 @@ function renderOcorrenciasGestor(el, perfil_atual){
         ocM.descricao_dinamica = narrativa;
         ocM.texto_original     = narrativa;
         ocM.descricao = narrativa.slice(0,150);
-        ocM.medidas  = "";
         ocM.policiais = document.getElementById("ed-policiais").value.trim();
         ocM.situacao  = (document.getElementById("ed-situacao")||{value:"nova"}).value || "nova";
         if(ocM.situacao==="em_acompanhamento") garantirCasoAcompanhamento(ocM);
@@ -21050,7 +21048,6 @@ function renderOcorrenciasGestor(el, perfil_atual){
             objetos:ocM.objetos,
             descricao:ocM.descricao,
             descricao_dinamica:ocM.descricao_dinamica,
-            medidas:ocM.medidas,
             policiais:ocM.policiais
           };
           // acao:"editar" -> editarOc() faz patch célula-a-célula só nos campos enviados.
