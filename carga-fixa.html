@@ -63,12 +63,13 @@ input:focus{ border-color:#D9A53C; }
     <span class="tag" id="item-tag">ITEM</span>
     <div class="desc" id="item-desc"></div>
     <div class="meta" id="item-meta"></div>
+    <div class="meta" id="item-resp-atual" style="display:none;margin-top:6px;font-weight:700;color:#3a7a4a"></div>
   </div>
 
   <form id="form-fixa" onsubmit="enviarCargaFixa(event)">
 
     <div class="secao">
-      <div class="secao-titulo">👮 Policial que Recebe a Carga</div>
+      <div class="secao-titulo" id="titulo-pol">👮 Policial que Recebe a Carga</div>
       <div class="row3" style="margin-bottom:10px">
         <label class="campo" style="margin:0"><span>Graduação</span><input type="text" id="f-grad" placeholder="Ex: 3°Sgt"/></label>
         <label class="campo" style="margin:0">
@@ -98,7 +99,7 @@ input:focus{ border-color:#D9A53C; }
     </div>
 
     <div class="secao">
-      <div class="secao-titulo libera">🗝️ Responsável que Libera a Carga</div>
+      <div class="secao-titulo libera" id="titulo-lib">🗝️ Responsável que Libera a Carga</div>
       <div class="row3" style="margin-bottom:10px">
         <label class="campo" style="margin:0"><span>Graduação</span><input type="text" id="f-lib-grad" placeholder="Ex: Sgt"/></label>
         <label class="campo" style="margin:0">
@@ -245,6 +246,9 @@ function buscarItem(tentativa){
   sc.onerror = function(){ clearTimeout(tmout); delete window[cbName]; };
   document.head.appendChild(sc);
 }
+// MODO decidido pelo estado ATUAL do item ao abrir o link: se já tem Carga Fixa ativa,
+// o mesmo link vira devolução em vez de atribuição — evita ter dois tipos de link/QR.
+var MODO = "atribuir";
 function mostrarItem(item){
   document.getElementById("card-carregando").style.display = "none";
   document.getElementById("card-form").style.display = "block";
@@ -252,6 +256,23 @@ function mostrarItem(item){
   document.getElementById("item-desc").textContent = item.descricao || "(sem descrição)";
   var meta = [item.categoria, item.marca, item.modelo, item.localizacao].filter(Boolean).join(" · ");
   document.getElementById("item-meta").textContent = meta;
+
+  MODO = (item.tipo_carga==="fixa" && item.carga_responsavel_nome) ? "devolver" : "atribuir";
+  if(MODO==="devolver"){
+    var resp = (item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+item.carga_responsavel_nome;
+    var respEl = document.getElementById("item-resp-atual");
+    respEl.textContent = "Atualmente sob responsabilidade de: "+resp;
+    respEl.style.display = "block";
+    document.getElementById("titulo-pol").textContent = "👮 Policial que Devolve";
+    document.getElementById("titulo-lib").textContent = "🗝️ Responsável que Recebe de Volta";
+    document.getElementById("lbl-recebe").textContent = "Assine aqui com o dedo";
+    document.getElementById("lbl-libera").textContent = "Responsável assina aqui";
+    document.getElementById("btn-enviar").textContent = "✅ Confirmar Devolução";
+    // Pré-preenche com quem está com o item — quem devolve normalmente é a mesma pessoa
+    document.getElementById("f-grad").value = item.carga_responsavel_grad||"";
+    document.getElementById("f-mat").value = item.carga_responsavel_matricula||"";
+    document.getElementById("f-nome").value = item.carga_responsavel_nome||"";
+  }
 }
 buscarItem();
 
@@ -327,11 +348,18 @@ function enviarCargaFixa(e){
   document.getElementById("erro-assin-libera").style.display = "none";
 
   var btn = document.getElementById("btn-enviar");
+  var btnTextoOrig = btn.textContent;
   btn.disabled = true; btn.textContent = "Enviando...";
 
   // Objeto COMPLETO do item (nunca parcial) — só os campos de carga são alterados,
   // tudo mais (descrição, categoria, foto, localização...) vem intacto do que já buscamos.
-  var item = Object.assign({}, ITEM_ATUAL, {
+  var camposCarga = MODO==="devolver" ? {
+    tipo_carga: "none",
+    carga_responsavel_grad: "", carga_responsavel_nome: "", carga_responsavel_matricula: "", carga_assinatura: "",
+    carga_liberador_grad: "", carga_liberador_nome: "", carga_liberador_matricula: "", carga_liberador_assinatura: "",
+    carga_localizacao: "", carga_data: "",
+    atualizadoEm: new Date().toISOString()
+  } : {
     tipo_carga: "fixa",
     carga_responsavel_grad: (document.getElementById("f-grad")||{}).value||"",
     carga_responsavel_nome: (document.getElementById("f-nome")||{}).value||"",
@@ -344,7 +372,11 @@ function enviarCargaFixa(e){
     carga_localizacao: "",
     carga_data: new Date().toISOString(),
     atualizadoEm: new Date().toISOString()
-  });
+  };
+  var item = Object.assign({}, ITEM_ATUAL, camposCarga);
+  // Guarda quem devolveu/recebeu ANTES do objeto perder esses dados (limpos acima no modo devolver)
+  var quemPol = { grad:(document.getElementById("f-grad")||{}).value||"", nome:(document.getElementById("f-nome")||{}).value||"", mat:(document.getElementById("f-mat")||{}).value||"", assin:ASSIN_RECEBE.toDataURL() };
+  var quemLib = { grad:(document.getElementById("f-lib-grad")||{}).value||"", nome:(document.getElementById("f-lib-nome")||{}).value||"", mat:(document.getElementById("f-lib-mat")||{}).value||"", assin:ASSIN_LIBERA.toDataURL() };
 
   var cb = "cb_env_"+Date.now();
   var falhou = false;
@@ -352,7 +384,7 @@ function enviarCargaFixa(e){
   window[cb] = function(resp){
     if(falhou) return;
     clearTimeout(tmout); delete window[cb];
-    if(resp && resp.ok){ registrarMovimentacao(item); onSucesso(); }
+    if(resp && resp.ok){ registrarMovimentacao(item, quemPol, quemLib); onSucesso(); }
     else onFalha();
   };
   var sc = document.createElement("script");
@@ -363,27 +395,42 @@ function enviarCargaFixa(e){
   function onSucesso(){
     document.getElementById("form-fixa").style.display = "none";
     document.getElementById("bloco-sucesso").style.display = "block";
-    var nome1 = (item.carga_responsavel_nome||"").split(" ")[0]||"Policial";
-    document.getElementById("msg-sucesso").innerHTML =
-      "<strong>"+esc(nome1)+"</strong> ficou responsável por:<br>"+esc(item.descricao||"")+
-      (item.tombamento?"<br>Nº "+esc(item.tombamento):"");
+    var nome1 = (quemPol.nome||"").split(" ")[0]||"Policial";
+    if(MODO==="devolver"){
+      document.querySelector("#bloco-sucesso h2").textContent = "Devolução registrada!";
+      document.getElementById("msg-sucesso").innerHTML =
+        "<strong>"+esc(nome1)+"</strong> devolveu:<br>"+esc(item.descricao||"")+
+        (item.tombamento?"<br>Nº "+esc(item.tombamento):"");
+    } else {
+      document.getElementById("msg-sucesso").innerHTML =
+        "<strong>"+esc(nome1)+"</strong> ficou responsável por:<br>"+esc(item.descricao||"")+
+        (item.tombamento?"<br>Nº "+esc(item.tombamento):"");
+    }
   }
   function onFalha(){
-    btn.disabled = false; btn.textContent = "✅ Registrar Carga Fixa";
+    btn.disabled = false; btn.textContent = btnTextoOrig;
     alert("Não foi possível enviar. Confira a internet e tente de novo.");
   }
 }
 
-// Registra a movimentação de entrega — mesmo padrão usado dentro do app (index.html)
-// quando a Carga Fixa é atribuída pela tela de edição do item.
-function registrarMovimentacao(item){
-  var mov = {
+// Registra a movimentação — "entrega" (mesma forma usada dentro do app quando a Carga
+// Fixa é atribuída pela tela de edição) ou "estoque"/devolução (mesma forma usada pelo
+// botão "Devolver Carga Fixa" do app — já lida por _invVerHistorico/_invPDFMovimentacao).
+function registrarMovimentacao(item, quemPol, quemLib){
+  var mov = MODO==="devolver" ? {
+    id: "mc"+Date.now(), itemId: item.id, tipo_mov: "estoque",
+    origem: "Carga Fixa — "+(quemPol.grad?quemPol.grad+" ":"")+quemPol.nome,
+    destino: "Almoxarifado", motivo: "Devolução de Carga Fixa",
+    dataHora: new Date().toISOString(),
+    autorizador_grad: quemPol.grad, autorizador_nome: quemPol.nome, autorizador_mat: quemPol.mat, autorizador_assinatura: quemPol.assin,
+    receptor_grad: quemLib.grad, receptor_nome: quemLib.nome, receptor_mat: quemLib.mat, receptor_assinatura: quemLib.assin
+  } : {
     id: "mc"+Date.now(),
     itemId: item.id,
     tipo: "entrega",
     modalidade: "individual",
-    responsavel: (item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+item.carga_responsavel_nome+(item.carga_responsavel_matricula?" ("+item.carga_responsavel_matricula+")":""),
-    assinatura: item.carga_assinatura||"",
+    responsavel: (quemPol.grad?quemPol.grad+" ":"")+quemPol.nome+(quemPol.mat?" ("+quemPol.mat+")":""),
+    assinatura: quemPol.assin,
     dataHora: new Date().toISOString(),
     observacao: "Carga fixa registrada via link (preenchida pelo próprio policial)"
   };

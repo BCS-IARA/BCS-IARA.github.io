@@ -23055,6 +23055,11 @@ function _invAbrirItem(id){
   html += "<button id='inv-carga-btn-none' onclick=\"_invSetTipoCarga('none')\" type='button' style='flex:1;padding:8px;border:1px solid #5e4636;border-radius:6px;color:#6B5236;font-size:12px;cursor:pointer;background:"+(tipoCarga==="none"?"#DBC79E":"transparent")+"'>Sem Carga</button>";
   html += "<button id='inv-carga-btn-fixa' onclick=\"_invSetTipoCarga('fixa')\" type='button' style='flex:1;padding:8px;border:1px solid #D9A53C;border-radius:6px;color:#D9A53C;font-size:12px;font-weight:700;cursor:pointer;background:"+(tipoCarga==="fixa"?"#2a1c10":"transparent")+"'>✅ Carga Fixa</button>";
   html += "</div>";
+  // Devolver — reflete o que está SALVO no item (não o toggle acima, que é edição em
+  // andamento), pra sempre oferecer devolver a carga fixa que realmente está no registro.
+  if(item && item.tipo_carga==="fixa" && item.carga_responsavel_nome){
+    html += "<button type='button' onclick=\"_invAbrirDevolucaoCarga('"+esc(id||"")+"')\" style='width:100%;margin-bottom:12px;background:#3a1c10;border:1px solid #c8860a;color:#e8a020;padding:9px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer'>↩️ Devolver Carga Fixa</button>";
+  }
   html += "<input type='hidden' id='inv-tipo-carga-val' value='"+tipoCarga+"'>";
   // Oculta os botões antigos de pessoal — carga fixa agora é o único modo com policial
   html += "<input type='hidden' id='inv-carga-btn-pessoal' value='pessoal'>";
@@ -25504,6 +25509,116 @@ function _invGerarLinkCargaFixa(itemId){
   html+="</div></div></div></div>";
   document.body.insertAdjacentHTML("beforeend", html);
   document.getElementById("modal-inv-link-fixa").onclick=function(e){if(e.target===this)this.remove();};
+}
+
+// ── Devolver Carga Fixa — fecha o ciclo, com assinatura dos dois lados ────────
+// Usa tipo_mov:"estoque" e os campos autorizador_*/receptor_* — mesma convenção já
+// lida por _invVerHistorico()/_invPDFMovimentacao(), sem precisar mudar essas telas.
+function _invAbrirDevolucaoCarga(itemId){
+  var item=(state.invItens||[]).find(function(x){return x.id===itemId;});
+  if(!item){ showToast("Item não encontrado","error"); return; }
+  if(!(item.tipo_carga==="fixa" && item.carga_responsavel_nome)){ showToast("Este item não está em Carga Fixa","error"); return; }
+  var IS="width:100%;background:#EAD9B8;border:1px solid #A87B22;color:#3D2B1A;padding:8px;border-radius:6px;font-size:13px;box-sizing:border-box";
+  var html="<div id='modal-inv-devol' style='position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9700;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto'>";
+  html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:14px;width:100%;max-width:480px;padding:0;margin-bottom:16px'>";
+  html+="<div style='background:#2a1c10;padding:14px 18px;border-bottom:1px solid #5e4636;display:flex;justify-content:space-between;align-items:center'>";
+  html+="<span style='color:#D9A53C;font-size:14px;font-weight:700'>↩️ Devolver Carga Fixa</span>";
+  html+="<button onclick=\"document.getElementById('modal-inv-devol').remove()\" style='background:none;border:none;color:#888;font-size:18px;cursor:pointer'>✕</button>";
+  html+="</div><div style='padding:18px;display:flex;flex-direction:column;gap:14px'>";
+  html+="<div style='background:#EAD9B8;border:1px solid #DBC79E;border-radius:8px;padding:10px 14px'>";
+  html+="<p style='color:#6B5236;font-size:11px;margin:0 0 4px'>Item</p>";
+  html+="<p style='color:#3D2B1A;font-size:13px;font-weight:700;margin:0'>"+esc(item.descricao||"")+"</p>";
+  html+="<p style='color:#6B5236;font-size:11px;margin:6px 0 0'>Atualmente sob responsabilidade de: <b>"+esc((item.carga_responsavel_grad?item.carga_responsavel_grad+" ":"")+item.carga_responsavel_nome)+"</b></p>";
+  html+="</div>";
+  html+="<div style='background:#F2E4C8;border:1px solid #5e4636;border-radius:7px;padding:12px'>";
+  html+="<p style='color:#3a7a4a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>👮 Policial que Devolve</p>";
+  html+="<div style='display:grid;grid-template-columns:100px 1fr 140px;gap:8px;margin-bottom:10px'>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Graduação</label><input id='dev-pol-grad' value='"+esc(item.carga_responsavel_grad||"")+"' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Nome *</label><input id='dev-pol-nome' value='"+esc(item.carga_responsavel_nome||"")+"' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Matrícula</label><input id='dev-pol-mat' value='"+esc(item.carga_responsavel_matricula||"")+"' style='"+IS+"'></div>";
+  html+="</div>";
+  html+="<label style='color:#6B5236;font-size:11px'>Assinatura de quem devolve</label>";
+  html+="<div style='position:relative;margin-top:4px;border:1px solid #DBC79E;border-radius:8px;background:#fff'>";
+  html+="<canvas id='dev-pad-pol' width='500' height='140' style='width:100%;height:140px;border-radius:8px;display:block;cursor:crosshair;touch-action:none'></canvas>";
+  html+="<button type='button' onclick='_invLimparPad(\"dev-pad-pol\")' style='position:absolute;top:5px;right:6px;background:#f0f0f0;border:1px solid #ccc;color:#555;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
+  html+="</div></div>";
+  html+="<div style='background:#EAD9B8;border:1px solid #5e4636;border-radius:7px;padding:12px'>";
+  html+="<p style='color:#6B5236;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px'>🗝️ Responsável que Recebe de Volta</p>";
+  html+="<div style='display:grid;grid-template-columns:100px 1fr 140px;gap:8px;margin-bottom:10px'>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Graduação</label><input id='dev-lib-grad' placeholder='Ex: Sgt' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Nome *</label><input id='dev-lib-nome' placeholder='Nome do responsável' style='"+IS+"'></div>";
+  html+="<div><label style='color:#6B5236;font-size:11px'>Matrícula</label><input id='dev-lib-mat' placeholder='Nº matrícula' style='"+IS+"'></div>";
+  html+="</div>";
+  html+="<label style='color:#6B5236;font-size:11px'>Assinatura de quem recebe de volta</label>";
+  html+="<div style='position:relative;margin-top:4px;border:1px solid #DBC79E;border-radius:8px;background:#fff'>";
+  html+="<canvas id='dev-pad-lib' width='500' height='140' style='width:100%;height:140px;border-radius:8px;display:block;cursor:crosshair;touch-action:none'></canvas>";
+  html+="<button type='button' onclick='_invLimparPad(\"dev-pad-lib\")' style='position:absolute;top:5px;right:6px;background:#f0f0f0;border:1px solid #ccc;color:#555;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer'>Limpar</button>";
+  html+="</div></div>";
+  html+="<div style='display:flex;gap:10px;justify-content:flex-end'>";
+  html+="<button onclick=\"document.getElementById('modal-inv-devol').remove()\" style='background:#EAD9B8;border:1px solid #DBC79E;color:#6B5236;padding:9px 20px;border-radius:7px;font-size:13px;cursor:pointer'>Cancelar</button>";
+  html+="<button onclick=\"_invConfirmarDevolucao('"+esc(itemId)+"')\" style='background:linear-gradient(135deg,#2a1c10,#3a2818);border:1px solid #C8A84B;color:#f5ede0;padding:9px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer'>✅ Confirmar Devolução</button>";
+  html+="</div></div></div></div>";
+  document.body.insertAdjacentHTML("beforeend", html);
+  var cPol=document.getElementById("dev-pad-pol"), cLib=document.getElementById("dev-pad-lib");
+  [cPol,cLib].forEach(function(c){ c.getContext("2d").fillStyle="#fff"; c.getContext("2d").fillRect(0,0,c.width,c.height); _invIniciarPad(c,null); });
+}
+function _invTemTraco(canvasId){
+  var c=document.getElementById(canvasId); if(!c) return false;
+  var ctx=c.getContext("2d");
+  var px=ctx.getImageData(0,0,c.width,c.height).data;
+  for(var i=0;i<px.length;i+=4){ if(px[i]<250||px[i+1]<250||px[i+2]<250) return true; }
+  return false;
+}
+function _invCapturarAssin(canvasId){
+  var c=document.getElementById(canvasId); if(!c) return "";
+  return _invTemTraco(canvasId) ? c.toDataURL("image/jpeg",0.85) : "";
+}
+function _invConfirmarDevolucao(itemId){
+  var nomePol=(document.getElementById("dev-pol-nome")||{}).value||"";
+  var nomeLib=(document.getElementById("dev-lib-nome")||{}).value||"";
+  if(!nomePol.trim()){ showToast("Informe o nome de quem devolve","error"); return; }
+  if(!nomeLib.trim()){ showToast("Informe o nome de quem recebe de volta","error"); return; }
+  if(!_invTemTraco("dev-pad-pol")){ showToast("Falta a assinatura de quem devolve","error"); return; }
+  if(!_invTemTraco("dev-pad-lib")){ showToast("Falta a assinatura de quem recebe de volta","error"); return; }
+
+  var idx=(state.invItens||[]).findIndex(function(x){return x.id===itemId;});
+  if(idx<0){ showToast("Item não encontrado","error"); return; }
+  var item=Object.assign({}, state.invItens[idx]); // objeto completo — nunca parcial
+
+  var gradPol=(document.getElementById("dev-pol-grad")||{}).value||"";
+  var matPol=(document.getElementById("dev-pol-mat")||{}).value||"";
+  var gradLib=(document.getElementById("dev-lib-grad")||{}).value||"";
+  var matLib=(document.getElementById("dev-lib-mat")||{}).value||"";
+  var assinPol=_invCapturarAssin("dev-pad-pol");
+  var assinLib=_invCapturarAssin("dev-pad-lib");
+
+  var mov={
+    id:"mc"+Date.now(), itemId:item.id, tipo_mov:"estoque",
+    origem:"Carga Fixa — "+(gradPol?gradPol+" ":"")+nomePol,
+    destino:"Almoxarifado", motivo:"Devolução de Carga Fixa",
+    dataHora:new Date().toISOString(),
+    autorizador_grad:gradPol, autorizador_nome:nomePol, autorizador_mat:matPol, autorizador_assinatura:assinPol,
+    receptor_grad:gradLib, receptor_nome:nomeLib, receptor_mat:matLib, receptor_assinatura:assinLib
+  };
+  if(!state.invMovimentacoes) state.invMovimentacoes=[];
+  state.invMovimentacoes.push(mov);
+  _invEnviarSheets("inv_movimentacao", mov);
+
+  // Limpa a carga fixa — só esses campos mudam, o resto do item permanece intacto
+  item.tipo_carga="none";
+  item.carga_responsavel_grad=""; item.carga_responsavel_nome=""; item.carga_responsavel_matricula=""; item.carga_assinatura="";
+  item.carga_liberador_grad=""; item.carga_liberador_nome=""; item.carga_liberador_matricula=""; item.carga_liberador_assinatura="";
+  item.carga_data="";
+  item.atualizadoEm=new Date().toISOString();
+  state.invItens[idx]=item;
+  _invSalvarLocal();
+  _invEnviarSheets("inv_item", item);
+
+  var mDev=document.getElementById("modal-inv-devol"); if(mDev) mDev.remove();
+  var mItem=document.getElementById("modal-inv-item"); if(mItem) mItem.remove();
+  var main=document.getElementById("main-content")||document.getElementById("main");
+  if(main) renderInventario(main);
+  showToast("✓ Carga Fixa devolvida");
 }
 
 // ── QR Code por item ──────────────────────────────────────────
