@@ -943,6 +943,13 @@ async function carregarDadosAppDoSheets(){
     // usa um callback JSONP próprio (contador incremental), então não há risco de colisão.
     var _results = await Promise.all([
       lerDadoAppSheets("bcs_projetos"),
+      // Vítimas — aba dedicada "vitimas" (listarVitimas já existe no backend e sempre
+      // devolveu tudo, sem parâmetro). Nunca era chamada de forma geral: state.vitimas só
+      // recebia registros via busca por nome (autocomplete) ou criação local — uma vítima
+      // cadastrada num aparelho nunca aparecia no outro, e o dossiê de uma ocorrência ligada
+      // a essa vítima falhava com "Vítima não encontrada" em qualquer aparelho que não a
+      // tivesse criado ou buscado por nome antes.
+      _sheetsGet({acao:"listar",tipo:"vitimas"}),
       // Eventos avulsos: aba da planilha (fonte primária) + ScriptProperties (fallback)
       _sheetsGet({acao:"listar",tipo:"eventos_avulsos"}),
       lerDadoAppSheets("bcs_eventos_avulsos"),
@@ -962,6 +969,13 @@ async function carregarDadosAppDoSheets(){
       lerDadoAppSheets("bcs_cargas_armamento"),
       lerDadoAppSheets("bcs_inv_itens"),
       lerDadoAppSheets("bcs_inv_mov"),
+      // Itens e movimentações — aba dedicada (fonte canônica). Mesmo problema do Encaminhamentos:
+      // o blob acima só reflete o que este aparelho tinha localmente na última sincronização;
+      // itens criados/com foto atualizada noutro aparelho ficavam invisíveis aqui a menos que
+      // alguém clicasse em "Recarregar do Sheets" (que descarta tudo local pra buscar de novo —
+      // era o único jeito de "sincronizar" e por isso parecia que precisava "limpar cache").
+      _sheetsGet({acao:"listar",tipo:"inv_itens"}),
+      _sheetsGet({acao:"listar",tipo:"inv_movimentacoes"}),
       // Conferências: buscar da aba dedicada (fonte canônica) para capturar itens marcados por outros aparelhos
       _sheetsGet({acao:"listar",tipo:"inv_conferencias"}),
       lerDadoAppSheets("bcs_visitas_escolares"),
@@ -979,6 +993,15 @@ async function carregarDadosAppDoSheets(){
       // num aparelho e nunca vistos por outro (que nunca teve o id localmente) ficavam
       // invisíveis pra sempre na Fila de Encaminhamentos. sem vitima_id retorna tudo.
       _sheetsGet({acao:"listar",tipo:"encaminhamentos"}),
+      // Policiais — mesmo padrão: aba real existe (usada no picker "quem está conferindo" do
+      // Inventário), mas nunca era puxada na sincronização geral, só via blob.
+      _sheetsGet({acao:"listar",tipo:"policiais"}),
+      // Solicitações — feature ativa (aba "Solicitações", badge de pendentes). Criadas via
+      // formulário público (solicitacao.html) direto na aba real; o lado gestor nunca lia de
+      // lá, então uma solicitação enviada por um policial podia nunca aparecer pro gestor.
+      _sheetsGet({acao:"listar",tipo:"solicitacoes"}),
+      // Materiais/Patrimônio — mesmo caso: grava na aba real ao cadastrar, nunca lia de volta.
+      _sheetsGet({acao:"listar",tipo:"materiais_patrimonio"}),
       lerDadoAppSheets("bcs_fila_pendente"),
       lerDadoAppSheets("bcs_conselho_atas"),
       lerDadoAppSheets("bcs_conselho_associados"),
@@ -986,6 +1009,7 @@ async function carregarDadosAppDoSheets(){
     ]);
     var _i=0;
     var projetos              = _results[_i++];
+    var _rVitimas              = _results[_i++];
     var _evAba                = _results[_i++];
     var _evProps               = _results[_i++];
     var alertas                = _results[_i++];
@@ -1004,6 +1028,8 @@ async function carregarDadosAppDoSheets(){
     var cargasSheets            = _results[_i++];
     var invItensSheets          = _results[_i++];
     var invMovSheets            = _results[_i++];
+    var _rInvItensTabela         = _results[_i++];
+    var _rInvMovTabela           = _results[_i++];
     var _rConf                  = _results[_i++];
     var visEscSheets            = _results[_i++];
     var candidaturasSheets      = _results[_i++];
@@ -1016,6 +1042,9 @@ async function carregarDadosAppDoSheets(){
     var devolutivasSheets       = _results[_i++];
     var encaminhamientosSheets  = _results[_i++];
     var _rEncTabela              = _results[_i++];
+    var _rPoliciaisTabela         = _results[_i++];
+    var _rSolicitacoesTabela      = _results[_i++];
+    var _rMateriaisTabela         = _results[_i++];
     var filaPendenteSheets      = _results[_i++];
     var conselhoAtasSheets      = _results[_i++];
     var conselhoAssocSheets     = _results[_i++];
@@ -1035,6 +1064,12 @@ async function carregarDadosAppDoSheets(){
 
     var localProj  = state.projetos||[];
     var localEv    = state.eventosAvulsos||[];
+
+    // 🧍 Vítimas — merge por id, local sempre preservado (_mergeById), aba real só acrescenta
+    // registros que este aparelho ainda não conhece.
+    if(_rVitimas && _rVitimas.ok && Array.isArray(_rVitimas.dados)){
+      state.vitimas = _mergeById(state.vitimas||[], _rVitimas.dados);
+    }
 
     // Merge delegado à função global _mergeById
 
@@ -1128,6 +1163,15 @@ async function carregarDadosAppDoSheets(){
     state.cargasArmamento     = _mergeById(state.cargasArmamento||[],     cargasSheets);
     state.invItens            = _mergeByIdTimestamp(state.invItens||[],            invItensSheets);
     state.invMovimentacoes    = _mergeById(state.invMovimentacoes||[],    invMovSheets);
+    // Mescla com a aba dedicada — só ACRESCENTA o que ainda não existe localmente (_mergeById,
+    // não por timestamp: mesmo risco de reversão que o de Encaminhamentos se algum campo não
+    // tiver um timestamp confiável dos dois lados).
+    if(_rInvItensTabela && _rInvItensTabela.ok && Array.isArray(_rInvItensTabela.dados)){
+      state.invItens = _mergeById(state.invItens, _rInvItensTabela.dados);
+    }
+    if(_rInvMovTabela && _rInvMovTabela.ok && Array.isArray(_rInvMovTabela.dados)){
+      state.invMovimentacoes = _mergeById(state.invMovimentacoes, _rInvMovTabela.dados);
+    }
     state.invConferencias     = _invMergeConferencias(state.invConferencias||[],   invConfSheets);
     state.visitasEscolares    = _mergeById(state.visitasEscolares||[],    visEscSheets);
     state.candidaturas        = _mergeById(state.candidaturas||[],        candidaturasSheets);
@@ -1158,6 +1202,15 @@ async function carregarDadosAppDoSheets(){
         });
       });
       state.encaminhamentos = _mergeById(state.encaminhamentos, _encTabNorm);
+    }
+    if(_rPoliciaisTabela && _rPoliciaisTabela.ok && Array.isArray(_rPoliciaisTabela.dados)){
+      state.policiais = _mergeById(state.policiais, _rPoliciaisTabela.dados);
+    }
+    if(_rSolicitacoesTabela && _rSolicitacoesTabela.ok && Array.isArray(_rSolicitacoesTabela.dados)){
+      state.solicitacoes = _mergeById(state.solicitacoes||[], _rSolicitacoesTabela.dados);
+    }
+    if(_rMateriaisTabela && _rMateriaisTabela.ok && Array.isArray(_rMateriaisTabela.dados)){
+      state.materiaisPatrimonio = _mergeById(state.materiaisPatrimonio||[], _rMateriaisTabela.dados);
     }
     // Fila de triagem: sobrescrever (ordem-dependente, sem merge)
     if(filaPendenteSheets && Array.isArray(filaPendenteSheets)){
