@@ -14537,6 +14537,19 @@ function _ocNaFila(o){
   var iso=m?m[3]+"-"+m[2]+"-"+m[1]:(/^\d{4}-\d{2}-\d{2}/.test(s)?s.substring(0,10):null);
   return iso ? iso > _CORTE_FILA : false;
 }
+// Bairros da jurisdição — filtro padrão da Triagem. Substring-match (sem acento, case-insensitive)
+// pra pegar variações reais que aparecem nos dados importados do SIGESPOL, ex.: "Alto Maron" e
+// "Alto Marom" (grafias diferentes pro mesmo bairro), "Panorama"/"Panorama II"/"Alto do Panorama".
+var _TRIAGEM_BAIRROS_JURISDICAO = ["primavera","europa unida","panorama","alto maron","alto marom","cruzeiro","pedrinhas","guarani"];
+function _triagemNormBairro(s){
+  return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+}
+function _triagemBairroNaJurisdicao(o){
+  var b = _triagemNormBairro(o.bairro);
+  if(!b) return false;
+  return _TRIAGEM_BAIRROS_JURISDICAO.some(function(k){ return b.indexOf(k)>=0; });
+}
+
 function renderTriagem(main) {
   var ocs = (state.db.ocorrencias||[]);
   var novas = ocs.filter(_ocNaFila);
@@ -14546,14 +14559,16 @@ function renderTriagem(main) {
   vds.sort(porDataDesc); resto.sort(porDataDesc);
   var fila = vds.concat(resto);
 
-  // Filtro mês/dia
+  // Filtro mês/dia/bairro
   var _fMes = state._triagemFiltroMes||"";
   var _fDia = state._triagemFiltroDia||"";
+  var _fBairro = state._triagemFiltroBairro !== false; // padrão: marcado
   function _isoOc(o){ var s=String(o.data||"").trim(); var m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m?m[3]+"-"+m[2]+"-"+m[1]:s; }
   var filaFiltrada = fila.filter(function(o){
     var iso = _isoOc(o);                    // YYYY-MM-DD
     if(_fMes && iso.substring(0,7)!==_fMes) return false;
     if(_fDia  && iso.substring(8,10)!==_fDia) return false;
+    if(_fBairro && !_triagemBairroNaJurisdicao(o)) return false;
     return true;
   });
 
@@ -14606,16 +14621,20 @@ function renderTriagem(main) {
   });
   h += "</select>";
   h += "</div>";
+  // Filtro bairros da jurisdição — marcado por padrão
+  h += "<label style='display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--tinta-2);cursor:pointer'>";
+  h += "<input type='checkbox' "+(_fBairro?"checked":"")+" onchange='state._triagemFiltroBairro=this.checked;var m=document.getElementById(\"main\");if(m)renderTriagem(m)'> Só bairros da jurisdição";
+  h += "</label>";
   h += "</div>";
 
-  if(!fila.length){
+  if(!filaFiltrada.length){
     h += "<div style='padding:32px 16px;text-align:center'>";
     h += "<p style='font-size:24px;margin-bottom:8px'>✅</p>";
-    h += "<p style='font-size:13px;font-weight:700;color:var(--tinta);font-family:Georgia,serif'>Fila vazia</p>";
-    h += "<p style='color:var(--tinta-2);font-size:11px;margin-top:4px'>Todas as ocorrências foram triadas.</p>";
+    h += "<p style='font-size:13px;font-weight:700;color:var(--tinta);font-family:Georgia,serif'>"+(fila.length?"Nada com os filtros atuais":"Fila vazia")+"</p>";
+    h += "<p style='color:var(--tinta-2);font-size:11px;margin-top:4px'>"+(fila.length?"Ajuste ou desmarque os filtros pra ver o restante da fila.":"Todas as ocorrências foram triadas.")+"</p>";
     h += "</div>";
   } else {
-    fila.forEach(function(o){
+    filaFiltrada.forEach(function(o){
       var isVD = o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
       var ativo = ocSel && ocSel.id===o.id;
       h += "<div onclick='_selecionarTriagem(\""+esc(o.id)+"\")' style='padding:10px 14px;border-bottom:1px solid var(--papel-3);cursor:pointer;background:"+(ativo?"var(--ambar-claro)":"transparent")+";border-left:3px solid "+(isVD?"var(--verm)":(ativo?"var(--ambar)":"transparent"))+"'>";
