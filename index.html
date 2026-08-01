@@ -1139,10 +1139,17 @@ async function carregarDadosAppDoSheets(){
     state.alertasGraves       = _mergeById(state.alertasGraves||[],       alertasGravesSheets);
     state.devolutivasCrav     = _mergeById(state.devolutivasCrav||[],     devolutivasSheets);
     state.encaminhamentos     = _mergeByIdTimestamp(state.encaminhamentos||[], encaminhamientosSheets);
-    // Mescla com a aba dedicada — normaliza os campos que a tela usa (status/tipo/data),
-    // já que essa aba grava como "situacao" e (para registros criados antes deste fix)
-    // não tem tipo/data/prazo/descricao — cai no orgao/criadoEm como aproximação razoável.
+    // Mescla com a aba dedicada — só ACRESCENTA o que ainda não existe localmente (_mergeById,
+    // não _mergeByIdTimestamp). Objetos criados no front-end não têm campo criadoEm (só a aba
+    // real adiciona isso ao gravar) — numa comparação por timestamp, "" sempre perde pra uma
+    // data real, então a versão da aba real sempre vencia, mesmo desatualizada (ex.: alguém
+    // marca "concluído" e o próximo sync ainda lê a aba real com o status antigo, porque
+    // atualizarEncaminhamento() é fire-and-forget e pode não ter terminado — isso desfazia a
+    // conclusão). Com _mergeById, a aba real nunca sobrescreve um id que já existe local.
     if(_rEncTabela && _rEncTabela.ok && Array.isArray(_rEncTabela.dados)){
+      // Normaliza os campos que a tela usa (status/tipo/data) — essa aba grava como "situacao"
+      // e, para registros criados antes deste fix, não tem tipo/data/prazo/descricao — cai no
+      // orgao/criadoEm como aproximação razoável.
       var _encTabNorm = _rEncTabela.dados.map(function(e){
         return Object.assign({}, e, {
           status: e.status||e.situacao||"a_encaminhar",
@@ -1150,7 +1157,7 @@ async function carregarDadosAppDoSheets(){
           data: e.data||(e.criadoEm||"").slice(0,10)
         });
       });
-      state.encaminhamentos = _mergeByIdTimestamp(state.encaminhamentos, _encTabNorm);
+      state.encaminhamentos = _mergeById(state.encaminhamentos, _encTabNorm);
     }
     // Fila de triagem: sobrescrever (ordem-dependente, sem merge)
     if(filaPendenteSheets && Array.isArray(filaPendenteSheets)){
