@@ -17,6 +17,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f
 .campo input,.campo select,.campo textarea{width:100%;background:#1a0a28;border:1px solid #3a1a58;color:#e0d0ff;padding:10px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit}
 .campo input:focus,.campo select:focus{border-color:#8a4aba}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.pill-check{display:flex;align-items:center;gap:6px;background:#1a0a28;border:1px solid #3a1a58;border-radius:8px;padding:8px 10px;font-size:12px}
+.pill-check input{width:auto}
+.foto-label{display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #3a1a58;border-radius:10px;padding:20px;cursor:pointer;text-align:center;background:#1a0a28;transition:border-color .2s;min-height:90px}
+.foto-label:hover{border-color:#8a4aba}
+.foto-label img{max-width:100%;max-height:120px;border-radius:6px;margin-top:8px}
 .assin-wrap{border:2px solid #3a1a58;border-radius:10px;background:#fff;position:relative;overflow:hidden}
 .assin-wrap canvas{display:block;width:100%;height:140px;cursor:crosshair;touch-action:none}
 .btn-limpar-assin{position:absolute;top:6px;right:8px;background:rgba(240,240,240,.9);border:1px solid #ccc;color:#555;padding:3px 10px;border-radius:5px;font-size:10px;cursor:pointer}
@@ -48,7 +54,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f
     <span style="font-size:22px">📋</span>
     <div>
       <p style="color:#e0d0ff;font-size:14px;font-weight:700;margin:0">Registro de Candidatura</p>
-      <p style="color:#7060a0;font-size:11px;margin:2px 0 0">Conforme Art. 56 do Estatuto do CONSEP Primavera</p>
+      <p style="color:#7060a0;font-size:11px;margin:2px 0 0">Filiação (Art. 6º/7º) + Candidatura (Art. 56) do Estatuto do CONSEP Primavera</p>
     </div>
   </div>
 
@@ -101,7 +107,46 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f
     <input id="f-tel" type="tel" placeholder="(77) 9 xxxx-xxxx"/>
   </div>
 
-  <div class="secao-titulo" style="margin-top:20px">📜 Declarações (Art. 56)</div>
+  <div class="secao-titulo" style="margin-top:20px">📍 Vínculo com o bairro (Art. 6º, "a")</div>
+
+  <div class="grid3">
+    <label class="pill-check"><input type="checkbox" id="f-vinc-reside"/> Reside</label>
+    <label class="pill-check"><input type="checkbox" id="f-vinc-trabalha"/> Trabalha</label>
+    <label class="pill-check"><input type="checkbox" id="f-vinc-estuda"/> Estuda</label>
+  </div>
+  <div class="erro-msg" id="erro-vinculo">Marque ao menos uma opção de vínculo com o bairro Primavera</div>
+
+  <div class="secao-titulo" style="margin-top:20px">🏠 Comprovante de Residência</div>
+  <p style="color:#5a4a80;font-size:11px;margin-bottom:14px">Tire uma foto do comprovante (conta de luz, água, gás ou IPTU) no seu nome, ou de quem você reside/trabalha/estuda.</p>
+
+  <div class="campo">
+    <label for="f-comprovante">Foto do comprovante <span class="obrig">*</span></label>
+    <label class="foto-label" id="label-comprovante">
+      <span style="font-size:28px">📄</span>
+      <span style="color:#7060a0;font-size:12px;margin-top:6px">Toque para fotografar ou selecionar</span>
+      <img id="prev-comprovante" style="display:none"/>
+      <input type="file" id="f-comprovante" accept="image/*" style="display:none" onchange="onFotoComprovante(this)"/>
+    </label>
+    <div class="erro-msg" id="erro-comp">Comprovante de residência obrigatório</div>
+  </div>
+
+  <div class="secao-titulo" style="margin-top:20px">📜 Declarações de Filiação (Art. 6º)</div>
+
+  <div class="declaracao">
+    <input type="checkbox" id="f-decl-maior"/>
+    <span>Declaro ser <strong>maior de 18 (dezoito) anos e possuir plena capacidade civil</strong> (Art. 6º, "c").</span>
+  </div>
+  <div class="declaracao">
+    <input type="checkbox" id="f-decl-condenacao"/>
+    <span>Declaro <strong>não ter sido condenado(a)</strong>, em decisão transitada em julgado ou proferida por órgão judicial colegiado, por crimes contra a administração pública, crimes dolosos ou contravenção penal (Art. 6º, "d").</span>
+  </div>
+  <div class="declaracao">
+    <input type="checkbox" id="f-decl-lgpd"/>
+    <span>Autorizo o <strong>tratamento dos meus dados pessoais</strong> pelo CONSEP Primavera, exclusivamente para os fins deste cadastro, nos termos da Lei nº 13.709/2018 — LGPD (Art. 6º, "e").</span>
+  </div>
+  <div class="erro-msg" id="erro-decl-filiacao">As três declarações de filiação são obrigatórias</div>
+
+  <div class="secao-titulo" style="margin-top:20px">📜 Declarações de Candidatura (Art. 56)</div>
 
   <div class="declaracao">
     <input type="checkbox" id="f-decl1"/>
@@ -111,10 +156,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f
     <input type="checkbox" id="f-decl2"/>
     <span>Declaro que <strong>não sou Prefeito(a) Municipal, membro da Câmara de Vereadores, nem membro nato do Conselho Consultivo</strong>, nem estou impedido(a) por qualquer legislação aplicável (Art. 56, § 2º).</span>
   </div>
-  <div class="erro-msg" id="erro-decl">As duas declarações são obrigatórias</div>
+  <div class="erro-msg" id="erro-decl">As duas declarações de candidatura são obrigatórias</div>
 
   <div class="secao-titulo" style="margin-top:20px">✍️ Assinatura</div>
-  <p style="color:#5a4a80;font-size:11px;margin-bottom:10px">Assine no quadro abaixo com o dedo (celular) ou o mouse, confirmando que aceita concorrer ao cargo indicado.</p>
+  <p style="color:#5a4a80;font-size:11px;margin-bottom:10px">Assine no quadro abaixo com o dedo (celular) ou o mouse, confirmando a filiação e a candidatura ao cargo indicado.</p>
 
   <div class="campo">
     <div class="assin-wrap">
@@ -127,7 +172,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f
 
   <div class="erro-msg" id="erro-geral" style="font-size:12px;padding:8px;background:#2a0808;border-radius:6px;border:1px solid #ef444455"></div>
   <div class="status-envio" id="status-envio"></div>
-  <button class="btn-enviar" id="btn-enviar" onclick="enviarRegistro()">✅ Confirmar Candidatura</button>
+  <button class="btn-enviar" id="btn-enviar" onclick="enviarRegistro()">✅ Confirmar Filiação e Candidatura</button>
 
 </div><!-- /form-card -->
 
@@ -140,8 +185,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f
 
 <script>
 // ── CONFIGURAÇÃO ────────────────────────────────────────────────
-// Depois de publicar o Apps Script (ver Apps_Script_Registro_Chapa.gs),
-// cole aqui a URL de implantação ("Web app URL") e o mesmo TOKEN definido lá.
 var SHEETS_URL = "https://script.google.com/macros/s/AKfycbwHgp5UBti-wwV28wTxVYCtPIh5A_K2PnMqlTaXF-wYgqGXLeon_t77lXEnDkfXYo18IA/exec";
 var TOKEN      = "consep-primavera-2026";
 
@@ -186,6 +229,28 @@ function limparAssinatura(){
   document.getElementById("assin-ok").style.display="none";
 }
 
+// ── Foto comprovante ─────────────────────────────────────────
+var _compData = null;
+function onFotoComprovante(inp){
+  var file=inp.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var W=Math.min(800,img.width), H=Math.round(img.height*W/img.width);
+      var c=document.createElement("canvas"); c.width=W; c.height=H;
+      c.getContext("2d").drawImage(img,0,0,W,H);
+      _compData=c.toDataURL("image/jpeg",0.75);
+      var prev=document.getElementById("prev-comprovante");
+      prev.src=_compData; prev.style.display="block";
+      document.querySelector("#label-comprovante span:first-child").textContent="✅";
+      document.getElementById("erro-comp").style.display="none";
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 // ── Envio ─────────────────────────────────────────────────────
 function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
@@ -196,12 +261,21 @@ function enviarRegistro(){
   var cargo = document.getElementById("f-cargo").value;
   var nome  = document.getElementById("f-nome").value.trim();
   var cpf   = document.getElementById("f-cpf").value.trim();
+  var vincReside   = document.getElementById("f-vinc-reside").checked;
+  var vincTrabalha = document.getElementById("f-vinc-trabalha").checked;
+  var vincEstuda   = document.getElementById("f-vinc-estuda").checked;
+  var declMaior    = document.getElementById("f-decl-maior").checked;
+  var declCond     = document.getElementById("f-decl-condenacao").checked;
+  var declLgpd     = document.getElementById("f-decl-lgpd").checked;
   var decl1 = document.getElementById("f-decl1").checked;
   var decl2 = document.getElementById("f-decl2").checked;
 
   if(!cargo){ document.getElementById("erro-cargo").style.display="block"; erros.push("cargo"); }
   if(!nome) { document.getElementById("erro-nome").style.display="block"; erros.push("nome"); }
   if(!cpf)  erros.push("cpf");
+  if(!vincReside && !vincTrabalha && !vincEstuda){ document.getElementById("erro-vinculo").style.display="block"; erros.push("vinculo"); }
+  if(!_compData){ document.getElementById("erro-comp").style.display="block"; erros.push("comp"); }
+  if(!declMaior || !declCond || !declLgpd){ document.getElementById("erro-decl-filiacao").style.display="block"; erros.push("declfil"); }
   if(!decl1 || !decl2){ document.getElementById("erro-decl").style.display="block"; erros.push("decl"); }
   if(!_assinData){ document.getElementById("erro-assin").style.display="block"; erros.push("assin"); }
 
@@ -215,6 +289,11 @@ function enviarRegistro(){
   btn.disabled=true; btn.textContent="Enviando...";
 
   var protocolo="CHAPA-"+Date.now();
+  var vinculo=[];
+  if(vincReside) vinculo.push("Reside");
+  if(vincTrabalha) vinculo.push("Trabalha");
+  if(vincEstuda) vinculo.push("Estuda");
+
   var dados={
     id: protocolo,
     protocolo: protocolo,
@@ -223,6 +302,11 @@ function enviarRegistro(){
     cpf: cpf,
     rg: document.getElementById("f-rg").value.trim(),
     telefone: document.getElementById("f-tel").value.trim(),
+    vinculo_bairro: vinculo.join(", "),
+    comprovante_residencia: _compData||"",
+    declaracao_maioridade: declMaior,
+    declaracao_sem_condenacao: declCond,
+    declaracao_lgpd: declLgpd,
     declaracao_sem_outra_chapa: decl1,
     declaracao_sem_impedimento: decl2,
     assinatura: _assinData||"",
@@ -244,12 +328,13 @@ function enviarRegistro(){
     document.getElementById("protocolo-cand").textContent="Protocolo: "+protocolo;
     document.getElementById("status-envio").textContent=msg||"";
     document.getElementById("msg-sucesso").innerHTML=
-      "Candidatura de <strong style='color:#e0d0ff'>"+esc(nome)+"</strong> ao cargo de "
-      +"<strong style='color:#e0d0ff'>"+esc(cargo)+"</strong> registrada!";
+      "Filiação e candidatura de <strong style='color:#e0d0ff'>"+esc(nome)+"</strong> ao cargo de "
+      +"<strong style='color:#e0d0ff'>"+esc(cargo)+"</strong> registradas!";
   }
 
   if(SHEETS_URL && SHEETS_URL.indexOf("COLE_AQUI") === -1){
     var dadosSheets=Object.assign({},dados);
+
     function enviarParaSheets(){
       var payload=JSON.stringify({token:TOKEN,tipo:"registro_chapa_consep_primavera",registro:dadosSheets});
       if(window.fetch){
@@ -260,6 +345,23 @@ function enviarRegistro(){
         mostrarSucesso("✅ Candidatura registrada!");
       }
     }
+
+    function comprimirComprovanteEEnviar(){
+      if(dadosSheets.comprovante_residencia && dadosSheets.comprovante_residencia.length > 5000){
+        var imgC=new Image();
+        imgC.onload=function(){
+          var cC=document.createElement("canvas"); cC.width=300; cC.height=200;
+          cC.getContext("2d").drawImage(imgC,0,0,300,200);
+          dadosSheets.comprovante_residencia=cC.toDataURL("image/jpeg",0.5);
+          enviarParaSheets();
+        };
+        imgC.onerror=function(){ enviarParaSheets(); };
+        imgC.src=dadosSheets.comprovante_residencia;
+      } else {
+        enviarParaSheets();
+      }
+    }
+
     // Comprime a assinatura antes de enviar (mantém leve na planilha)
     if(dadosSheets.assinatura && dadosSheets.assinatura.length > 5000){
       var img3=new Image();
@@ -269,12 +371,12 @@ function enviarRegistro(){
         ctx3.fillStyle="#fff"; ctx3.fillRect(0,0,300,100);
         ctx3.drawImage(img3,0,0,300,100);
         dadosSheets.assinatura=c3.toDataURL("image/jpeg",0.8);
-        enviarParaSheets();
+        comprimirComprovanteEEnviar();
       };
-      img3.onerror=function(){ enviarParaSheets(); };
+      img3.onerror=function(){ comprimirComprovanteEEnviar(); };
       img3.src=dadosSheets.assinatura;
     } else {
-      enviarParaSheets();
+      comprimirComprovanteEEnviar();
     }
   } else {
     setTimeout(function(){mostrarSucesso("⚠️ Registrado só neste celular — backend ainda não configurado (avisar Oséias).");},600);
