@@ -208,7 +208,7 @@ def carregar_whatsapp():
             "violencia_domestica":   vd,
             "requer_visita":         vd,
             "reincidente":           False,
-            "descricao":             resumo[:150],
+            "descricao":             resumo,
             "descricao_dinamica":    dinamica,
             "medidas":               medidas,
             "texto_original":        dinamica,

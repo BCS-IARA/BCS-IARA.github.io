@@ -2314,7 +2314,7 @@ function renderImportarZap(main) {
           violencia_domestica:    vd,
           requer_visita:          vd||(reg.requer_visita===true||String(reg.requer_visita).toLowerCase()==='true'),
           reincidente:            reg.reincidente===true||String(reg.reincidente).toLowerCase()==='true',
-          descricao:              String(reg.descricao||'').slice(0,150),
+          descricao:              String(reg.descricao||''),
           descricao_dinamica:     reg.descricao_dinamica||reg.descricao||'',
           medidas:                reg.medidas||'',
           texto_original:         reg.descricao_dinamica||reg.descricao||'',
@@ -8731,9 +8731,9 @@ function _parsearNarrativa(texto){
   var mMedidas = reMedidas.exec(t);
 
   if(!mDesc && !mDinam && !mMedidas){
-    // Sem cabeçalhos — tudo vai para descricao_dinamica; descricao = primeiros 150 chars
+    // Sem cabeçalhos — tudo vai para descricao_dinamica e descricao (texto completo)
     r.descricao_dinamica = t;
-    r.descricao = t.slice(0,150);
+    r.descricao = t;
     return r;
   }
 
@@ -8751,9 +8751,9 @@ function _parsearNarrativa(texto){
     r[secoes[i].campo]=t.slice(inicio,proxIdx).trim();
   }
 
-  // Fallback: se descricao ficou vazio, usa slice da dinâmica
+  // Fallback: se descricao ficou vazio, usa a dinâmica completa
   if(!r.descricao && r.descricao_dinamica)
-    r.descricao=r.descricao_dinamica.slice(0,150);
+    r.descricao=r.descricao_dinamica;
 
   return r;
 }
@@ -15905,7 +15905,7 @@ function renderTela() {
               endereco:(document.getElementById("oc-sol-end")||{value:""}).value.trim()
             },
             objetos:(document.getElementById("oc-objetos")||{value:""}).value.trim(),
-            descricao:dinamica.slice(0,150),
+            descricao:dinamica,
             descricao_dinamica:dinamica,
             policiais:policiaisTexto,
             escolaId:(_det.escolaId||""), escolaNome:(_det.escolaNome||""),
@@ -21022,7 +21022,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
         var narrativa = document.getElementById("ed-narrativa").value.trim();
         ocM.descricao_dinamica = narrativa;
         ocM.texto_original     = narrativa;
-        ocM.descricao = narrativa.slice(0,150);
+        ocM.descricao = narrativa;
         ocM.policiais = document.getElementById("ed-policiais").value.trim();
         ocM.situacao  = (document.getElementById("ed-situacao")||{value:"nova"}).value || "nova";
         if(ocM.situacao==="em_acompanhamento") garantirCasoAcompanhamento(ocM);
