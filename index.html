@@ -15786,7 +15786,7 @@ function renderTela() {
         var ids=["oc-numero","oc-relatorio","oc-posto","oc-tipo","oc-data","oc-hora","oc-zona",
                  "oc-local","oc-referencia","oc-bairro","oc-municipio",
                  "oc-sol-nome","oc-sol-tel","oc-sol-end","oc-objetos","oc-texto","oc-classificacao"];
-        ids.forEach(function(id){ var el=document.getElementById(id); if(el&&r[id]!==undefined) el.value=r[id]; });
+        ids.forEach(function(id){ var el=document.getElementById(id); if(el&&r[id]) el.value=r[id]; });
         // Restaura vítimas
         if(r._vits&&r._vits.length){
           _nVitimas=r._vits.length; _renderVitimas();
