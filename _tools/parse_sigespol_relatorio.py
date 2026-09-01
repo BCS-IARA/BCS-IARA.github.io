@@ -187,7 +187,7 @@ def parsear_bloco(bloco):
         "violencia_domestica": vd,
         "requer_visita": vd,
         "reincidente": bool(re.search(r"reincid|j[áa] (possu[ií]a|tinha) medida protetiva|descumpr", dinamica, re.IGNORECASE)),
-        "descricao": descricao[:150],
+        "descricao": descricao or dinamica_completa,
         "descricao_dinamica": dinamica_completa,
         "medidas": "",
         "texto_original": dinamica_completa,
