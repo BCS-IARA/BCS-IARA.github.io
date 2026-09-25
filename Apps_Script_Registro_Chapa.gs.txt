@@ -1,0 +1,232 @@
+// Registro de Chapa + Filiacao + Cadastro de Assembleia - CONSEP Primavera
+// Backend unico: recebe o registro de chapa (filiacao + candidatura, registro-chapa.html),
+// a ficha de filiacao geral de associado (filiacao-consep.html) e o cadastro de membro
+// na Assembleia (cadastro-assembleia.html), cada um numa aba propria.
+//
+// COMO ATUALIZAR (script ja publicado):
+// 1. Abrir a planilha "Registro Chapa - CONSEP Primavera" -> Extensoes > Apps Script
+// 2. Apagar TUDO no editor (Ctrl+A, Delete) e colar este arquivo inteiro no lugar
+// 3. Salvar (icone de disquete ou Ctrl+S)
+// 4. Implantar > Gerenciar implantacoes -> icone de lapis na implantacao existente
+//    -> Versao: "Nova versao" -> Implantar
+//    (isso atualiza o mesmo link /exec que ja esta em uso, sem trocar a URL)
+//
+// COMO PUBLICAR DO ZERO (se ainda nao existe):
+// 1. sheets.google.com -> criar planilha nova (ex.: "Registro Chapa - CONSEP Primavera")
+// 2. Menu: Extensoes > Apps Script
+// 3. Colar este arquivo inteiro
+// 4. Salvar
+// 5. Implantar > Nova implantacao > Tipo: "App da Web"
+//    Executar como: "Eu" | Quem pode acessar: "Qualquer pessoa"
+// 6. Implantar -> autorizar (e sua propria planilha, e seguro)
+// 7. Copiar a URL que termina em /exec e enviar para a Iara colar nos formularios
+
+var TOKEN = "consep-primavera-2026";
+var ABA_CHAPA = "Registro_Chapa";
+var ABA_FILIACAO = "Filiacao_Membros";
+var ABA_CADASTRO_ASSEMBLEIA = "Cadastro_Assembleia";
+
+var CABECALHO_CHAPA = [
+  "Protocolo", "Data/Hora", "Cargo", "Nome", "CPF", "RG", "Telefone",
+  "Vinculo com o bairro",
+  "Declaracao: maioridade/capacidade civil", "Declaracao: sem condenacao",
+  "Declaracao: LGPD",
+  "Declaracao: nao esta em outra chapa", "Declaracao: sem impedimento (Art.56 par.2)",
+  "Comprovante de residencia (imagem)", "Assinatura (imagem)", "Status"
+];
+
+var CABECALHO_FILIACAO = [
+  "Protocolo", "Data/Hora", "Nome", "Data de Nascimento", "CPF",
+  "Documento (tipo/no)", "Orgao emissor", "Endereco", "Telefone", "E-mail",
+  "Vinculo com o bairro",
+  "Declaracao: maioridade/capacidade civil", "Declaracao: sem condenacao", "Declaracao: LGPD",
+  "Documento de identidade (imagem)", "Comprovante (imagem)", "Assinatura (imagem)", "Status"
+];
+
+// Mesmos campos da Filiacao (Arts. 6o/7o) - aba propria para nao misturar
+// com quem se filiou fora do dia da Assembleia
+var CABECALHO_CADASTRO_ASSEMBLEIA = [
+  "Protocolo", "Data/Hora", "Nome", "Data de Nascimento", "CPF",
+  "Documento (tipo/no)", "Orgao emissor", "Endereco", "Telefone", "E-mail",
+  "Vinculo com o bairro",
+  "Declaracao: maioridade/capacidade civil", "Declaracao: sem condenacao", "Declaracao: LGPD",
+  "Documento de identidade (imagem)", "Comprovante (imagem)", "Assinatura (imagem)", "Status"
+];
+
+function doPost(e) {
+  try {
+    var body = JSON.parse(e.postData.contents);
+
+    if (body.token !== TOKEN) {
+      return ContentService.createTextOutput(JSON.stringify({ok: false, erro: "token invalido"}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (body.tipo === "registro_chapa_consep_primavera") {
+      gravarRegistroChapa(body.registro);
+    } else if (body.tipo === "filiacao_consep_primavera") {
+      gravarFiliacao(body.registro);
+    } else if (body.tipo === "cadastro_assembleia_consep_primavera") {
+      gravarCadastroAssembleia(body.registro);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ok: true}))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ok: false, erro: String(err)}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function salvarImagemNoDrive(base64Img, nomeArquivo, nomePasta) {
+  if (!base64Img || base64Img.indexOf("base64,") === -1) return "";
+  try {
+    var base64 = base64Img.split("base64,")[1];
+    var bytes = Utilities.base64Decode(base64);
+    var blob = Utilities.newBlob(bytes, "image/jpeg", nomeArquivo);
+    var pastas = DriveApp.getFoldersByName(nomePasta);
+    var pasta = pastas.hasNext() ? pastas.next() : DriveApp.createFolder(nomePasta);
+    var arquivo = pasta.createFile(blob);
+    arquivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return arquivo.getUrl();
+  } catch (errImg) {
+    return "[erro ao salvar imagem: " + errImg + "]";
+  }
+}
+
+function gravarRegistroChapa(r) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(ABA_CHAPA);
+  if (!sheet) {
+    sheet = ss.insertSheet(ABA_CHAPA);
+    sheet.appendRow(CABECALHO_CHAPA);
+    sheet.setFrozenRows(1);
+  }
+
+  var linkAssinatura = salvarImagemNoDrive(
+    r.assinatura, "assinatura_" + r.protocolo + ".jpg",
+    "Assinaturas - Registro Chapa CONSEP Primavera"
+  );
+
+  var linkComprovante = salvarImagemNoDrive(
+    r.comprovante_residencia, "comprovante_" + r.protocolo + ".jpg",
+    "Comprovantes de Residencia - Registro Chapa CONSEP Primavera"
+  );
+
+  sheet.appendRow([
+    r.protocolo || "",
+    r.data_registro || new Date().toISOString(),
+    r.cargo || "",
+    r.nome || "",
+    r.cpf || "",
+    r.rg || "",
+    r.telefone || "",
+    r.vinculo_bairro || "",
+    r.declaracao_maioridade ? "SIM" : "NAO",
+    r.declaracao_sem_condenacao ? "SIM" : "NAO",
+    r.declaracao_lgpd ? "SIM" : "NAO",
+    r.declaracao_sem_outra_chapa ? "SIM" : "NAO",
+    r.declaracao_sem_impedimento ? "SIM" : "NAO",
+    linkComprovante,
+    linkAssinatura,
+    r.status || "pendente"
+  ]);
+}
+
+function gravarFiliacao(r) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(ABA_FILIACAO);
+  if (!sheet) {
+    sheet = ss.insertSheet(ABA_FILIACAO);
+    sheet.appendRow(CABECALHO_FILIACAO);
+    sheet.setFrozenRows(1);
+  }
+
+  var linkDocumento = salvarImagemNoDrive(
+    r.documento_foto, "documento_" + r.protocolo + ".jpg",
+    "Documentos de Identidade - Filiacao CONSEP Primavera"
+  );
+
+  var linkComprovante = salvarImagemNoDrive(
+    r.comprovante_residencia, "comprovante_" + r.protocolo + ".jpg",
+    "Comprovantes - Filiacao CONSEP Primavera"
+  );
+
+  var linkAssinatura = salvarImagemNoDrive(
+    r.assinatura, "assinatura_" + r.protocolo + ".jpg",
+    "Assinaturas - Filiacao CONSEP Primavera"
+  );
+
+  sheet.appendRow([
+    r.protocolo || "",
+    r.data_registro || new Date().toISOString(),
+    r.nome || "",
+    r.data_nascimento || "",
+    r.cpf || "",
+    r.documento || "",
+    r.orgao_emissor || "",
+    r.endereco || "",
+    r.telefone || "",
+    r.email || "",
+    r.vinculo_bairro || "",
+    r.declaracao_maioridade ? "SIM" : "NAO",
+    r.declaracao_sem_condenacao ? "SIM" : "NAO",
+    r.declaracao_lgpd ? "SIM" : "NAO",
+    linkDocumento,
+    linkComprovante,
+    linkAssinatura,
+    r.status || "pendente"
+  ]);
+}
+
+function gravarCadastroAssembleia(r) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(ABA_CADASTRO_ASSEMBLEIA);
+  if (!sheet) {
+    sheet = ss.insertSheet(ABA_CADASTRO_ASSEMBLEIA);
+    sheet.appendRow(CABECALHO_CADASTRO_ASSEMBLEIA);
+    sheet.setFrozenRows(1);
+  }
+
+  var linkDocumento = salvarImagemNoDrive(
+    r.documento_foto, "documento_" + r.protocolo + ".jpg",
+    "Documentos de Identidade - Cadastro Assembleia CONSEP Primavera"
+  );
+
+  var linkComprovante = salvarImagemNoDrive(
+    r.comprovante_residencia, "comprovante_" + r.protocolo + ".jpg",
+    "Comprovantes - Cadastro Assembleia CONSEP Primavera"
+  );
+
+  var linkAssinatura = salvarImagemNoDrive(
+    r.assinatura, "assinatura_" + r.protocolo + ".jpg",
+    "Assinaturas - Cadastro Assembleia CONSEP Primavera"
+  );
+
+  sheet.appendRow([
+    r.protocolo || "",
+    r.data_registro || new Date().toISOString(),
+    r.nome || "",
+    r.data_nascimento || "",
+    r.cpf || "",
+    r.documento || "",
+    r.orgao_emissor || "",
+    r.endereco || "",
+    r.telefone || "",
+    r.email || "",
+    r.vinculo_bairro || "",
+    r.declaracao_maioridade ? "SIM" : "NAO",
+    r.declaracao_sem_condenacao ? "SIM" : "NAO",
+    r.declaracao_lgpd ? "SIM" : "NAO",
+    linkDocumento,
+    linkComprovante,
+    linkAssinatura,
+    r.status || "pendente"
+  ]);
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput("Backend Registro de Chapa + Filiacao + Cadastro de Assembleia - CONSEP Primavera - OK")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
