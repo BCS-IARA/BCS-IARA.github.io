@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Ficha de Filiação — CONSEP Primavera</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0a1a;color:#e8e0f0;min-height:100vh;padding-bottom:40px}
+.topo{background:linear-gradient(135deg,#1a0a2e,#2a1040);border-bottom:2px solid #6a3a9a44;padding:16px 20px;text-align:center}
+.topo h1{font-size:16px;font-weight:800;color:#e0d0ff;margin:0 0 3px}
+.topo p{font-size:11px;color:#7060a0;margin:0}
+.card{background:#130d24;border:1px solid #2a1a4a;border-radius:14px;max-width:520px;margin:20px auto;padding:22px}
+.secao-titulo{color:#a78bfa;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #2a1a4a;display:flex;align-items:center;gap:6px}
+.campo{margin-bottom:12px}
+.campo label{color:#8a6ab8;font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px}
+.campo input,.campo select,.campo textarea{width:100%;background:#1a0a28;border:1px solid #3a1a58;color:#e0d0ff;padding:10px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit}
+.campo input:focus,.campo select:focus{border-color:#8a4aba}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.pill-check{display:flex;align-items:center;gap:6px;background:#1a0a28;border:1px solid #3a1a58;border-radius:8px;padding:8px 10px;font-size:12px}
+.pill-check input{width:auto}
+.foto-label{display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #3a1a58;border-radius:10px;padding:20px;cursor:pointer;text-align:center;background:#1a0a28;transition:border-color .2s;min-height:90px}
+.foto-label:hover{border-color:#8a4aba}
+.foto-label img{max-width:100%;max-height:120px;border-radius:6px;margin-top:8px}
+.assin-wrap{border:2px solid #3a1a58;border-radius:10px;background:#fff;position:relative;overflow:hidden}
+.assin-wrap canvas{display:block;width:100%;height:140px;cursor:crosshair;touch-action:none}
+.btn-limpar-assin{position:absolute;top:6px;right:8px;background:rgba(240,240,240,.9);border:1px solid #ccc;color:#555;padding:3px 10px;border-radius:5px;font-size:10px;cursor:pointer}
+.btn-enviar{width:100%;background:linear-gradient(135deg,#6a2a9a,#4a1a7a);border:2px solid #8a4aba;color:#e8d0ff;padding:14px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;margin-top:8px;letter-spacing:.3px}
+.btn-enviar:disabled{opacity:.5;cursor:not-allowed}
+.badge-projeto{display:inline-flex;align-items:center;gap:8px;background:#2a1250;border:1px solid #6a3a9a44;border-radius:10px;padding:10px 16px;margin-bottom:16px}
+.erro-msg{color:#ef4444;font-size:11px;margin-top:4px;display:none}
+.sucesso{display:none;text-align:center;padding:40px 16px}
+.sucesso .icon{font-size:60px;margin-bottom:14px}
+.sucesso h2{color:#a78bfa;font-size:20px;margin-bottom:8px}
+.sucesso p{color:#7060a0;font-size:13px;line-height:1.7}
+.status-envio{display:none;margin-top:12px;background:#1a0a28;border:1px solid #3a1a58;border-radius:8px;padding:10px 14px;color:#a78bfa;font-size:12px;font-weight:700}
+.obrig{color:#ef4444}
+.declaracao{display:flex;gap:10px;align-items:flex-start;background:#1a0a28;border:1px solid #3a1a58;border-radius:8px;padding:12px;margin-bottom:10px}
+.declaracao input{width:auto;margin-top:2px}
+.declaracao span{font-size:12px;color:#c8b8e8;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <h1>🏘️ CONSEP Primavera</h1>
+  <p>Ficha de Filiação — Cadastro de Associado · Vitória da Conquista/BA</p>
+</div>
+
+<div class="card" id="form-card">
+
+  <div class="badge-projeto">
+    <span style="font-size:22px">📝</span>
+    <div>
+      <p style="color:#e0d0ff;font-size:14px;font-weight:700;margin:0">Cadastro de Associado</p>
+      <p style="color:#7060a0;font-size:11px;margin:2px 0 0">Conforme Arts. 6º e 7º do Estatuto Social do CONSEP Primavera</p>
+    </div>
+  </div>
+
+  <div class="secao-titulo">👤 Dados do Requerente</div>
+
+  <div class="campo">
+    <label>Nome completo <span class="obrig">*</span></label>
+    <input id="f-nome" type="text" placeholder="Nome completo"/>
+    <div class="erro-msg" id="erro-nome">Informe o nome</div>
+  </div>
+
+  <div class="grid2">
+    <div class="campo">
+      <label>Data de nascimento <span class="obrig">*</span></label>
+      <input id="f-nasc" type="date"/>
+    </div>
+    <div class="campo">
+      <label>CPF <span class="obrig">*</span></label>
+      <input id="f-cpf" type="text" placeholder="000.000.000-00"/>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="campo">
+      <label>Documento de identidade (tipo/nº) <span class="obrig">*</span></label>
+      <input id="f-doc" type="text" placeholder="Ex.: RG 12.345.678-9"/>
+    </div>
+    <div class="campo">
+      <label>Órgão emissor</label>
+      <input id="f-orgao" type="text" placeholder="Ex.: SSP/BA"/>
+    </div>
+  </div>
+
+  <div class="campo">
+    <label>Endereço completo <span class="obrig">*</span></label>
+    <input id="f-endereco" type="text" placeholder="Rua, número, bairro, referência"/>
+  </div>
+
+  <div class="grid2">
+    <div class="campo">
+      <label>Telefone/contato <span class="obrig">*</span></label>
+      <input id="f-tel" type="tel" placeholder="(77) 9 xxxx-xxxx"/>
+    </div>
+    <div class="campo">
+      <label>E-mail (opcional)</label>
+      <input id="f-email" type="email" placeholder="seu@email.com"/>
+    </div>
+  </div>
+
+  <div class="secao-titulo" style="margin-top:20px">📍 Vínculo com o bairro Primavera ou entorno (Art. 6º, "a")</div>
+
+  <div class="grid3">
+    <label class="pill-check"><input type="checkbox" id="f-vinc-reside"/> Reside</label>
+    <label class="pill-check"><input type="checkbox" id="f-vinc-trabalha"/> Trabalha</label>
+    <label class="pill-check"><input type="checkbox" id="f-vinc-estuda"/> Estuda</label>
+  </div>
+  <div class="erro-msg" id="erro-vinculo">Marque ao menos uma opção de vínculo com o bairro</div>
+
+  <div class="secao-titulo" style="margin-top:20px">📜 Declarações (Art. 6º, "c", "d" e "e")</div>
+
+  <div class="declaracao">
+    <input type="checkbox" id="f-decl-maior"/>
+    <span>Declaro ser <strong>maior de 18 (dezoito) anos e possuir plena capacidade civil</strong>.</span>
+  </div>
+  <div class="declaracao">
+    <input type="checkbox" id="f-decl-condenacao"/>
+    <span>Declaro <strong>não ter sido condenado(a)</strong>, em decisão transitada em julgado ou proferida por órgão judicial colegiado, por crimes contra a administração pública, crimes dolosos ou contravenção penal.</span>
+  </div>
+  <div class="declaracao">
+    <input type="checkbox" id="f-decl-lgpd"/>
+    <span>Autorizo o <strong>tratamento dos meus dados pessoais</strong> pelo CONSEP Primavera, exclusivamente para os fins deste cadastro, nos termos da Lei nº 13.709/2018 (LGPD) e do Art. 54º do Estatuto Social.</span>
+  </div>
+  <div class="erro-msg" id="erro-decl">As três declarações são obrigatórias</div>
+
+  <div class="secao-titulo" style="margin-top:20px">📎 Documentos Anexados (Art. 7º, §1º)</div>
+  <p style="color:#5a4a80;font-size:11px;margin-bottom:14px">Anexe fotos legíveis dos dois documentos abaixo.</p>
+
+  <div class="campo">
+    <label for="f-doc-foto">Cópia do documento de identidade oficial com foto <span class="obrig">*</span></label>
+    <label class="foto-label" id="label-doc-foto">
+      <span style="font-size:28px">🪪</span>
+      <span style="color:#7060a0;font-size:12px;margin-top:6px">Toque para fotografar ou selecionar</span>
+      <img id="prev-doc-foto" style="display:none"/>
+      <input type="file" id="f-doc-foto" accept="image/*" style="display:none" onchange="onFotoDocumento(this)"/>
+    </label>
+    <div class="erro-msg" id="erro-doc-foto">Foto do documento de identidade obrigatória</div>
+  </div>
+
+  <div class="campo">
+    <label for="f-comprovante">Comprovante de residência, trabalho ou estudo <span class="obrig">*</span></label>
+    <label class="foto-label" id="label-comprovante">
+      <span style="font-size:28px">📄</span>
+      <span style="color:#7060a0;font-size:12px;margin-top:6px">Toque para fotografar ou selecionar</span>
+      <img id="prev-comprovante" style="display:none"/>
+      <input type="file" id="f-comprovante" accept="image/*" style="display:none" onchange="onFotoComprovante(this)"/>
+    </label>
+    <div class="erro-msg" id="erro-comp">Comprovante obrigatório</div>
+  </div>
+
+  <div class="secao-titulo" style="margin-top:20px">✍️ Assinatura</div>
+  <p style="color:#5a4a80;font-size:11px;margin-bottom:10px">Assine no quadro abaixo com o dedo (celular) ou o mouse, confirmando os dados e declarações acima.</p>
+
+  <div class="campo">
+    <div class="assin-wrap">
+      <canvas id="assin-req" width="480" height="140"></canvas>
+      <button type="button" class="btn-limpar-assin" onclick="limparAssinatura()">Limpar</button>
+    </div>
+    <div id="assin-ok" style="display:none;color:#22c55e;font-size:11px;font-weight:700;margin-top:4px">✅ Assinatura registrada</div>
+    <div class="erro-msg" id="erro-assin">Assinatura obrigatória — assine no campo acima</div>
+  </div>
+
+  <div class="erro-msg" id="erro-geral" style="font-size:12px;padding:8px;background:#2a0808;border-radius:6px;border:1px solid #ef444455"></div>
+  <div class="status-envio" id="status-envio"></div>
+  <button class="btn-enviar" id="btn-enviar" onclick="enviarFiliacao()">✅ Confirmar Filiação</button>
+
+</div><!-- /form-card -->
+
+<div class="sucesso card" id="bloco-sucesso">
+  <div class="icon">✅</div>
+  <h2>Filiação registrada!</h2>
+  <p id="msg-sucesso">Seu cadastro de associado do CONSEP Primavera foi recebido com sucesso.</p>
+  <div id="protocolo-cand" style="margin-top:16px;background:#1a0a28;border:1px solid #3a1a58;border-radius:10px;padding:14px;font-size:13px;color:#a78bfa;font-family:monospace;word-break:break-all"></div>
+</div>
+
+<script>
+// ── CONFIGURAÇÃO ────────────────────────────────────────────────
+// Mesmo backend do registro-chapa.html (Google Apps Script já publicado);
+// este formulário envia tipo:"filiacao_consep_primavera" para uma aba separada.
+var SHEETS_URL = "https://script.google.com/macros/s/AKfycbwHgp5UBti-wwV28wTxVYCtPIh5A_K2PnMqlTaXF-wYgqGXLeon_t77lXEnDkfXYo18IA/exec";
+var TOKEN      = "consep-primavera-2026";
+
+// ── Canvas de assinatura ─────────────────────────────────────
+var _assinData = null;
+var _assinDesenhada = false;
+(function(){
+  var cv  = document.getElementById("assin-req");
+  var ctx = cv.getContext("2d");
+  var painting = false;
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.strokeStyle="#1a0a28"; ctx.lineWidth=2.8; ctx.lineCap="round"; ctx.lineJoin="round";
+
+  function pos(e){
+    var r=cv.getBoundingClientRect();
+    var s=e.touches?e.touches[0]:e;
+    return {x:(s.clientX-r.left)*(cv.width/r.width), y:(s.clientY-r.top)*(cv.height/r.height)};
+  }
+  function salvarSnap(){
+    if(!_assinDesenhada) return;
+    _assinData = cv.toDataURL("image/png");
+    document.getElementById("assin-ok").style.display = "block";
+    document.getElementById("erro-assin").style.display = "none";
+  }
+
+  cv.addEventListener("mousedown",function(e){painting=true;ctx.beginPath();var p=pos(e);ctx.moveTo(p.x,p.y);});
+  cv.addEventListener("mousemove",function(e){if(!painting)return;_assinDesenhada=true;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+  cv.addEventListener("mouseup",function(){painting=false;salvarSnap();});
+  cv.addEventListener("mouseleave",function(){painting=false;});
+  cv.addEventListener("touchstart",function(e){e.preventDefault();painting=true;ctx.beginPath();var p=pos(e);ctx.moveTo(p.x,p.y);},{passive:false});
+  cv.addEventListener("touchmove",function(e){e.preventDefault();if(!painting)return;_assinDesenhada=true;var p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();},{passive:false});
+  cv.addEventListener("touchend",function(){painting=false;salvarSnap();},{passive:false});
+})();
+
+function limparAssinatura(){
+  var cv=document.getElementById("assin-req");
+  var ctx=cv.getContext("2d");
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.strokeStyle="#1a0a28"; ctx.lineWidth=2.8; ctx.lineCap="round"; ctx.lineJoin="round";
+  _assinData=null;
+  _assinDesenhada=false;
+  document.getElementById("assin-ok").style.display="none";
+}
+
+// ── Fotos (documento + comprovante) ────────────────────────────
+function comprimirFoto(inputEl, callback){
+  var file=inputEl.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var W=Math.min(800,img.width), H=Math.round(img.height*W/img.width);
+      var c=document.createElement("canvas"); c.width=W; c.height=H;
+      c.getContext("2d").drawImage(img,0,0,W,H);
+      callback(c.toDataURL("image/jpeg",0.75));
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+var _docFotoData = null;
+function onFotoDocumento(inp){
+  comprimirFoto(inp, function(dataUrl){
+    _docFotoData=dataUrl;
+    var prev=document.getElementById("prev-doc-foto");
+    prev.src=dataUrl; prev.style.display="block";
+    document.querySelector("#label-doc-foto span:first-child").textContent="✅";
+    document.getElementById("erro-doc-foto").style.display="none";
+  });
+}
+
+var _compData = null;
+function onFotoComprovante(inp){
+  comprimirFoto(inp, function(dataUrl){
+    _compData=dataUrl;
+    var prev=document.getElementById("prev-comprovante");
+    prev.src=dataUrl; prev.style.display="block";
+    document.querySelector("#label-comprovante span:first-child").textContent="✅";
+    document.getElementById("erro-comp").style.display="none";
+  });
+}
+
+// ── Envio ─────────────────────────────────────────────────────
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function comprimirImagemDataUrl(dataUrl, W, H, qualidade, cb){
+  if(!dataUrl || dataUrl.length <= 5000){ cb(dataUrl); return; }
+  var img=new Image();
+  img.onload=function(){
+    var c=document.createElement("canvas"); c.width=W; c.height=H;
+    var ctx=c.getContext("2d");
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
+    ctx.drawImage(img,0,0,W,H);
+    cb(c.toDataURL("image/jpeg",qualidade));
+  };
+  img.onerror=function(){ cb(dataUrl); };
+  img.src=dataUrl;
+}
+
+function enviarFiliacao(){
+  document.querySelectorAll(".erro-msg").forEach(function(e){e.style.display="none";});
+  var erros=[];
+
+  var nome     = document.getElementById("f-nome").value.trim();
+  var nasc     = document.getElementById("f-nasc").value;
+  var cpf      = document.getElementById("f-cpf").value.trim();
+  var doc      = document.getElementById("f-doc").value.trim();
+  var orgao    = document.getElementById("f-orgao").value.trim();
+  var endereco = document.getElementById("f-endereco").value.trim();
+  var tel      = document.getElementById("f-tel").value.trim();
+  var email    = document.getElementById("f-email").value.trim();
+  var vincReside   = document.getElementById("f-vinc-reside").checked;
+  var vincTrabalha = document.getElementById("f-vinc-trabalha").checked;
+  var vincEstuda   = document.getElementById("f-vinc-estuda").checked;
+  var declMaior    = document.getElementById("f-decl-maior").checked;
+  var declCond     = document.getElementById("f-decl-condenacao").checked;
+  var declLgpd     = document.getElementById("f-decl-lgpd").checked;
+
+  if(!nome){ document.getElementById("erro-nome").style.display="block"; erros.push("nome"); }
+  if(!nasc) erros.push("nasc");
+  if(!cpf)  erros.push("cpf");
+  if(!doc)  erros.push("doc");
+  if(!endereco) erros.push("endereco");
+  if(!tel)  erros.push("tel");
+  if(!vincReside && !vincTrabalha && !vincEstuda){ document.getElementById("erro-vinculo").style.display="block"; erros.push("vinculo"); }
+  if(!declMaior || !declCond || !declLgpd){ document.getElementById("erro-decl").style.display="block"; erros.push("decl"); }
+  if(!_docFotoData){ document.getElementById("erro-doc-foto").style.display="block"; erros.push("docfoto"); }
+  if(!_compData){ document.getElementById("erro-comp").style.display="block"; erros.push("comp"); }
+  if(!_assinData){ document.getElementById("erro-assin").style.display="block"; erros.push("assin"); }
+
+  if(erros.length){
+    var eg=document.getElementById("erro-geral");
+    eg.textContent="⚠️ Preencha todos os campos obrigatórios."; eg.style.display="block";
+    return;
+  }
+
+  var btn=document.getElementById("btn-enviar");
+  btn.disabled=true; btn.textContent="Enviando...";
+
+  var protocolo="FILIA-"+Date.now();
+  var vinculo=[];
+  if(vincReside) vinculo.push("Reside");
+  if(vincTrabalha) vinculo.push("Trabalha");
+  if(vincEstuda) vinculo.push("Estuda");
+
+  var dados={
+    id: protocolo,
+    protocolo: protocolo,
+    nome: nome,
+    data_nascimento: nasc,
+    cpf: cpf,
+    documento: doc,
+    orgao_emissor: orgao,
+    endereco: endereco,
+    telefone: tel,
+    email: email,
+    vinculo_bairro: vinculo.join(", "),
+    declaracao_maioridade: declMaior,
+    declaracao_sem_condenacao: declCond,
+    declaracao_lgpd: declLgpd,
+    documento_foto: _docFotoData||"",
+    comprovante_residencia: _compData||"",
+    assinatura: _assinData||"",
+    status: "pendente",
+    data_registro: new Date().toISOString(),
+    origem: "filiacao_consep_primavera"
+  };
+
+  try{
+    var chave="consep_filiacao";
+    var local=JSON.parse(localStorage.getItem(chave)||"[]");
+    local.push(dados);
+    localStorage.setItem(chave,JSON.stringify(local));
+  }catch(er){}
+
+  function mostrarSucesso(msg){
+    document.getElementById("form-card").style.display="none";
+    document.getElementById("bloco-sucesso").style.display="block";
+    document.getElementById("protocolo-cand").textContent="Protocolo: "+protocolo;
+    document.getElementById("status-envio").textContent=msg||"";
+    document.getElementById("msg-sucesso").innerHTML=
+      "Filiação de <strong style='color:#e0d0ff'>"+esc(nome)+"</strong> ao CONSEP Primavera registrada!";
+  }
+
+  if(SHEETS_URL && SHEETS_URL.indexOf("COLE_AQUI") === -1){
+    var dadosSheets=Object.assign({},dados);
+
+    function enviarParaSheets(){
+      var payload=JSON.stringify({token:TOKEN,tipo:"filiacao_consep_primavera",registro:dadosSheets});
+      if(window.fetch){
+        fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:payload})
+          .then(function(){mostrarSucesso("✅ Filiação registrada no sistema!");})
+          .catch(function(){mostrarSucesso("⚠️ Salvo localmente (sem internet) — reenviar depois.");});
+      } else {
+        mostrarSucesso("✅ Filiação registrada!");
+      }
+    }
+
+    // Comprime assinatura, documento e comprovante antes de enviar
+    comprimirImagemDataUrl(dadosSheets.assinatura, 300, 100, 0.8, function(img1){
+      dadosSheets.assinatura = img1;
+      comprimirImagemDataUrl(dadosSheets.documento_foto, 300, 200, 0.5, function(img2){
+        dadosSheets.documento_foto = img2;
+        comprimirImagemDataUrl(dadosSheets.comprovante_residencia, 300, 200, 0.5, function(img3){
+          dadosSheets.comprovante_residencia = img3;
+          enviarParaSheets();
+        });
+      });
+    });
+  } else {
+    setTimeout(function(){mostrarSucesso("⚠️ Registrado só neste celular — backend ainda não configurado (avisar Oséias).");},600);
+  }
+}
+</script>
+</body>
+</html>
