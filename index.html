@@ -15423,7 +15423,7 @@ function _mtCasoHtml(o){
   // FRIDA
   if(vd){
     h+="<div class='mt-bl'>";
-    if(!fr) h+="<div class='mt-frida'><p>Violência doméstica: aplique o FRIDA antes de decidir</p><button class='mt-btn vm' data-mt-frida>Aplicar FRIDA ▶</button></div>";
+    if(!fr) h+="<div class='mt-frida' style='border-style:solid;background:var(--papel-2);border-color:var(--papel-3)'><p style='color:var(--tinta)'>Violência doméstica · FRIDA <span style='font-weight:400;color:var(--tinta-2);font-size:12px'>(opcional — recomendado para avaliar o risco)</span></p><button class='mt-btn sec' data-mt-frida>Aplicar FRIDA</button></div>";
     else { var nv={B:"BAIXO",M:"MÉDIO",E:"ELEVADO"}[fr.nivel]||fr.nivel; h+="<div class='mt-fok'>✓ FRIDA aplicado · risco "+nv+(fr.nivel==="E"?" · sugestão: encaminhar ao CRAV e à DEAM hoje":"")+"</div>"; }
     h+="</div>";
   }
@@ -15446,7 +15446,7 @@ function _mtCasoHtml(o){
       h+="</div>";
     });
   } else {
-    var trav = vd && !fr;
+    var trav = false; // FRIDA é opcional: não trava as ações
     h+="<p class='mt-perg'>O que você fez ou vai fazer?</p><div class='mt-acoes'>";
     h+="<button class='mt-ac pri' data-mt-painel='liguei'"+(trav?" disabled":"")+"><b>📞 Liguei</b><span>Registrar a ligação</span></button>";
     h+="<button class='mt-ac' data-mt-painel='encaminhar'"+(trav?" disabled":"")+"><b>📤 Encaminhar</b><span>CRAV, CRAS, DEAM, Conselho…</span></button>";
