@@ -1259,6 +1259,17 @@ async function carregarDadosAppDoSheets(){
         });
       });
       state.encaminhamentos = _mergeById(state.encaminhamentos, _encTabNorm);
+      // _mergeById não atualiza ids que já existem — mas a devolutiva enviada pelo formulário
+      // é gravada pelo Apps Script na linha do encaminhamento. Copia só esses campos (sem
+      // mexer no status), para a devolutiva aparecer no sino sem precisar de clique manual.
+      var _encLocMap={}; (state.encaminhamentos||[]).forEach(function(x){ if(x&&x.id) _encLocMap[String(x.id)]=x; });
+      _encTabNorm.forEach(function(r){
+        var l=_encLocMap[String(r.id)];
+        if(l && r.relato_devolutiva && !l.relato_devolutiva){
+          l.relato_devolutiva=r.relato_devolutiva; l.data_devolutiva=r.data_devolutiva||l.data_devolutiva||"";
+          if(r.responsavel_devolutiva) l.responsavel_devolutiva=r.responsavel_devolutiva;
+        }
+      });
     }
     if(_rPoliciaisTabela && _rPoliciaisTabela.ok && Array.isArray(_rPoliciaisTabela.dados)){
       state.policiais = _mergeById(state.policiais, _rPoliciaisTabela.dados);
@@ -15545,6 +15556,15 @@ function _mtCasoHtml(o){
     else { var nv={B:"BAIXO",M:"MÉDIO",E:"ELEVADO"}[fr.nivel]||fr.nivel; h+="<div class='mt-fok'>✓ FRIDA aplicado · risco "+nv+(fr.nivel==="E"?" · sugestão: encaminhar ao CRAV e à DEAM hoje":"")+"</div>"; }
     h+="</div>";
   }
+  // Devolutivas novas (ainda não lidas) em destaque
+  var _devNovas=(typeof _sinoNovas==="function"?_sinoNovas():[]).filter(function(e){ return String(e.ocorrencia_id||e.ocorrenciaId||"")===String(o.id); });
+  if(_devNovas.length){
+    h+="<div class='mt-bl'>";
+    _devNovas.forEach(function(e){
+      h+="<div class='mt-ult' style='border-color:var(--verde);background:#E1EBD6'><div class='tit' style='color:var(--verde-2)'>📬 Devolutiva nova — "+esc(e.orgao||e.tipo||"")+" · "+_mtBr(_mtIso(e.data_devolutiva))+(e.responsavel_devolutiva?" · "+esc(e.responsavel_devolutiva):"")+"</div><div class='conv'>"+esc(e.relato_devolutiva)+"</div><div class='mt-row'><button class='mt-btn sec' data-mt-devlida='"+esc(e.id)+"'>✓ Marcar como lida</button></div></div>";
+    });
+    h+="</div>";
+  }
   // Última conversa + combinado para esta ligação
   h+=_mtUltimaHtml(o);
   // Decisão
@@ -15963,6 +15983,7 @@ document.addEventListener("click",function(ev){
   if(d.mtDatalig){ M.rasc.dataLig=d.mtDatalig; _mtRender(); return; }
   if(d.mtMotivo){ M.rasc.motivo=d.mtMotivo; _mtRender(); return; }
   if(d.mtFim){ _mtConcluir(o, d.mtFim); return; }
+  if(d.mtDevlida){ _sinoMarcarLida(d.mtDevlida); _mtRender(); return; }
   if(d.mtCumprido){ M.rasc.cumprido=d.mtCumprido; _mtRender(); return; }
   if("mtSemcontato" in d){ M.painel="registrar"; M.rasc={motivo:"Sem contato possível"}; _mtRender(); return; }
   if("mtVisita" in d){
@@ -15990,6 +16011,161 @@ document.addEventListener("click",function(ev){
     M.feitos++; _mtProximo("Devolutiva registrada"+(d.mtEncerra?" · caso encerrado":"")); return;
   }
 });
+
+// ══════════════════════════════════════════════════════════════════
+//  🔔 SINO DE DEVOLUTIVAS — avisa quando um órgão responde um encaminhamento.
+//  "Nova" = encaminhamento com relato_devolutiva ainda não lido neste aparelho
+//  (nem registrado na ficha). Verifica a aba devolutivas_crav a cada 2 min
+//  e, a cada 10 min, as chaves individuais (_syncDevolutivas).
+// ══════════════════════════════════════════════════════════════════
+function _sinoLidas(){ try{ return JSON.parse(localStorage.getItem("bcs_dev_lidas")||"{}")||{}; }catch(e){ return {}; } }
+function _sinoMarcarLida(encId){
+  var m=_sinoLidas(); m[encId]=Date.now();
+  try{ localStorage.setItem("bcs_dev_lidas", JSON.stringify(m)); }catch(e){}
+  var e=(state.encaminhamentos||[]).find(function(x){return x.id===encId;});
+  if(e) e.devolutiva_lida_em=new Date().toISOString();
+  _sinoAtualizar();
+}
+function _sinoNovas(){
+  var l=_sinoLidas();
+  return (state.encaminhamentos||[]).filter(function(e){
+    return e && e.relato_devolutiva && !e.registrado_na_ficha && !e.devolutiva_lida_em && !l[e.id];
+  }).sort(function(a,b){ return _mtIso(b.data_devolutiva).localeCompare(_mtIso(a.data_devolutiva)); });
+}
+function _sinoOc(e){ return _mtOc(e.ocorrencia_id||e.ocorrenciaId||""); }
+function _sinoNome(e){
+  var o=_sinoOc(e);
+  var n=(o&&(o.vitima_nome||o.nome_vitima))||e.vitima_nome||"";
+  if(!n && typeof _nomeEncLimpo==="function"){ try{ n=_nomeEncLimpo(e); }catch(x){} }
+  return n||"Vítima não identificada";
+}
+var _sinoConhecidos=null;
+function _sinoAtualizar(){
+  var btn=document.getElementById("sino-dev");
+  var logado=state.perfil && ["gestor","operador","comandante"].indexOf(state.perfil)>=0;
+  if(!logado){ if(btn) btn.remove(); return; }
+  if(!btn){
+    if(!document.getElementById("sino-css")){
+      var st=document.createElement("style"); st.id="sino-css";
+      st.textContent="#sino-dev{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:8000;display:flex;align-items:center;gap:6px;border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta-2);border-radius:99px;padding:9px 14px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.18);font-family:inherit}"+
+        "#sino-dev.tem{background:var(--verm);border-color:var(--verm);color:#fff}"+
+        "#sino-dev .n{font-variant-numeric:tabular-nums}"+
+        "#sino-dev.balanca{animation:sino-bal .9s ease-in-out 3}"+
+        "@keyframes sino-bal{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(5deg)}}"+
+        "@media (prefers-reduced-motion:reduce){#sino-dev.balanca{animation:none}}"+
+        "@media (max-width:820px){#sino-dev{bottom:calc(84px + env(safe-area-inset-bottom,0px));right:12px}}"+
+        "#sino-painel{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9200;display:flex;align-items:flex-start;justify-content:center;padding:40px 14px;overflow-y:auto}"+
+        "#sino-painel .cx{background:var(--papel);color:var(--tinta);border-radius:14px;width:100%;max-width:620px;box-shadow:0 10px 40px rgba(0,0,0,.3)}"+
+        "#sino-painel .cab{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--papel-3)}"+
+        "#sino-painel .cab h3{margin:0;font-size:17px;flex:1}"+
+        "#sino-painel .it{padding:14px 18px;border-bottom:1px solid var(--papel-3);display:flex;flex-direction:column;gap:6px}"+
+        "#sino-painel .nome{font-size:18px;font-weight:800}"+
+        "#sino-painel .meta{font-size:12px;color:var(--tinta-2)}"+
+        "#sino-painel .rel{font-size:13px;line-height:1.5;background:var(--papel-2);border-radius:8px;padding:8px 10px;white-space:pre-wrap;max-height:120px;overflow:auto}"+
+        "#sino-painel .bts{display:flex;gap:8px;flex-wrap:wrap}"+
+        "#sino-painel button.b{border:0;border-radius:8px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}"+
+        "#sino-painel .pdf{background:var(--verde);color:#fff}#sino-painel .sec{background:transparent;border:1.5px solid var(--papel-3)!important;color:var(--tinta)}"+
+        "#sino-painel .vazio{padding:40px 18px;text-align:center;color:var(--tinta-2)}";
+      document.head.appendChild(st);
+    }
+    btn=document.createElement("button"); btn.id="sino-dev"; btn.type="button";
+    btn.title="Devolutivas recebidas"; btn.onclick=_sinoAbrir;
+    document.body.appendChild(btn);
+  }
+  var novas=_sinoNovas();
+  btn.className=novas.length?"tem":"";
+  btn.innerHTML="🔔"+(novas.length?" <span class='n'>"+novas.length+"</span>":"");
+  btn.setAttribute("aria-label", novas.length?novas.length+" devolutiva(s) nova(s)":"Nenhuma devolutiva nova");
+  // Chegou devolutiva nova desde a última olhada → balança, toca e notifica
+  var ids=novas.map(function(e){return e.id;});
+  if(_sinoConhecidos){
+    var chegaram=novas.filter(function(e){ return _sinoConhecidos.indexOf(e.id)<0; });
+    if(chegaram.length){
+      btn.classList.remove("balanca"); void btn.offsetWidth; btn.classList.add("balanca");
+      _sinoBeep();
+      try{ if(navigator.vibrate) navigator.vibrate([120,60,120]); }catch(e){}
+      try{
+        if(window.Notification && Notification.permission==="granted"){
+          var e0=chegaram[0];
+          new Notification("Devolutiva recebida — "+(e0.orgao||e0.tipo||""), {body:_sinoNome(e0)+(chegaram.length>1?" e mais "+(chegaram.length-1):""), icon:"icon-192.png", tag:"iara-devolutiva"});
+        }
+      }catch(e){}
+      showToast("🔔 Devolutiva recebida: "+_sinoNome(chegaram[0])+" ("+(chegaram[0].orgao||chegaram[0].tipo||"")+")");
+    }
+  }
+  _sinoConhecidos=ids;
+}
+function _sinoBeep(){
+  try{
+    var C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+    var ctx=_sinoBeep._ctx||(_sinoBeep._ctx=new C());
+    [880,1175].forEach(function(f,i){
+      var o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=f; o.type="sine";
+      g.gain.setValueAtTime(0.0001, ctx.currentTime+i*0.18);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime+i*0.18+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+i*0.18+0.25);
+      o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime+i*0.18); o.stop(ctx.currentTime+i*0.18+0.3);
+    });
+  }catch(e){}
+}
+function _sinoAbrir(){
+  // Primeiro toque no sino: pede permissão para avisar com notificação do sistema
+  try{ if(window.Notification && Notification.permission==="default") Notification.requestPermission(); }catch(e){}
+  try{ var C=window.AudioContext||window.webkitAudioContext; if(C && !_sinoBeep._ctx) _sinoBeep._ctx=new C(); }catch(e){}
+  var ant=document.getElementById("sino-painel"); if(ant) ant.remove();
+  var novas=_sinoNovas();
+  var h="<div class='cx' role='dialog' aria-label='Devolutivas recebidas'><div class='cab'><h3>🔔 Devolutivas recebidas</h3><button class='b sec' data-sino-verificar>🔄 Verificar agora</button><button class='b sec' data-sino-fechar aria-label='Fechar'>✕</button></div>";
+  if(!novas.length) h+="<div class='vazio'><b style='display:block;color:var(--tinta);font-size:15px;margin-bottom:4px'>Nenhuma devolutiva nova</b>Quando um órgão responder um encaminhamento, ela aparece aqui.</div>";
+  novas.forEach(function(e){
+    var o=_sinoOc(e);
+    h+="<div class='it'><div class='nome'>"+esc(_sinoNome(e))+"</div>";
+    h+="<div class='meta'><b>"+esc(e.orgao||e.tipo||"Órgão")+"</b> respondeu em "+_mtBr(_mtIso(e.data_devolutiva))+"/"+(_mtIso(e.data_devolutiva).slice(0,4)||"")+(e.responsavel_devolutiva?" · "+esc(e.responsavel_devolutiva):"")+(o&&o.numero?" · BO "+esc(String(o.numero)):"")+(o&&o.tipo?" · "+esc(o.tipo):"")+"</div>";
+    h+="<div class='rel'>"+esc(e.relato_devolutiva)+"</div><div class='bts'>";
+    if(o) h+="<button class='b pdf' data-sino-pdf='"+esc(e.id)+"'>📄 PDF consolidado do atendimento</button><button class='b sec' data-sino-caso='"+esc(e.id)+"'>Abrir o caso</button>";
+    else h+="<span class='meta'>Ocorrência não encontrada neste aparelho.</span>";
+    h+="<button class='b sec' data-sino-lida='"+esc(e.id)+"'>✓ Marcar como lida</button></div></div>";
+  });
+  h+="</div>";
+  var m=document.createElement("div"); m.id="sino-painel"; m.innerHTML=h;
+  m.addEventListener("click",function(ev){
+    if(ev.target===m){ m.remove(); return; }
+    var b=ev.target.closest("button"); if(!b) return;
+    var d=b.dataset, e=d.sinoPdf||d.sinoCaso||d.sinoLida?(state.encaminhamentos||[]).find(function(x){return x.id===(d.sinoPdf||d.sinoCaso||d.sinoLida);}):null;
+    if("sinoFechar" in d){ m.remove(); return; }
+    if("sinoVerificar" in d){ b.textContent="⏳ Verificando…"; _sinoVerificar(true).then(function(){ _sinoAbrir(); }); return; }
+    if(d.sinoPdf && e){ var o=_sinoOc(e); if(o) _mtGerarPdf(o.id); _sinoMarcarLida(e.id); _sinoAbrir(); return; }
+    if(d.sinoCaso && e){
+      var oc=_sinoOc(e); m.remove(); _sinoMarcarLida(e.id);
+      if(!state._mt) state._mt={pilha:"novo", sel:null, painel:null, rasc:{}, feitos:0};
+      state._mt.busca=(oc&&oc.vitima_nome)||""; state._mt.sel=oc?oc.id:null; state._mt.painel=null; state._mt.rasc={};
+      setTela("mesa_triagem"); return;
+    }
+    if(d.sinoLida && e){ _sinoMarcarLida(e.id); _sinoAbrir(); return; }
+  });
+  document.body.appendChild(m);
+}
+// Busca devolutivas enviadas pelo formulário (aba devolutivas_crav) e aplica nos encaminhamentos
+function _sinoVerificar(manual){
+  if(!SHEETS_URL || !state.perfil) return Promise.resolve(0);
+  return _sheetsGet({acao:"listar",tipo:"devolutivas_crav"}).then(function(r){
+    var regs=(r&&(r.registros||r.dados))||[], n=0;
+    if(Array.isArray(regs)) regs.forEach(function(x){ try{ if(_aplicarDevolutiva(x)) n++; }catch(e){} });
+    if(n){ try{ localStorage.setItem("bcs_encaminhamentos", JSON.stringify(state.encaminhamentos)); }catch(e){} salvarLocal(); }
+    _sinoAtualizar();
+    if(manual) showToast(n?"✓ "+n+" devolutiva(s) nova(s)":"Nenhuma devolutiva nova");
+    if(n && state.tela==="mesa_triagem" && typeof _mtRender==="function") _mtRender();
+    return n;
+  }).catch(function(){ return 0; });
+}
+(function(){
+  setInterval(function(){ try{ _sinoAtualizar(); }catch(e){} }, 5000);
+  setTimeout(function(){ _sinoVerificar(false); }, 8000);
+  setInterval(function(){ if(document.visibilityState!=="hidden") _sinoVerificar(false); }, 2*60*1000);
+  setInterval(function(){
+    if(document.visibilityState==="hidden" || !state.perfil || typeof _syncDevolutivas!=="function") return;
+    _syncDevolutivas(function(n){ if(n>0){ _sinoAtualizar(); if(state.tela==="mesa_triagem"&&typeof _mtRender==="function") _mtRender(); } });
+  }, 10*60*1000);
+})();
 
 function renderTela() {
   const main=document.getElementById("main");
