@@ -15530,9 +15530,14 @@ function _mtPainelHtml(o){
   var M=state._mt, r=M.rasc, h="<div class='mt-pn'>";
   function datas(tit){
     if(!r.quando) r.quando=_mtDia(1);
-    return "<h4>"+tit+"</h4><div class='mt-chips'>"+[[1,"Amanhã"],[2,"Em 2 dias"],[7,"Em 1 semana"]].map(function(x){ var d=_mtDia(x[0]); return "<button class='mt-chip"+(r.quando===d?" on":"")+"' data-mt-quando='"+d+"'>"+x[1]+" ("+_mtBr(d)+")</button>"; }).join("")+"</div>";
+    var rapidas=[[1,"Amanhã"],[2,"Em 2 dias"],[7,"Em 1 semana"]];
+    var ehRapida=rapidas.some(function(x){ return _mtDia(x[0])===r.quando; });
+    return "<h4>"+tit+"</h4><div class='mt-chips' style='align-items:center'>"+rapidas.map(function(x){ var d=_mtDia(x[0]); return "<button class='mt-chip"+(r.quando===d?" on":"")+"' data-mt-quando='"+d+"'>"+x[1]+" ("+_mtBr(d)+")</button>"; }).join("")+
+      "<label class='mt-chip"+(ehRapida?"":" on")+"' style='display:inline-flex;gap:6px;align-items:center;white-space:nowrap'>Outra data: <input type='date' id='mt-quando-manual' min='"+hoje()+"' value='"+(ehRapida?"":esc(r.quando))+"' style='border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px'></label></div>";
   }
   if(M.painel==="liguei"){
+    if(!r.dataLig) r.dataLig=hoje();
+    h+="<h4>Quando foi a ligação?</h4><div class='mt-chips' style='align-items:center'><button class='mt-chip"+(r.dataLig===hoje()?" on":"")+"' data-mt-datalig='"+hoje()+"'>Hoje</button><button class='mt-chip"+(r.dataLig===_mtDia(-1)?" on":"")+"' data-mt-datalig='"+_mtDia(-1)+"'>Ontem</button><label class='mt-chip"+(r.dataLig!==hoje()&&r.dataLig!==_mtDia(-1)?" on":"")+"' style='display:inline-flex;gap:6px;align-items:center;white-space:nowrap'>Outra data: <input type='date' id='mt-datalig-manual' max='"+hoje()+"' value='"+(r.dataLig!==hoje()&&r.dataLig!==_mtDia(-1)?esc(r.dataLig):"")+"' style='border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px'></label></div>";
     h+="<h4>Atendeu?</h4><div class='mt-chips'><button class='mt-chip"+(r.atendeu==="sim"?" on":"")+"' data-mt-atendeu='sim'>Sim, conversamos</button><button class='mt-chip"+(r.atendeu==="nao"?" on":"")+"' data-mt-atendeu='nao'>Não atendeu</button></div>";
     if(r.atendeu==="sim"){
       h+="<label class='mt-rot' for='mt-conversa'>O que conversaram</label><textarea id='mt-conversa' placeholder='Ex.: está segura na casa da mãe, quer apoio psicológico, vai pedir medida protetiva…'>"+esc(r.conversa||"")+"</textarea>";
@@ -15555,7 +15560,7 @@ function _mtPainelHtml(o){
     h+="<div class='mt-row'><button class='mt-btn ok' data-mt-fim='encaminhar'"+(r.orgaos.length?"":" disabled")+">Encaminhar"+(r.orgaos.length?" ("+r.orgaos.length+")":"")+"</button></div>";
   }
   if(M.painel==="depois"){
-    if(r.atendeu==="sim") h+="<p class='mt-dica'>A ligação de hoje também será registrada.</p>";
+    if(r.atendeu==="sim") h+="<p class='mt-dica'>A ligação de "+_mtBr(r.dataLig||hoje())+" também será registrada.</p>";
     h+=datas("Ligar quando?");
     h+="<div class='mt-row'><button class='mt-btn ok' data-mt-fim='depois'>Marcar retorno</button></div>";
   }
@@ -15685,14 +15690,17 @@ function _mtNovaLigacao(o, status, data, texto){
   return ag;
 }
 function _mtRegistrarLigacao(o, atendeu, texto){
-  // Se havia retorno marcado para hoje, ele vira a ligação feita
+  // Data da ligação: escolhida no painel (hoje, ontem ou manual)
+  var dl=(state._mt.rasc&&state._mt.rasc.dataLig)||hoje();
+  var conf=(dl===hoje())?new Date().toISOString():dl+"T12:00:00";
+  // Se havia retorno marcado até essa data, ele vira a ligação feita
   var pend=_mtLigarPendente(o.id);
-  if(pend && _mtIso(pend.data)<=hoje()){
-    pend.status=atendeu?"Realizado":"NaoRealizado"; pend.resultado=texto||""; pend.data_confirmacao=new Date().toISOString();
-  } else _mtNovaLigacao(o, atendeu?"Realizado":"NaoRealizado", hoje(), texto);
+  if(pend && _mtIso(pend.data)<=dl){
+    pend.status=atendeu?"Realizado":"NaoRealizado"; pend.resultado=texto||""; pend.data_confirmacao=conf;
+  } else { var ag=_mtNovaLigacao(o, atendeu?"Realizado":"NaoRealizado", dl, texto); ag.data_confirmacao=conf; }
   if(atendeu && texto){
-    o.resumo_atendimento=(o.resumo_atendimento?o.resumo_atendimento+"\n":"")+_mtBr(hoje())+": "+texto;
-    o.data_atendimento=hoje();
+    o.resumo_atendimento=(o.resumo_atendimento?o.resumo_atendimento+"\n":"")+_mtBr(dl)+": "+texto;
+    o.data_atendimento=dl;
   }
 }
 function _mtSituacao(o, sit){
@@ -15785,7 +15793,16 @@ document.addEventListener("keydown",function(ev){
   state._mt.busca=""; state._mt.sel=null; _mtRender();
 });
 document.addEventListener("change",function(ev){
-  if(state.tela!=="mesa_triagem" || !ev.target.hasAttribute("data-mt-jur")) return;
+  if(state.tela!=="mesa_triagem") return;
+  if(ev.target.id==="mt-quando-manual" && ev.target.value){
+    if(ev.target.value<hoje()){ showToast("Escolha hoje ou uma data futura","error"); return; }
+    state._mt.rasc.quando=ev.target.value; _mtRender(); return;
+  }
+  if(ev.target.id==="mt-datalig-manual" && ev.target.value){
+    if(ev.target.value>hoje()){ showToast("A ligação não pode ser no futuro","error"); return; }
+    state._mt.rasc.dataLig=ev.target.value; _mtRender(); return;
+  }
+  if(!ev.target.hasAttribute("data-mt-jur")) return;
   state._mt.jur=ev.target.checked; state._mt.sel=null; _mtRender();
 });
 document.addEventListener("click",function(ev){
@@ -15805,11 +15822,12 @@ document.addEventListener("click",function(ev){
     var iv=setInterval(function(){ if(!document.getElementById("modal-frida")){ clearInterval(iv); M.manter=true; _mtRender(); M.manter=false; } },500);
     return;
   }
-  if(d.mtPainel){ M.painel=d.mtPainel; M.rasc={atendeu:M.rasc.atendeu, conversa:M.rasc.conversa}; _mtRender(); return; }
+  if(d.mtPainel){ M.painel=d.mtPainel; M.rasc={atendeu:M.rasc.atendeu, conversa:M.rasc.conversa, dataLig:M.rasc.dataLig}; _mtRender(); return; }
   if(d.mtAtendeu){ M.rasc.atendeu=d.mtAtendeu; _mtRender(); return; }
   if(d.mtOrgao){ var a=M.rasc.orgaos, i=a.indexOf(d.mtOrgao); if(i>=0) a.splice(i,1); else a.push(d.mtOrgao); _mtRender(); return; }
   if(d.mtPrazo){ M.rasc.prazo=+d.mtPrazo; _mtRender(); return; }
   if(d.mtQuando){ M.rasc.quando=d.mtQuando; _mtRender(); return; }
+  if(d.mtDatalig){ M.rasc.dataLig=d.mtDatalig; _mtRender(); return; }
   if(d.mtMotivo){ M.rasc.motivo=d.mtMotivo; _mtRender(); return; }
   if(d.mtFim){ _mtConcluir(o, d.mtFim); return; }
   if(d.mtCobrei){
