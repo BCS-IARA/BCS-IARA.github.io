@@ -22562,11 +22562,29 @@ var INV_ESTADOS = {
   inservivel:  {label:"Inservível",  cor:"#ef4444"}
 };
 
+// Nunca lança erro: com o localStorage do aparelho cheio (fotos/assinaturas em base64),
+// o setItem estourava a cota e interrompia quem chamou — a tela de Conferência não abria.
 function _invSalvarLocal(){
-  localStorage.setItem("bcs_inv_itens",  JSON.stringify(state.invItens||[]));
-  localStorage.setItem("bcs_inv_mov",    JSON.stringify(state.invMovimentacoes||[]));
-  localStorage.setItem("bcs_inv_conf",   JSON.stringify(state.invConferencias||[]));
-  localStorage.setItem("bcs_inv_locais", JSON.stringify(_invGetLocaisObj()));
+  var falhou=false;
+  function _set(chave, valor){
+    try{ localStorage.setItem(chave, JSON.stringify(valor)); return true; }
+    catch(e){ console.warn("[INV] Falha ao salvar "+chave+" no aparelho:",e); falhou=true; return false; }
+  }
+  if(!_set("bcs_inv_itens", state.invItens||[])){
+    // Libera espaço: fotos base64 que já estão no Drive (foto_url) não precisam ficar no aparelho
+    var liberou=false;
+    (state.invItens||[]).forEach(function(x){
+      if(x&&x.foto_url&&x.foto&&x.foto.length>500&&x.foto.indexOf("http")!==0){ x.foto="[foto_drive]"; liberou=true; }
+    });
+    if(liberou){ falhou=false; _set("bcs_inv_itens", state.invItens); }
+  }
+  _set("bcs_inv_mov",    state.invMovimentacoes||[]);
+  _set("bcs_inv_conf",   state.invConferencias||[]);
+  _set("bcs_inv_locais", _invGetLocaisObj());
+  if(falhou&&!window._invAvisoCotaMostrado){
+    window._invAvisoCotaMostrado=true;
+    if(typeof showToast==="function") showToast("⚠ Armazenamento do aparelho cheio — os dados seguem sendo enviados ao Sheets","error");
+  }
 }
 function _invGetLocaisObj(){
   if(!state.invLocais){
@@ -23819,13 +23837,22 @@ function _invAbrirConferencia2(conf, sincronizar){
       if(btnC){btnC.disabled=true;btnC.textContent="🔄 Carregando…";}
       _syncPromise.then(function(confAtual){
         mc.remove();
-        _invRenderConferencia(confAtual||_confRef);
+        _invRenderConferenciaSeguro(confAtual||_confRef);
       });
     } else {
       mc.remove();
-      _invRenderConferencia(_confRef);
+      _invRenderConferenciaSeguro(_confRef);
     }
   };
+}
+// Se a montagem da tela falhar, avisa o motivo em vez de voltar calado para a lista
+function _invRenderConferenciaSeguro(conf){
+  try{ _invRenderConferencia(conf); }
+  catch(e){
+    console.error("[INV] Falha ao abrir conferência:",e);
+    var m=document.getElementById("modal-inv-conf"); if(m) m.remove();
+    showToast("Erro ao abrir conferência: "+((e&&e.message)||e),"error");
+  }
 }
 function _invRenderConferencia(conf){
   // Normalizar conf.itens: pode chegar como string JSON quando vindo do Sheets
