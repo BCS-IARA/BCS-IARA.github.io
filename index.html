@@ -14166,6 +14166,7 @@ function renderFilaDia(main) {
 
   var abas = [
     {k:"triagem",       label:"Triagem",          badge:_nTri,  cor:"var(--verm)"},
+    {k:"triagem_nova",  label:"🆕 Triagem · Novo Fluxo", badge:_nTri, cor:"var(--verde)"},
     {k:"agenda",        label:"Fila do Dia",       badge:0,      cor:"var(--ambar)"},
     {k:"encaminhamentos",label:"Encaminhamentos",  badge:_nEnc,  cor:"var(--ambar)"},
     {k:"devolutivas",   label:"Devolutivas",       badge:_nDev,  cor:"var(--verde)"},
@@ -14188,7 +14189,7 @@ function renderFilaDia(main) {
   var content = document.getElementById("fila-dia-content");
   state._inFilaDia = true;
   try {
-    if(tab === "triagem")              renderTriagem(content);
+    if(tab === "triagem" || tab === "triagem_nova") renderTriagem(content);
     else if(tab === "vcm")             renderDashboardVCM(content);
     else if(tab === "encaminhamentos") renderFilaEncaminhamentos(content);
     else if(tab === "devolutivas")     renderDevolutivas(content);
@@ -14611,6 +14612,9 @@ function _triagemBairroNaJurisdicao(o){
 }
 
 function renderTriagem(main) {
+  // Aba "Triagem · Novo Fluxo" (Fila do Dia): mesma fila, formulário com o fluxo novo
+  // vindo da beta — Descrição/Dinâmica/Medidas separados, autor visível, atendimento telefônico
+  var _nv = state._filaTab === "triagem_nova";
   var ocs = (state.db.ocorrencias||[]);
   var novas = ocs.filter(_ocNaFila);
   var vds   = novas.filter(function(o){ return o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||""); });
@@ -14661,7 +14665,7 @@ function renderTriagem(main) {
   h += "<div style='width:310px;min-width:220px;border-right:1px solid var(--papel-3);overflow-y:auto;background:var(--papel-2);flex-shrink:0'>";
   h += "<div style='padding:10px 12px;border-bottom:1px solid var(--papel-3);background:var(--papel-2);position:sticky;top:0;z-index:2'>";
   h += "<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>";
-  h += "<span style='font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--tinta)'>📥 Triagem</span>";
+  h += "<span style='font-family:Georgia,serif;font-size:14px;font-weight:700;color:var(--tinta)'>"+(_nv?"🆕 Triagem · Novo Fluxo":"📥 Triagem")+"</span>";
   if(filaFiltrada.length) h += "<span style='background:var(--verm);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:900'>"+filaFiltrada.length+"</span>";
   if(filaFiltrada.length<fila.length) h += "<span style='color:var(--tinta-2);font-size:10px'>de "+fila.length+"</span>";
   h += "</div>";
@@ -14696,14 +14700,24 @@ function renderTriagem(main) {
   } else {
     filaFiltrada.forEach(function(o){
       var isVD = o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
+      var isMenorFila = _nv && (o.menor_envolvido || (o.vitima_idade && parseInt(o.vitima_idade)<18));
       var ativo = ocSel && ocSel.id===o.id;
       h += "<div onclick='_selecionarTriagem(\""+esc(o.id)+"\")' style='padding:10px 14px;border-bottom:1px solid var(--papel-3);cursor:pointer;background:"+(ativo?"var(--ambar-claro)":"transparent")+";border-left:3px solid "+(isVD?"var(--verm)":(ativo?"var(--ambar)":"transparent"))+"'>";
       h += "<div style='display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap'>";
       if(isVD) h += "<span style='background:var(--verm);color:#fff;border-radius:3px;padding:0px 5px;font-size:9px;font-weight:900'>VD</span>";
+      if(isMenorFila) h += "<span style='background:var(--ambar);color:var(--madeira-3);border-radius:3px;padding:0px 5px;font-size:9px;font-weight:900'>MENOR</span>";
       h += "<span style='font-size:11px;font-weight:700;color:var(--tinta)'>"+esc((o.tipo||"—").substring(0,28))+"</span>";
       h += "</div>";
-      if(o.vitima_nome) h += "<p style='font-size:11px;color:var(--tinta-2);margin:0 0 2px;font-weight:600'>👤 "+esc(o.vitima_nome)+"</p>";
-      h += "<p style='font-size:10px;color:var(--tinta-2);margin:0'>"+esc(o.data||"—")+(o.bairro?" · "+esc(o.bairro):"")+"</p>";
+      if(_nv){
+        if(o.vitima_nome) h += "<p style='font-size:11px;color:var(--tinta-2);margin:0 0 2px;font-weight:600'>👤 "+esc(o.vitima_nome)+(o.vitima_idade?" ("+esc(String(o.vitima_idade))+")":"")+"</p>";
+        else h += "<p style='font-size:11px;color:var(--verm-2);margin:0 0 2px;font-weight:600;font-style:italic'>👤 Vítima não identificada</p>";
+        if(o.suspeito_nome) h += "<p style='font-size:11px;color:var(--tinta-2);margin:0 0 2px;font-weight:600'>🎯 "+esc(o.suspeito_nome)+(o.suspeito_idade?" ("+esc(String(o.suspeito_idade))+")":"")+"</p>";
+        else h += "<p style='font-size:11px;color:var(--tinta-3);margin:0 0 2px;font-style:italic'>🎯 Autor não identificado</p>";
+        h += "<p style='font-size:10px;color:var(--tinta-2);margin:0'>"+esc(o.data||"—")+(o.bairro?" · "+esc(o.bairro):"")+(o.numero?" · Nº "+esc(String(o.numero)):"")+"</p>";
+      } else {
+        if(o.vitima_nome) h += "<p style='font-size:11px;color:var(--tinta-2);margin:0 0 2px;font-weight:600'>👤 "+esc(o.vitima_nome)+"</p>";
+        h += "<p style='font-size:10px;color:var(--tinta-2);margin:0'>"+esc(o.data||"—")+(o.bairro?" · "+esc(o.bairro):"")+"</p>";
+      }
       h += "</div>";
     });
   }
@@ -14735,7 +14749,8 @@ function renderTriagem(main) {
 
     // BLOCO 1 — Vítima + Relato
     h += "<div class='card' style='margin-bottom:14px;padding:14px 16px'>";
-    h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0 0 10px'>① Vítima e Contexto</p>";
+    if(_nv) h += "<div style='background:#E8F0E8;border:1px solid var(--verde);border-radius:6px;padding:7px 12px;margin:-4px 0 12px;font-size:11px;color:var(--verde-2);font-weight:700'>🆕 Novo fluxo de atendimento — a triagem antiga continua disponível na aba \"Triagem\".</div>";
+    h += "<p style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.8px;margin:0 0 10px'>"+(_nv?"① Vítima, Autor e Contexto":"① Vítima e Contexto")+"</p>";
     if(vit||o.vitima_nome){
       h += "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px;background:var(--papel-3);border-radius:6px;padding:10px 12px'>";
       var campos=[["Nome",(vit&&vit.nome)||o.vitima_nome||"—"],["Sexo",(vit&&vit.sexo)||o.vitima_sexo||"—"],["Idade",((vit&&vit.idade)||o.vitima_idade||"—")],["Telefone",(vit&&vit.telefone)||o.vitima_telefone||"—"],["Bairro",(vit&&vit.bairro)||o.bairro||"—"]];
@@ -14745,9 +14760,26 @@ function renderTriagem(main) {
     } else {
       h += "<div style='background:var(--papel-3);border-radius:6px;padding:10px 12px;margin-bottom:12px;color:var(--tinta-2);font-size:12px'>⚠️ Vítima não identificada — preencher durante a triagem.</div>";
     }
+    if(_nv){
+      if(o.suspeito_nome||o.autores){
+        h += "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px;background:#F5E8E4;border-radius:6px;padding:10px 12px;border:1px solid var(--verm)'>";
+        var camposAutor=[["Autor",o.suspeito_nome||"—"],["Sexo",o.suspeito_sexo||"—"],["Idade",o.suspeito_idade||"—"],["Endereço",o.suspeito_endereco||"—"]];
+        camposAutor.forEach(function(c){ h+="<div><p style='font-size:9px;font-weight:700;color:var(--verm-2);text-transform:uppercase;letter-spacing:.4px;margin:0 0 2px'>"+c[0]+"</p><p style='font-size:12px;color:var(--tinta);font-weight:600;margin:0'>"+esc(String(c[1]))+"</p></div>"; });
+        h += "</div>";
+      } else {
+        h += "<div style='background:var(--papel-3);border-radius:6px;padding:10px 12px;margin-bottom:12px;color:var(--tinta-2);font-size:12px'>🎯 Autor não identificado — preencher se houver.</div>";
+      }
+      h += "<label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>Descrição</label>";
+      h += "<textarea id='tri-descricao' rows='2' placeholder='Resumo objetivo do que ocorreu — 1 a 2 frases.' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6;margin-bottom:10px'>"+esc(o.descricao||"")+"</textarea>";
+      h += "<label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>Dinâmica dos Fatos</label>";
+      h += "<textarea id='tri-dinamica' rows='4' placeholder='Relato detalhado: o que aconteceu, na ordem em que aconteceu.' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6;margin-bottom:10px'>"+esc(o.descricao_dinamica||o.texto_original||"")+"</textarea>";
+      h += "<label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>Medidas Adotadas</label>";
+      h += "<textarea id='tri-medidas' rows='3' placeholder='Providências tomadas: BO lavrado, orientação dada, encaminhamento, medida protetiva, etc.' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(o.medidas||"")+"</textarea>";
+    } else {
     var relato = o.descricao_dinamica||o.texto_original||o.descricao||"";
     h += "<label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>Relato / Dinâmica dos fatos</label>";
     h += "<textarea id='tri-relato' rows='4' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(relato)+"</textarea>";
+    }
     h += "<div style='margin-top:10px'>";
     h += "<label style='font-size:10px;font-weight:700;color:var(--ambar-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>📝 Resumo do Atendimento</label>";
     h += "<textarea id='tri-resumo-atend' rows='3' placeholder='Descreva o que foi conversado, orientações dadas, providências tomadas no atendimento...' style='width:100%;padding:8px 10px;border:1.5px solid var(--ambar-2);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(o.resumo_atendimento||"")+"</textarea>";
@@ -14811,17 +14843,25 @@ function renderTriagem(main) {
     h += "<div id='tri-vis-bloco' style='border:1.5px solid var(--papel-3);border-radius:8px;padding:12px 14px;background:var(--papel-2);transition:.2s'>";
     h += "<label style='display:flex;align-items:center;gap:8px;cursor:pointer'>";
     h += "<input type='checkbox' id='tri-vis' onchange='_triToggle(\"vis\")'> ";
-    h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>🏠 Agendar Visita</span></label>";
+    h += "<span style='font-size:13px;font-weight:700;color:var(--tinta)'>"+(_nv?"📞 Agendar Atendimento":"🏠 Agendar Visita")+"</span></label>";
     h += "<div id='tri-vis-extra' style='display:none;margin-top:10px;display:none'>";
     h += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px'>";
-    h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Tipo</label>";
-    h += "<select id='tri-vis-tipo' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px'>";
-    h += "<option value='solidaria'>Solidária (vítima)</option><option value='comunitaria'>Comunitária (território)</option></select></div>";
+    if(_nv){
+      h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Modo</label>";
+      h += "<select id='tri-vis-tipo' onchange='_triVisModoMudou()' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px'>";
+      h += "<option value='telefone'>📞 Atendimento Telefônico</option><option value='solidaria'>🏠 Visita Solidária (vítima)</option><option value='comunitaria'>🏘 Visita Comunitária (território)</option></select></div>";
+    } else {
+      h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Tipo</label>";
+      h += "<select id='tri-vis-tipo' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px'>";
+      h += "<option value='solidaria'>Solidária (vítima)</option><option value='comunitaria'>Comunitária (território)</option></select></div>";
+    }
     h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Responsável</label>";
-    h += "<input id='tri-vis-resp' type='text' placeholder='Policial/equipe' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px;box-sizing:border-box'></div>";
+    h += "<input id='tri-vis-resp' type='text' placeholder='"+(_nv?"Atendente":"Policial/equipe")+"' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px;box-sizing:border-box'></div>";
     h += "<div><label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px'>Data</label>";
     h += "<input id='tri-vis-data' type='date' style='width:100%;padding:7px 8px;border:1.5px solid var(--papel-3);border-radius:5px;background:var(--papel);color:var(--tinta);font-size:12px;box-sizing:border-box'></div>";
-    h += "</div></div></div>";
+    h += "</div>";
+    if(_nv) h += "<p id='tri-vis-hint' style='font-size:10px;color:var(--tinta-2);margin:8px 0 0;font-style:italic'>↳ Fica na fila de ligações do atendente — não precisa de deslocamento.</p>";
+    h += "</div></div>";
 
     // Trilho Acompanhamento Interno
     h += "<div id='tri-acomp-bloco' style='border:1.5px solid var(--papel-3);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:var(--papel-2);transition:.2s'>";
@@ -14919,6 +14959,22 @@ window._triToggle = function(trilho) {
   }
 };
 
+// Novo fluxo: ajusta placeholder/dica conforme o modo — telefone (atendente,
+// sem deslocamento) ou visita in loco (guarnição vai até o endereço)
+window._triVisModoMudou = function() {
+  var sel = document.getElementById("tri-vis-tipo");
+  var resp = document.getElementById("tri-vis-resp");
+  var hint = document.getElementById("tri-vis-hint");
+  if(!sel) return;
+  if(sel.value === "telefone"){
+    if(resp) resp.placeholder = "Atendente";
+    if(hint) hint.textContent = "↳ Fica na fila de ligações do atendente — não precisa de deslocamento.";
+  } else {
+    if(resp) resp.placeholder = "Guarnição / policial";
+    if(hint) hint.textContent = "↳ Fica na fila de visitas da guarnição — precisa deslocamento até o endereço.";
+  }
+};
+
 window._salvarTriagem = function(ocId) {
   var idx = (state.db.ocorrencias||[]).findIndex(function(o){ return o.id===ocId; });
   if(idx<0){ showToast("Ocorrência não encontrada","error"); return; }
@@ -14935,7 +14991,18 @@ window._salvarTriagem = function(ocId) {
     oc.violencia_domestica = true;
   }
 
-  // Atualiza relato
+  // Novo fluxo: Descrição, Dinâmica dos Fatos e Medidas Adotadas — 3 campos independentes
+  var descEl = document.getElementById("tri-descricao");
+  if(descEl) oc.descricao = descEl.value.trim();
+  var dinamicaEl = document.getElementById("tri-dinamica");
+  if(dinamicaEl){
+    oc.descricao_dinamica = dinamicaEl.value.trim();
+    oc.texto_original     = dinamicaEl.value.trim();
+  }
+  var medidasEl = document.getElementById("tri-medidas");
+  if(medidasEl) oc.medidas = medidasEl.value.trim();
+
+  // Atualiza relato (triagem antiga — campo único)
   var relatoEl = document.getElementById("tri-relato");
   if(relatoEl && relatoEl.value.trim()){
     oc.descricao_dinamica = relatoEl.value.trim();
@@ -15004,11 +15071,13 @@ window._salvarTriagem = function(ocId) {
     var visData  = (document.getElementById("tri-vis-data")||{value:""}).value;
     if(visData){
       if(!state.db.agendamentos) state.db.agendamentos=[];
+      var _visTipoLabel = visTipo==="telefone" ? "Atendimento Telefônico"
+                        : visTipo==="comunitaria" ? "Visita Comunitária" : "Visita Solidária";
       var ag = {
         id:"ag_tri_"+Date.now(),
         ocorrenciaId: ocId,
         vitima_id: oc.vitima_id||"",
-        tipo: visTipo==="comunitaria"?"Visita Comunitária":"Visita Solidária",
+        tipo: _visTipoLabel,
         subtipo: visTipo,
         data: visData,
         responsavel: visResp||"",
@@ -15017,9 +15086,9 @@ window._salvarTriagem = function(ocId) {
       };
       state.db.agendamentos.push(ag);
       enviarSheets("agendamentos", ag);
-      oc.requer_visita = true;
+      if(visTipo!=="telefone") oc.requer_visita = true;
     } else {
-      showToast("Informe a data da visita","error"); return;
+      showToast(visTipo==="telefone"?"Informe a data do contato":"Informe a data da visita","error"); return;
     }
   }
 
