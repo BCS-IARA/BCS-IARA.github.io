@@ -15307,6 +15307,21 @@ function _mtPrazo(e){ var p=_mtIso(e.prazo); if(p) return p; var b=_mtIso(e.data
 function _mtEncAberto(e){ return !_MT_ENC_FIM[e.status] && !e.relato_devolutiva; }
 function _mtEncAtrasado(e){ var p=_mtPrazo(e); return _mtEncAberto(e) && p && p<hoje(); }
 function _mtLigacoesOc(ocId){ return (state.db.agendamentos||[]).filter(function(a){ return a.tipo===_MT_TEL && String(a.ocorrenciaId||"")===String(ocId); }); }
+// Contatos já feitos (atendeu ou não), em ordem — numerados 1º, 2º, 3º…
+function _mtContatos(ocId){
+  return _mtLigacoesOc(ocId).filter(function(a){ return a.status==="Realizado"||a.status==="NaoRealizado"; })
+    .sort(function(a,b){ return _mtIso(a.data_confirmacao||a.data).localeCompare(_mtIso(b.data_confirmacao||b.data)) || String(a.data_confirmacao||"").localeCompare(String(b.data_confirmacao||"")); });
+}
+// Tentativas sem resposta seguidas no fim da lista de contatos
+function _mtFalhasSeguidas(ocId){
+  var c=_mtContatos(ocId), n=0;
+  for(var i=c.length-1;i>=0;i--){ if(c[i].status==="NaoRealizado") n++; else break; }
+  return n;
+}
+function _mtAtendente(){
+  if(state._mt && state._mt.atendente) return state._mt.atendente;
+  try{ var a=localStorage.getItem("bcs_mt_atendente")||""; if(state._mt) state._mt.atendente=a; return a; }catch(e){ return ""; }
+}
 function _mtLigarPendente(ocId){ return _mtLigacoesOc(ocId).filter(function(a){ return a.status==="Agendado"; }).sort(function(a,b){ return _mtIso(a.data).localeCompare(_mtIso(b.data)); })[0]||null; }
 
 // Pilhas
@@ -15380,6 +15395,17 @@ function _mtCss(){
   "#mt-root .mt-p{background:var(--papel-2);border-radius:8px;padding:10px 12px;min-width:0} #mt-root .mt-p.a{background:#F3DCD2}"+
   "#mt-root .mt-rot{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tinta-2);margin-bottom:3px}"+
   "#mt-root .mt-p .n{font-weight:700;font-size:15px} #mt-root .mt-p .s{font-size:12px;color:var(--tinta-2)}"+
+  "#mt-root .mt-atend{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--tinta-2)}"+
+  "#mt-root .mt-atend input{border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;min-width:190px}"+
+  "#mt-root .mt-atend.falta input{border-color:var(--verm);background:#F3DCD2}"+
+  "#mt-root .mt-ult{background:var(--ambar-claro);border:1.5px solid var(--ambar);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}"+
+  "#mt-root .mt-ult .tit{font-weight:800;font-size:14px;color:var(--ambar-2)}"+
+  "#mt-root .mt-ult .conv{font-size:14px;line-height:1.5;white-space:pre-wrap;background:var(--papel);border-radius:6px;padding:8px 10px}"+
+  "#mt-root .mt-ult .comb{font-size:14px;font-weight:700;color:var(--tinta)}"+
+  "#mt-root .mt-ult .lin{font-size:12px;color:var(--tinta-2)}"+
+  "#mt-root .mt-ult details summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--ambar-2)}"+
+  "#mt-root .mt-ult ol{margin:6px 0 0;padding-left:20px;font-size:12px;display:flex;flex-direction:column;gap:4px}"+
+  "#mt-root .mt-alerta{background:#F3DCD2;border:1.5px solid var(--verm);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--verm-2);font-weight:700}"+
   "#mt-root .mt-telbar{display:flex;flex-wrap:wrap;gap:10px;padding:12px 18px;background:#E1EBD6;border-bottom:1px solid var(--papel-3)}"+
   "#mt-root .mt-telbar.vazio{background:var(--papel-2);color:var(--tinta-2);font-size:13px;font-style:italic}"+
   "#mt-root .mt-telitem{display:flex;align-items:center;gap:8px;flex-wrap:wrap}"+
@@ -15435,7 +15461,11 @@ function _renderMesaTriagem(main){
   var lista=_mtPilha(M.pilha);
   if(M.sel && !M.busca && !lista.some(function(o){return o.id===M.sel;}) && !M.manter) M.sel=null;
   var h="<div id='mt-root'>";
-  h+="<div class='mt-cab'><h2>Minha Mesa</h2><span class='mt-teste'>🧪 em teste · grava nos mesmos dados do app</span></div>";
+  h+="<div class='mt-cab'><h2>Minha Mesa</h2><span class='mt-teste'>🧪 em teste · grava nos mesmos dados do app</span>";
+  var _at=_mtAtendente();
+  var _pols=(state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";}).map(function(p){return ((p.posto?p.posto+" ":"")+(p.nome||"")).trim();}).filter(Boolean).sort();
+  h+="<label class='mt-atend"+(_at?"":" falta")+"'>👤 Atendente: <input id='mt-atendente' list='mt-atend-lista' placeholder='seu nome' value='"+esc(_at)+"'><datalist id='mt-atend-lista'>"+_pols.map(function(n){return "<option value='"+esc(n)+"'>";}).join("")+"</datalist></label>";
+  h+="</div>";
   h+="<div class='mt-pilhas'>"+P.map(function(p){ return "<button class='mt-pilha"+(M.pilha===p.k?" on":"")+"' data-mt-pilha='"+p.k+"'><b>"+_mtPilha(p.k).length+"</b><span>"+p.r+"</span><small>"+p.d+"</small></button>"; }).join("")+"</div>";
   h+="<div class='mt-sub'><span>"+(M.feitos?"Hoje você já resolveu <b>"+M.feitos+"</b> "+(M.feitos===1?"caso":"casos")+".":"Ordem: violência doméstica, depois menores, depois os mais antigos.")+"</span>";
   if(M.pilha==="novo") h+="<label style='display:flex;gap:5px;align-items:center;cursor:pointer'><input type='checkbox' data-mt-jur "+(M.jur!==false?"checked":"")+"> Só bairros da jurisdição</label>";
@@ -15515,6 +15545,8 @@ function _mtCasoHtml(o){
     else { var nv={B:"BAIXO",M:"MÉDIO",E:"ELEVADO"}[fr.nivel]||fr.nivel; h+="<div class='mt-fok'>✓ FRIDA aplicado · risco "+nv+(fr.nivel==="E"?" · sugestão: encaminhar ao CRAV e à DEAM hoje":"")+"</div>"; }
     h+="</div>";
   }
+  // Última conversa + combinado para esta ligação
+  h+=_mtUltimaHtml(o);
   // Decisão
   h+="<div class='mt-bl'>";
   var encsAbertos=_mtEncsOc(o.id).filter(_mtEncAberto);
@@ -15552,6 +15584,36 @@ function _mtCasoHtml(o){
   return h;
 }
 
+function _mtUltimaHtml(o){
+  var cont=_mtContatos(o.id), pend=_mtLigarPendente(o.id);
+  if(!cont.length && !(pend&&pend.recado)) return "";
+  var h="<div class='mt-bl'><div class='mt-ult'>";
+  h+="<div class='tit'>🔁 "+(cont.length+1)+"º contato"+(cont.length?" · "+cont.length+" anterior"+(cont.length>1?"es":""):"")+"</div>";
+  var ultOk=null; for(var i=cont.length-1;i>=0;i--){ if(cont[i].status==="Realizado"){ ultOk=cont[i]; break; } }
+  if(ultOk){
+    h+="<div class='lin'>Última conversa em <b>"+_mtBr(_mtIso(ultOk.data_confirmacao||ultOk.data))+"</b>"+(ultOk.atendente?" · com "+esc(ultOk.atendente):"")+(ultOk.combinado_cumprido?" · combinado anterior: "+({sim:"cumprido",nao:"não cumprido",parcial:"cumprido em parte"}[ultOk.combinado_cumprido]||""):"")+"</div>";
+    h+="<div class='conv'>"+esc(ultOk.resultado||"(sem anotação)")+"</div>";
+  } else if(cont.length){
+    h+="<div class='lin'>Ainda não conseguimos falar com a vítima.</div>";
+  }
+  if(pend&&pend.recado) h+="<div class='comb'>➜ Combinado para "+(_mtIso(pend.data)<=hoje()?"hoje":_mtBr(_mtIso(pend.data)))+": "+esc(pend.recado)+"</div>";
+  var falhas=_mtFalhasSeguidas(o.id);
+  if(falhas && ultOk) h+="<div class='lin'>Tentativas sem resposta desde então: <b>"+falhas+"</b></div>";
+  var encs=_mtEncsOc(o.id);
+  if(encs.length) h+="<div class='lin'>Encaminhamentos: "+encs.map(function(e){ return esc(e.orgao||e.tipo||"?")+" ("+(e.relato_devolutiva?"devolutiva recebida":"aguardando, prazo "+_mtBr(_mtPrazo(e)))+")"; }).join(" · ")+"</div>";
+  if(falhas>=3 && !_mtArquivada(o)){
+    h+="<div class='mt-alerta'>⚠ "+falhas+" tentativas seguidas sem resposta. O que fazer?<div class='mt-row'><button class='mt-btn sec' data-mt-visita>🏠 Pedir visita da guarnição</button><button class='mt-btn sec' data-mt-semcontato>Encerrar: sem contato possível</button></div></div>";
+  }
+  if(cont.length){
+    h+="<details><summary>Ver todas as conversas ("+cont.length+")</summary><ol>";
+    cont.forEach(function(a){
+      h+="<li><b>"+_mtBr(_mtIso(a.data_confirmacao||a.data))+"</b>"+(a.atendente?" · "+esc(a.atendente):"")+" — "+(a.status==="Realizado"?"atendeu":"não atendeu")+(a.recado?" · combinado: "+esc(a.recado)+(a.combinado_cumprido?" ("+({sim:"cumprido",nao:"não cumprido",parcial:"em parte"}[a.combinado_cumprido]||"")+")":""):"")+(a.resultado?"<br>"+esc(a.resultado):"")+"</li>";
+    });
+    h+="</ol></details>";
+  }
+  return h+"</div></div>";
+}
+
 function _mtPainelHtml(o){
   var M=state._mt, r=M.rasc, h="<div class='mt-pn'>";
   function datas(tit){
@@ -15566,11 +15628,17 @@ function _mtPainelHtml(o){
     if(!r.dataLig) r.dataLig=hoje();
     h+="<h4>Quando foi a ligação?</h4><div class='mt-chips' style='align-items:center'><button class='mt-chip"+(r.dataLig===hoje()?" on":"")+"' data-mt-datalig='"+hoje()+"'>Hoje</button><button class='mt-chip"+(r.dataLig===_mtDia(-1)?" on":"")+"' data-mt-datalig='"+_mtDia(-1)+"'>Ontem</button><label class='mt-chip"+(r.dataLig!==hoje()&&r.dataLig!==_mtDia(-1)?" on":"")+"' style='display:inline-flex;gap:6px;align-items:center;white-space:nowrap'>Outra data: <input type='date' id='mt-datalig-manual' max='"+hoje()+"' value='"+(r.dataLig!==hoje()&&r.dataLig!==_mtDia(-1)?esc(r.dataLig):"")+"' style='border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px'></label></div>";
     h+="<h4>Atendeu?</h4><div class='mt-chips'><button class='mt-chip"+(r.atendeu==="sim"?" on":"")+"' data-mt-atendeu='sim'>Sim, conversamos</button><button class='mt-chip"+(r.atendeu==="nao"?" on":"")+"' data-mt-atendeu='nao'>Não atendeu</button></div>";
+    var _pendL=_mtLigarPendente(o.id);
+    if(r.atendeu==="sim" && _pendL && _pendL.recado){
+      h+="<h4>O combinado foi cumprido?</h4><p class='mt-dica'>Combinado: <b>"+esc(_pendL.recado)+"</b></p><div class='mt-chips'>"+[["sim","Sim"],["parcial","Em parte"],["nao","Não"]].map(function(x){ return "<button class='mt-chip"+(r.cumprido===x[0]?" on":"")+"' data-mt-cumprido='"+x[0]+"'>"+x[1]+"</button>"; }).join("")+"</div>";
+    }
     if(r.atendeu==="sim"){
       h+="<label class='mt-rot' for='mt-conversa'>O que conversaram</label><textarea id='mt-conversa' placeholder='Ex.: está segura na casa da mãe, quer apoio psicológico, vai pedir medida protetiva…'>"+esc(r.conversa||"")+"</textarea>";
       h+="<h4>E agora?</h4><div class='mt-row'><button class='mt-btn ok' data-mt-fim='encerrar'>Resolvido, encerrar caso</button><button class='mt-btn sec' data-mt-painel='encaminhar'>Encaminhar também</button><button class='mt-btn sec' data-mt-painel='depois'>Ligar de novo</button></div>";
     } else if(r.atendeu==="nao"){
       h+=datas("Tentar de novo quando?");
+      if(r.recado==null) r.recado=(_pendL&&_pendL.recado)||"";
+      h+=_mtRecadoHtml(r);
       h+="<div class='mt-row'><button class='mt-btn ok' data-mt-fim='nao_atendeu'>Salvar tentativa</button></div>";
     }
   }
@@ -15589,6 +15657,7 @@ function _mtPainelHtml(o){
   if(M.painel==="depois"){
     if(r.atendeu==="sim") h+="<p class='mt-dica'>A ligação de "+_mtBr(r.dataLig||hoje())+" também será registrada.</p>";
     h+=datas("Ligar quando?");
+    h+=_mtRecadoHtml(r);
     h+="<div class='mt-row'><button class='mt-btn ok' data-mt-fim='depois'>Marcar retorno</button></div>";
   }
   if(M.painel==="registrar"){
@@ -15598,14 +15667,19 @@ function _mtPainelHtml(o){
   return h+"</div>";
 }
 
+function _mtRecadoHtml(r){
+  return "<label class='mt-rot' for='mt-recado'>O que fazer na próxima ligação? *</label><textarea id='mt-recado' style='min-height:54px' placeholder='Ex.: confirmar se foi ao CRAV · saber se o autor voltou para casa · ela pediu para ligar depois das 14h'>"+esc(r.recado||"")+"</textarea>";
+}
+
 // Linha do tempo montada dos registros reais do app (funciona em qualquer aparelho)
 function _mtTempo(o){
   var t=[{d:_mtIso(o.data),t:"Chegou",s:(o.numero?"BO nº "+o.numero:"")+(o.origem?" · "+o.origem:"")}];
   (state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id&&f.nivel;}).forEach(function(f){ t.push({d:_mtIso(f.data||""),t:"FRIDA aplicado",s:"Risco "+({B:"baixo",M:"médio",E:"elevado"}[f.nivel]||f.nivel)}); });
   if(o._triadoEm) t.push({d:_mtIso(o._triadoEm),t:"Triado",s:"Situação: "+String(o.situacao||"").replace(/_/g," ")});
   _mtLigacoesOc(o.id).forEach(function(a){
-    if(a.status==="Agendado") t.push({d:_mtIso(a.data),t:"Ligação marcada",s:a.responsavel?"Com "+a.responsavel:""});
-    else t.push({d:_mtIso(a.data_confirmacao||a.data),t:a.status==="Realizado"?"Ligou — conversou":"Ligou — não atendeu",s:a.resultado||""});
+    if(a.status==="Agendado") t.push({d:_mtIso(a.data),t:"Ligação marcada",s:(a.recado?"Combinado: "+a.recado:"")+(a.agendadoPor?" · por "+a.agendadoPor:"")});
+    else if(a.status==="Cancelado") return;
+    else t.push({d:_mtIso(a.data_confirmacao||a.data),t:(a.status==="Realizado"?"Ligou — conversou":"Ligou — não atendeu")+(a.atendente?" ("+a.atendente+")":""),s:a.resultado||""});
   });
   _mtEncsOc(o.id).forEach(function(e){
     t.push({d:_mtIso(e.data_envio||e.data),t:"Encaminhado: "+(e.orgao||e.tipo||"?"),s:"Prazo "+_mtBr(_mtPrazo(e))});
@@ -15646,7 +15720,7 @@ function _mtGerarPdf(ocId){
   h+="@media print{body{padding:10mm 12mm}.nao-imp{display:none}}</style></head><body>";
   h+="<div class='cab'><img src='"+brasao+"' onerror=\"this.style.display='none'\"><div><h1>POLÍCIA MILITAR DA BAHIA — 77ª CIPM</h1><p>Base Comunitária de Segurança · Relatório Consolidado de Atendimento</p></div></div>";
   h+="<h2>"+E(o.tipo)+"</h2><div class='sub'>BO nº "+E(o.numero)+" · "+dt(o.data)+(o.hora?" "+E(o.hora):"")+" · "+E(o.bairro)+" · Situação: <b>"+E(SIT[o.situacao]||o.situacao)+"</b></div>";
-  h+="<div class='resumo'><div><b>"+ligs.filter(function(a){return a.status!=="Agendado";}).length+"</b>ligações feitas</div><div><b>"+encs.length+"</b>encaminhamentos</div><div><b>"+nDev+" de "+encs.length+"</b>devolutivas recebidas</div>"+(frs.length?"<div><b>"+({B:"Baixo",M:"Médio",E:"Elevado"}[frs[frs.length-1].nivel]||frs[frs.length-1].nivel)+"</b>risco FRIDA</div>":"")+"</div>";
+  h+="<div class='resumo'><div><b>"+ligs.filter(function(a){return a.status==="Realizado"||a.status==="NaoRealizado";}).length+"</b>ligações feitas</div><div><b>"+encs.length+"</b>encaminhamentos</div><div><b>"+nDev+" de "+encs.length+"</b>devolutivas recebidas</div>"+(frs.length?"<div><b>"+({B:"Baixo",M:"Médio",E:"Elevado"}[frs[frs.length-1].nivel]||frs[frs.length-1].nivel)+"</b>risco FRIDA</div>":"")+"</div>";
   // Vítima / autor
   h+="<div class='sec'>Vítima</div><div class='grid'>";
   [["Nome",o.vitima_nome],["Idade",o.vitima_idade],["Sexo",o.vitima_sexo],["Telefone",o.vitima_telefone],["Endereço",o.vitima_endereco||o.local],["Bairro",o.bairro]].forEach(function(c){ h+="<div class='c'><label>"+c[0]+"</label><span>"+E(c[1])+"</span></div>"; });
@@ -15667,10 +15741,13 @@ function _mtGerarPdf(ocId){
   h+="<div class='sec'>Contatos telefônicos</div>";
   if(!ligs.length) h+="<p class='txt'>Nenhum contato telefônico registrado.</p>";
   else {
-    h+="<table><tr><th style='width:70px'>Data</th><th style='width:120px'>Resultado</th><th>O que foi conversado</th></tr>";
-    ligs.forEach(function(a){
+    h+="<table><tr><th style='width:28px'>Nº</th><th style='width:66px'>Data</th><th style='width:100px'>Atendente</th><th style='width:90px'>Resultado</th><th>Combinado para esta ligação</th><th>O que foi conversado</th></tr>";
+    var _n=0;
+    ligs.filter(function(a){return a.status!=="Cancelado";}).forEach(function(a){
+      var feita=a.status!=="Agendado"; if(feita) _n++;
       var r=a.status==="Realizado"?"<span class='ok'>Atendeu</span>":a.status==="NaoRealizado"?"<span class='pend'>Não atendeu</span>":"Retorno marcado";
-      h+="<tr><td>"+dt(a.status==="Agendado"?a.data:(a.data_confirmacao||a.data))+"</td><td>"+r+"</td><td class='txt'>"+E(a.resultado||(a.status==="Agendado"?"Ligação prevista para "+dt(a.data):""))+"</td></tr>";
+      var comb=a.recado?E(a.recado)+(a.combinado_cumprido?"<br><i>"+({sim:"cumprido",nao:"não cumprido",parcial:"cumprido em parte"}[a.combinado_cumprido]||"")+"</i>":""):"—";
+      h+="<tr><td>"+(feita?_n+"º":"")+"</td><td>"+dt(feita?(a.data_confirmacao||a.data):a.data)+"</td><td>"+E(a.atendente||a.agendadoPor)+"</td><td>"+r+"</td><td class='txt'>"+comb+"</td><td class='txt'>"+E(a.resultado||(feita?"":"Ligação prevista para "+dt(a.data)))+"</td></tr>";
     });
     h+="</table>";
   }
@@ -15705,6 +15782,15 @@ function _mtGerarPdf(ocId){
 }
 
 // ── Gravação ───────────────────────────────────────────────
+function _mtAgendarRetorno(o, data, recado){
+  var ag=_mtNovaLigacao(o,"Agendado",data);
+  ag.recado=recado||""; ag.objetivo=recado?("Contato telefônico: "+recado):ag.objetivo; ag.agendadoPor=_mtAtendente();
+  return ag;
+}
+// Ao encerrar o caso, retornos ainda marcados deixam de aparecer em "Ligar hoje"
+function _mtCancelarPendentes(o){
+  _mtLigacoesOc(o.id).forEach(function(a){ if(a.status==="Agendado"){ a.status="Cancelado"; a.data_confirmacao=new Date().toISOString(); } });
+}
 function _mtNovaLigacao(o, status, data, texto){
   if(!state.db.agendamentos) state.db.agendamentos=[];
   var ag={id:"ag_mt_"+Date.now()+"_"+Math.random().toString(36).slice(2,5), criadoEm:new Date().toISOString(),
@@ -15718,13 +15804,17 @@ function _mtNovaLigacao(o, status, data, texto){
 }
 function _mtRegistrarLigacao(o, atendeu, texto){
   // Data da ligação: escolhida no painel (hoje, ontem ou manual)
-  var dl=(state._mt.rasc&&state._mt.rasc.dataLig)||hoje();
+  var r=state._mt.rasc||{};
+  var dl=r.dataLig||hoje();
   var conf=(dl===hoje())?new Date().toISOString():dl+"T12:00:00";
-  // Se havia retorno marcado até essa data, ele vira a ligação feita
-  var pend=_mtLigarPendente(o.id);
+  // Se havia retorno marcado até essa data, ele vira a ligação feita (mantém o recado combinado)
+  var pend=_mtLigarPendente(o.id), feita;
   if(pend && _mtIso(pend.data)<=dl){
-    pend.status=atendeu?"Realizado":"NaoRealizado"; pend.resultado=texto||""; pend.data_confirmacao=conf;
-  } else { var ag=_mtNovaLigacao(o, atendeu?"Realizado":"NaoRealizado", dl, texto); ag.data_confirmacao=conf; }
+    pend.status=atendeu?"Realizado":"NaoRealizado"; pend.resultado=texto||""; pend.data_confirmacao=conf; feita=pend;
+  } else { feita=_mtNovaLigacao(o, atendeu?"Realizado":"NaoRealizado", dl, texto); feita.data_confirmacao=conf; }
+  feita.atendente=_mtAtendente(); feita.responsavel=feita.responsavel||feita.atendente;
+  if(atendeu && r.cumprido) feita.combinado_cumprido=r.cumprido;
+  feita.contato_n=_mtContatos(o.id).indexOf(feita)+1;
   if(atendeu && texto){
     o.resumo_atendimento=(o.resumo_atendimento?o.resumo_atendimento+"\n":"")+_mtBr(dl)+": "+texto;
     o.data_atendimento=dl;
@@ -15750,17 +15840,20 @@ function _mtSalvarTudo(o){
 function _mtConcluir(o, tipo){
   var M=state._mt, r=M.rasc, msg="";
   var conversa=(r.conversa||"").trim();
+  if(!_mtAtendente()){ showToast("Informe o seu nome em “Atendente”, no topo da Mesa","error"); var ia=document.getElementById("mt-atendente"); if(ia) ia.focus(); return; }
+  var recado=(r.recado||"").trim();
+  if((tipo==="depois"||tipo==="nao_atendeu") && !recado){ showToast("Escreva o que fazer na próxima ligação","error"); var ir=document.getElementById("mt-recado"); if(ir) ir.focus(); return; }
   if(tipo==="encerrar"){
     _mtRegistrarLigacao(o,true,conversa); o.observacoes_triagem="Resolvido na ligação";
-    _mtSituacao(o,"encerrada"); msg="Caso encerrado";
+    _mtCancelarPendentes(o); _mtSituacao(o,"encerrada"); msg="Caso encerrado";
   }
   if(tipo==="nao_atendeu"){
-    _mtRegistrarLigacao(o,false,""); _mtNovaLigacao(o,"Agendado",r.quando);
+    _mtRegistrarLigacao(o,false,""); _mtAgendarRetorno(o,r.quando,recado);
     _mtSituacao(o,"em_acompanhamento"); msg="Tentativa salva · volta em "+_mtBr(r.quando);
   }
   if(tipo==="depois"){
     if(r.atendeu==="sim") _mtRegistrarLigacao(o,true,conversa);
-    _mtNovaLigacao(o,"Agendado",r.quando);
+    _mtCancelarPendentes(o); _mtAgendarRetorno(o,r.quando,recado);
     _mtSituacao(o,"em_acompanhamento"); msg="Retorno marcado para "+_mtBr(r.quando);
   }
   if(tipo==="encaminhar"){
@@ -15771,7 +15864,7 @@ function _mtConcluir(o, tipo){
       var enc={id:"enc_"+Date.now()+"_"+Math.random().toString(36).slice(2,6), vitima_id:o.vitima_id||"",
         vitima_nome:o.vitima_nome||o.nome_vitima||"", ocorrencia_id:o.id, tipo:g, orgao:g,
         descricao:conversa, data:hoje(), status:"pendente", data_envio:hoje(), prazo:prazo,
-        criadoEm:new Date().toISOString(), origem:"Minha Mesa"};
+        criadoEm:new Date().toISOString(), origem:"Minha Mesa", responsavel:_mtAtendente()};
       state.encaminhamentos.push(enc);
       _sheetsGet({acao:"salvar", tipo:"encaminhamento", dados:JSON.stringify(enc)}).catch(function(){});
     });
@@ -15779,7 +15872,7 @@ function _mtConcluir(o, tipo){
     _mtSituacao(o,"em_acompanhamento"); msg="Encaminhado a "+r.orgaos.join(", ");
   }
   if(tipo==="registrar"){
-    o.observacoes_triagem=r.motivo; _mtSituacao(o,"encerrada"); msg="Caso registrado e encerrado";
+    o.observacoes_triagem=r.motivo; _mtCancelarPendentes(o); _mtSituacao(o,"encerrada"); msg="Caso registrado e encerrado";
   }
   _mtSalvarTudo(o);
   M.feitos++;
@@ -15809,6 +15902,7 @@ document.addEventListener("input",function(ev){
   if(state.tela!=="mesa_triagem") return;
   if(ev.target.id==="mt-conversa") state._mt.rasc.conversa=ev.target.value;
   if(ev.target.id==="mt-volta") state._mt.rasc.volta=ev.target.value;
+  if(ev.target.id==="mt-recado") state._mt.rasc.recado=ev.target.value;
   if(ev.target.id==="mt-busca"){
     state._mt.busca=ev.target.value;
     var el=document.getElementById("mt-lista");
@@ -15821,6 +15915,13 @@ document.addEventListener("keydown",function(ev){
 });
 document.addEventListener("change",function(ev){
   if(state.tela!=="mesa_triagem") return;
+  if(ev.target.id==="mt-atendente"){
+    var v=ev.target.value.trim(); state._mt.atendente=v;
+    try{ localStorage.setItem("bcs_mt_atendente", v); }catch(e){}
+    var lb=ev.target.closest(".mt-atend"); if(lb) lb.classList.toggle("falta", !v);
+    if(v) showToast("Atendente: "+v);
+    return;
+  }
   if(ev.target.id==="mt-quando-manual" && ev.target.value){
     if(ev.target.value<hoje()){ showToast("Escolha hoje ou uma data futura","error"); return; }
     state._mt.rasc.quando=ev.target.value; _mtRender(); return;
@@ -15854,7 +15955,7 @@ document.addEventListener("click",function(ev){
     var iv=setInterval(function(){ if(!document.getElementById("modal-frida")){ clearInterval(iv); M.manter=true; _mtRender(); M.manter=false; } },500);
     return;
   }
-  if(d.mtPainel){ M.painel=d.mtPainel; M.rasc={atendeu:M.rasc.atendeu, conversa:M.rasc.conversa, dataLig:M.rasc.dataLig}; _mtRender(); return; }
+  if(d.mtPainel){ M.painel=d.mtPainel; M.rasc={atendeu:M.rasc.atendeu, conversa:M.rasc.conversa, dataLig:M.rasc.dataLig, cumprido:M.rasc.cumprido, recado:M.rasc.recado}; _mtRender(); return; }
   if(d.mtAtendeu){ M.rasc.atendeu=d.mtAtendeu; _mtRender(); return; }
   if(d.mtOrgao){ var a=M.rasc.orgaos, i=a.indexOf(d.mtOrgao); if(i>=0) a.splice(i,1); else a.push(d.mtOrgao); _mtRender(); return; }
   if(d.mtPrazo){ M.rasc.prazo=+d.mtPrazo; _mtRender(); return; }
@@ -15862,6 +15963,19 @@ document.addEventListener("click",function(ev){
   if(d.mtDatalig){ M.rasc.dataLig=d.mtDatalig; _mtRender(); return; }
   if(d.mtMotivo){ M.rasc.motivo=d.mtMotivo; _mtRender(); return; }
   if(d.mtFim){ _mtConcluir(o, d.mtFim); return; }
+  if(d.mtCumprido){ M.rasc.cumprido=d.mtCumprido; _mtRender(); return; }
+  if("mtSemcontato" in d){ M.painel="registrar"; M.rasc={motivo:"Sem contato possível"}; _mtRender(); return; }
+  if("mtVisita" in d){
+    if(!_mtAtendente()){ showToast("Informe o seu nome em “Atendente”, no topo da Mesa","error"); return; }
+    if(!state.db.agendamentos) state.db.agendamentos=[];
+    var vis={id:"ag_mt_vis_"+Date.now(), criadoEm:new Date().toISOString(), ocorrenciaId:o.id, vitima_id:o.vitima_id||"",
+      vitima_nome:o.vitima_nome||"", tipo:"Visita Solidária", subtipo:"solidaria", data:_mtDia(1), hora:"",
+      responsavel:"", status:"Agendado", endereco:o.vitima_endereco||o.local||o.bairro||"",
+      objetivo:"Sem contato telefônico após "+_mtFalhasSeguidas(o.id)+" tentativas", agendadoPor:_mtAtendente()};
+    state.db.agendamentos.push(vis); enviarSheets("agendamentos", vis);
+    _mtCancelarPendentes(o); o.requer_visita=true; _mtSituacao(o,"em_acompanhamento"); _mtSalvarTudo(o);
+    M.feitos++; _mtProximo("Visita solicitada para "+_mtBr(vis.data)+" — aparece no Calendário da guarnição"); return;
+  }
   if(d.mtCobrei){
     var e=(state.encaminhamentos||[]).find(function(x){return x.id===d.mtCobrei;}); if(!e) return;
     e.cobrancas=(Array.isArray(e.cobrancas)?e.cobrancas:[]).concat([hoje()]); e.prazo=_mtDia(7);
