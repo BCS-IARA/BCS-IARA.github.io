@@ -15171,6 +15171,430 @@ function _triarOc(id, situacao) {
   showToast("✓ Situação: "+situacao.replace(/_/g," "));
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  🧪 MINHA MESA (teste) — tela de trabalho de quem faz a triagem
+//  Tela nova e independente: não altera Triagem/Fila do Dia. Grava nos
+//  mesmos registros do app — ligações viram agendamentos "Atendimento
+//  Telefônico", encaminhamentos com prazo, FRIDA pelo modal oficial.
+// ══════════════════════════════════════════════════════════════════
+var _MT_TEL = "Atendimento Telefônico";
+var _MT_ORGAOS = ["CRAV","CRAS","CREAS","DEAM","Conselho Tutelar","UBS","Defensoria Pública","Ministério Público"];
+var _MT_ENC_FIM = {concluido:1, devolutiva_lida:1, cancelado:1};
+
+function _mtDia(n){ var d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function _mtBr(s){ var m=String(s||"").match(/^(\d{4})-(\d{2})-(\d{2})/); return m?m[3]+"/"+m[2]:(s||"—"); }
+function _mtIso(s){ s=String(s||"").trim(); var m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m?m[3]+"-"+m[2]+"-"+m[1]:s.slice(0,10); }
+function _mtHa(s){ var n=Math.round((new Date(hoje()+"T12:00")-new Date(_mtIso(s)+"T12:00"))/864e5); return isNaN(n)?"":n<=0?"hoje":n===1?"há 1 dia":"há "+n+" dias"; }
+function _mtIsVD(o){ return !!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")); }
+function _mtIsMenor(o){ return !!(o.menor_envolvido||(o.vitima_idade&&parseInt(o.vitima_idade)<18)); }
+function _mtOc(id){ return (state.db.ocorrencias||[]).find(function(o){ return String(o.id)===String(id); }); }
+function _mtFrida(ocId){
+  return (state.db.frida||[]).filter(function(f){ return f.ocorrenciaId===ocId && f.nivel && f.nivel!=="?"; })
+    .sort(function(a,b){ return (b.data||"").localeCompare(a.data||""); })[0]||null;
+}
+function _mtEncsOc(ocId){ return (state.encaminhamentos||[]).filter(function(e){ return String(e.ocorrencia_id||e.ocorrenciaId||"")===String(ocId); }); }
+function _mtPrazo(e){ if(e.prazo) return e.prazo; var b=_mtIso(e.data_envio||e.data||""); if(!b) return ""; var d=new Date(b+"T12:00"); d.setDate(d.getDate()+15); return d.toISOString().slice(0,10); }
+function _mtEncAberto(e){ return !_MT_ENC_FIM[e.status] && !e.relato_devolutiva; }
+function _mtEncAtrasado(e){ var p=_mtPrazo(e); return _mtEncAberto(e) && p && p<hoje(); }
+function _mtLigacoesOc(ocId){ return (state.db.agendamentos||[]).filter(function(a){ return a.tipo===_MT_TEL && String(a.ocorrenciaId||"")===String(ocId); }); }
+function _mtLigarPendente(ocId){ return _mtLigacoesOc(ocId).filter(function(a){ return a.status==="Agendado"; }).sort(function(a,b){ return (a.data||"").localeCompare(b.data||""); })[0]||null; }
+
+// Pilhas
+function _mtPilha(k){
+  var ocs = state.db.ocorrencias||[];
+  var lista=[];
+  if(k==="novo"){
+    var soJur = state._mt.jur!==false;
+    lista = ocs.filter(function(o){ return _ocNaFila(o) && (!soJur || _triagemBairroNaJurisdicao(o)); });
+  } else if(k==="ligar"){
+    var vistos={};
+    (state.db.agendamentos||[]).forEach(function(a){
+      if(a.tipo!==_MT_TEL || a.status!=="Agendado" || !a.data || a.data>hoje()) return;
+      var o=_mtOc(a.ocorrenciaId); if(!o || vistos[o.id]) return;
+      vistos[o.id]=1; lista.push(o);
+    });
+  } else if(k==="cobrar"){
+    var vistos2={};
+    (state.encaminhamentos||[]).forEach(function(e){
+      if(!_mtEncAtrasado(e)) return;
+      var o=_mtOc(e.ocorrencia_id||e.ocorrenciaId); if(!o || vistos2[o.id]) return;
+      vistos2[o.id]=1; lista.push(o);
+    });
+  }
+  function peso(o){ return (_mtIsVD(o)?0:_mtIsMenor(o)?1:2); }
+  return lista.sort(function(a,b){ return peso(a)-peso(b) || _mtIso(a.data).localeCompare(_mtIso(b.data)); });
+}
+
+function _mtCss(){
+  if(document.getElementById("mt-css")) return;
+  var s=document.createElement("style"); s.id="mt-css";
+  s.textContent=
+  "#mt-root{padding:14px 16px 28px;color:var(--tinta)}"+
+  "#mt-root .mt-cab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}"+
+  "#mt-root .mt-cab h2{font-size:20px;margin:0}"+
+  "#mt-root .mt-teste{font-size:11px;background:var(--ambar-claro);border:1px solid var(--ambar);color:var(--ambar-2);border-radius:99px;padding:2px 10px;font-weight:700}"+
+  "#mt-root .mt-pilhas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}"+
+  "#mt-root .mt-pilha{border:1.5px solid var(--papel-3);background:var(--papel);border-radius:10px;padding:10px 14px;text-align:left;display:flex;flex-direction:column;gap:2px;cursor:pointer;color:var(--tinta)}"+
+  "#mt-root .mt-pilha b{font-size:26px;line-height:1;font-variant-numeric:tabular-nums}"+
+  "#mt-root .mt-pilha span{font-size:12px;font-weight:700}"+
+  "#mt-root .mt-pilha small{font-size:11px;color:var(--tinta-2)}"+
+  "#mt-root .mt-pilha.on{border-color:var(--ambar);background:var(--ambar-claro);box-shadow:inset 0 -3px 0 var(--ambar)}"+
+  "#mt-root .mt-sub{font-size:12px;color:var(--tinta-2);margin:8px 0 12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}"+
+  "#mt-root .mt-sub b{color:var(--verde-2)}"+
+  "#mt-root .mt-grid{display:grid;grid-template-columns:330px minmax(0,1fr);gap:14px;align-items:start}"+
+  "#mt-root .mt-lista,#mt-root .mt-caso{background:var(--papel);border:1px solid var(--papel-3);border-radius:10px;overflow:hidden;min-width:0}"+
+  "#mt-root .mt-lista{max-height:calc(100vh - 230px);overflow-y:auto}"+
+  "#mt-root .mt-lcab{padding:9px 14px;border-bottom:1px solid var(--papel-3);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tinta-2);position:sticky;top:0;background:var(--papel)}"+
+  "#mt-root .mt-item{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--papel-3);border-left:4px solid transparent;background:transparent;padding:9px 12px;cursor:pointer;color:var(--tinta)}"+
+  "#mt-root .mt-item.vd{border-left-color:var(--verm)}"+
+  "#mt-root .mt-item.on{background:var(--ambar-claro);border-left-color:var(--ambar)}"+
+  "#mt-root .mt-item .t{font-weight:700;font-size:13px}"+
+  "#mt-root .mt-item .v{font-size:12px;color:var(--tinta-2);margin-top:2px}"+
+  "#mt-root .mt-item .q{font-size:11px;color:var(--tinta-3);margin-top:2px}"+
+  "#mt-root .mt-selo{font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:5px;color:#fff}"+
+  "#mt-root .mt-selo.vd{background:var(--verm)} #mt-root .mt-selo.me{background:var(--ambar)} #mt-root .mt-selo.at{background:var(--verm-2)}"+
+  "#mt-root .mt-vazio{padding:40px 18px;text-align:center;color:var(--tinta-2)} #mt-root .mt-vazio b{display:block;color:var(--tinta);font-size:15px;margin-bottom:4px}"+
+  "#mt-root .mt-ccab{padding:14px 18px;border-bottom:1px solid var(--papel-3);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}"+
+  "#mt-root .mt-ccab h3{margin:0;font-size:19px}"+
+  "#mt-root .mt-ccab .m{font-size:12px;color:var(--tinta-2)}"+
+  "#mt-root .mt-voltar{display:none;border:1px solid var(--papel-3);background:var(--papel-2);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;color:var(--tinta)}"+
+  "#mt-root .mt-bl{padding:14px 18px;border-bottom:1px solid var(--papel-3)}"+
+  "#mt-root .mt-pes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}"+
+  "#mt-root .mt-p{background:var(--papel-2);border-radius:8px;padding:10px 12px;min-width:0} #mt-root .mt-p.a{background:#F3DCD2}"+
+  "#mt-root .mt-rot{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tinta-2);margin-bottom:3px}"+
+  "#mt-root .mt-p .n{font-weight:700;font-size:15px} #mt-root .mt-p .s{font-size:12px;color:var(--tinta-2)}"+
+  "#mt-root .mt-tel{display:inline-block;margin-top:6px;font-weight:700;font-size:13px;background:var(--papel);border:1px solid var(--papel-3);border-radius:6px;padding:3px 8px;user-select:all}"+
+  "#mt-root .mt-txt{font-size:14px;line-height:1.55;max-width:70ch;margin:4px 0 0;white-space:pre-wrap}"+
+  "#mt-root .mt-mais{background:none;border:0;color:var(--ambar-2);font-weight:700;font-size:12px;cursor:pointer;padding:4px 0}"+
+  "#mt-root .mt-frida{background:#F3DCD2;border:1.5px dashed var(--verm);border-radius:8px;padding:12px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}"+
+  "#mt-root .mt-frida p{margin:0;font-weight:700;color:var(--verm-2)}"+
+  "#mt-root .mt-fok{background:#E1EBD6;color:var(--verde-2);border-radius:8px;padding:8px 12px;font-weight:700;font-size:13px}"+
+  "#mt-root .mt-perg{font-size:15px;font-weight:700;margin:0 0 10px}"+
+  "#mt-root .mt-acoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}"+
+  "#mt-root .mt-ac{border:1.5px solid var(--papel-3);background:var(--papel);border-radius:10px;padding:13px;text-align:left;display:flex;flex-direction:column;gap:2px;cursor:pointer;color:var(--tinta)}"+
+  "#mt-root .mt-ac b{font-size:15px} #mt-root .mt-ac span{font-size:12px;color:var(--tinta-2)}"+
+  "#mt-root .mt-ac:hover:not(:disabled){border-color:var(--ambar);background:var(--ambar-claro)}"+
+  "#mt-root .mt-ac:disabled{opacity:.45;cursor:not-allowed} #mt-root .mt-ac.pri{border-color:var(--verde);background:#E1EBD6}"+
+  "#mt-root .mt-pn{background:var(--papel-2);border-radius:10px;padding:14px;margin-top:12px;display:flex;flex-direction:column;gap:10px}"+
+  "#mt-root .mt-pn h4{margin:0;font-size:14px}"+
+  "#mt-root .mt-chips{display:flex;gap:6px;flex-wrap:wrap}"+
+  "#mt-root .mt-chip{border:1.5px solid var(--papel-3);background:var(--papel);border-radius:99px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--tinta)}"+
+  "#mt-root .mt-chip.on{border-color:var(--ambar);background:var(--ambar);color:#fff}"+
+  "#mt-root textarea,#mt-root input[type=date]{width:100%;border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:9px 10px;font:inherit;font-size:13px;box-sizing:border-box}"+
+  "#mt-root textarea{min-height:76px;resize:vertical}"+
+  "#mt-root .mt-btn{border:0;border-radius:8px;padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer}"+
+  "#mt-root .mt-btn.ok{background:var(--verde);color:#fff} #mt-root .mt-btn.ok:disabled{opacity:.5;cursor:not-allowed}"+
+  "#mt-root .mt-btn.sec{background:transparent;border:1.5px solid var(--papel-3);color:var(--tinta)}"+
+  "#mt-root .mt-btn.vm{background:var(--verm);color:#fff}"+
+  "#mt-root .mt-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}"+
+  "#mt-root .mt-dica{font-size:12px;color:var(--tinta-2);margin:0} #mt-root .mt-dica.sug{color:var(--ambar-2);font-weight:600}"+
+  "#mt-root .mt-enc{background:var(--papel-2);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;flex-direction:column;gap:8px}"+
+  "#mt-root .mt-tempo{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}"+
+  "#mt-root .mt-tempo li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;font-size:13px}"+
+  "#mt-root .mt-tempo .d{font-size:11px;color:var(--tinta-3);font-variant-numeric:tabular-nums;padding-top:1px}"+
+  "#mt-root .mt-tempo .o{border-left:2px solid var(--papel-3);padding-left:10px;min-width:0} #mt-root .mt-tempo .o b{display:block} #mt-root .mt-tempo .o span{color:var(--tinta-2);font-size:12px;white-space:pre-wrap}"+
+  "@media (max-width:820px){#mt-root .mt-grid{grid-template-columns:minmax(0,1fr)} #mt-root .mt-grid.aberto .mt-lista{display:none} #mt-root .mt-grid:not(.aberto) .mt-caso{display:none} #mt-root .mt-voltar{display:inline-block} #mt-root .mt-pes,#mt-root .mt-acoes{grid-template-columns:minmax(0,1fr)} #mt-root .mt-pilha{padding:8px 10px} #mt-root .mt-pilha small{display:none} #mt-root .mt-lista{max-height:none}}";
+  document.head.appendChild(s);
+}
+
+function renderMesaTriagem(main){
+  if(!state._mt) state._mt={pilha:"novo", sel:null, painel:null, rasc:{}, feitos:0};
+  _mtCss();
+  var M=state._mt;
+  var P=[{k:"novo",r:"Novos",d:"para triar"},{k:"ligar",r:"Ligar hoje",d:"retornos marcados até hoje"},{k:"cobrar",r:"Cobrar",d:"devolutiva com prazo vencido"}];
+  var lista=_mtPilha(M.pilha);
+  if(M.sel && !lista.some(function(o){return o.id===M.sel;}) && !M.manter) M.sel=null;
+  var h="<div id='mt-root'>";
+  h+="<div class='mt-cab'><h2>Minha Mesa</h2><span class='mt-teste'>🧪 em teste · grava nos mesmos dados do app</span></div>";
+  h+="<div class='mt-pilhas'>"+P.map(function(p){ return "<button class='mt-pilha"+(M.pilha===p.k?" on":"")+"' data-mt-pilha='"+p.k+"'><b>"+_mtPilha(p.k).length+"</b><span>"+p.r+"</span><small>"+p.d+"</small></button>"; }).join("")+"</div>";
+  h+="<div class='mt-sub'><span>"+(M.feitos?"Hoje você já resolveu <b>"+M.feitos+"</b> "+(M.feitos===1?"caso":"casos")+".":"Ordem: violência doméstica, depois menores, depois os mais antigos.")+"</span>";
+  if(M.pilha==="novo") h+="<label style='display:flex;gap:5px;align-items:center;cursor:pointer'><input type='checkbox' data-mt-jur "+(M.jur!==false?"checked":"")+"> Só bairros da jurisdição</label>";
+  h+="</div>";
+  h+="<div class='mt-grid"+(M.sel?" aberto":"")+"'>";
+  h+="<div class='mt-lista'><div class='mt-lcab'>"+P.find(function(p){return p.k===M.pilha;}).r+" · "+lista.length+"</div>";
+  if(!lista.length) h+="<div class='mt-vazio'><b>Nada aqui</b>Pilha zerada. Veja as outras pilhas acima.</div>";
+  lista.forEach(function(o){
+    var vd=_mtIsVD(o), me=_mtIsMenor(o);
+    var q;
+    if(M.pilha==="cobrar") q=_mtEncsOc(o.id).filter(_mtEncAtrasado).map(function(e){return esc(e.orgao||e.tipo||"?")+" · venceu "+_mtBr(_mtPrazo(e));}).join(" · ");
+    else if(M.pilha==="ligar"){ var lp=_mtLigarPendente(o.id); q="Retorno de "+_mtBr(lp&&lp.data)+(lp&&lp.responsavel?" · "+esc(lp.responsavel):""); }
+    else q=_mtHa(o.data)+(o.bairro?" · "+esc(o.bairro):"")+(o.numero?" · BO "+esc(String(o.numero)):"");
+    h+="<button class='mt-item"+(vd?" vd":"")+(M.sel===o.id?" on":"")+"' data-mt-caso='"+esc(o.id)+"'>";
+    h+="<div>"+(vd?"<span class='mt-selo vd'>VD</span>":"")+(me?"<span class='mt-selo me'>MENOR</span>":"")+(M.pilha==="cobrar"?"<span class='mt-selo at'>ATRASADA</span>":"")+"<span class='t'>"+esc((o.tipo||"Ocorrência").substring(0,40))+"</span></div>";
+    h+="<div class='v'>👤 "+esc(o.vitima_nome||"Vítima não identificada")+(o.vitima_idade?" ("+esc(String(o.vitima_idade))+")":"")+"</div>";
+    h+="<div class='q'>"+q+"</div></button>";
+  });
+  h+="</div>";
+  h+="<div class='mt-caso'>"+_mtCasoHtml(M.sel?_mtOc(M.sel):null)+"</div>";
+  h+="</div></div>";
+  main.innerHTML=h;
+}
+
+function _mtCasoHtml(o){
+  var M=state._mt;
+  if(!o) return "<div class='mt-vazio' style='padding:70px 20px'><b>Escolha um caso na lista</b>Ele abre aqui com o que você precisa para decidir.</div>";
+  var vd=_mtIsVD(o), me=_mtIsMenor(o), fr=_mtFrida(o.id);
+  var h="<div class='mt-ccab'><button class='mt-voltar' data-mt-voltar>← Lista</button><h3>"+esc(o.tipo||"Ocorrência")+"</h3>";
+  h+=(vd?"<span class='mt-selo vd'>VD</span>":"")+(me?"<span class='mt-selo me'>MENOR</span>":"");
+  h+="<span class='m'>"+esc(o.data||"—")+(o.hora?" "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+(o.numero?" · BO nº "+esc(String(o.numero)):"")+"</span></div>";
+  // Quem
+  h+="<div class='mt-bl'><div class='mt-pes'>";
+  h+="<div class='mt-p'><div class='mt-rot'>Vítima</div><div class='n'>"+esc(o.vitima_nome||"Não identificada")+"</div><div class='s'>"+[o.vitima_idade?o.vitima_idade+" anos":"",o.vitima_sexo||""].filter(Boolean).map(esc).join(" · ")+"</div>";
+  h+=(o.vitima_telefone?"<div class='mt-tel'>📞 "+esc(o.vitima_telefone)+"</div>":"<div class='s' style='margin-top:6px;font-style:italic'>Sem telefone no BO</div>");
+  if(o.vitima_id) h+="<div><button class='mt-mais' onclick='state._vitimaAtual=\""+esc(o.vitima_id)+"\";setTela(\"vitima\")'>Ver ficha da vítima →</button></div>";
+  h+="</div>";
+  h+="<div class='mt-p a'><div class='mt-rot'>Autor</div><div class='n'>"+esc(o.suspeito_nome||"Não identificado")+"</div><div class='s'>"+[o.suspeito_idade?o.suspeito_idade+" anos":"",o.suspeito_endereco||""].filter(Boolean).map(esc).join(" · ")+"</div></div>";
+  h+="</div>";
+  var relato=o.descricao_dinamica||o.texto_original||o.descricao||"";
+  var curto=relato.length>420 && !M.relatoTodo;
+  h+="<div class='mt-rot' style='margin-top:14px'>O que aconteceu</div><p class='mt-txt'>"+esc(curto?relato.slice(0,420)+"…":relato||"Sem relato no BO.")+"</p>";
+  if(relato.length>420) h+="<button class='mt-mais' data-mt-relato>"+(curto?"Ler relato completo":"Mostrar menos")+"</button>";
+  if(o.medidas) h+="<div class='mt-rot' style='margin-top:10px'>Medidas adotadas no BO</div><p class='mt-txt'>"+esc(o.medidas)+"</p>";
+  var ant=(state.db.ocorrencias||[]).filter(function(x){ return x.id!==o.id && ((o.vitima_id&&x.vitima_id===o.vitima_id)||(o.vitima_nome&&x.vitima_nome&&x.vitima_nome.trim().toLowerCase()===o.vitima_nome.trim().toLowerCase())); }).length;
+  h+="<div class='mt-dica' style='margin-top:10px'>"+(ant?"⚠ <b>"+ant+" outra"+(ant>1?"s":"")+" ocorrência"+(ant>1?"s":"")+"</b> com esta vítima":"Nenhuma outra ocorrência com esta vítima")+"</div>";
+  h+="</div>";
+  // FRIDA
+  if(vd){
+    h+="<div class='mt-bl'>";
+    if(!fr) h+="<div class='mt-frida'><p>Violência doméstica: aplique o FRIDA antes de decidir</p><button class='mt-btn vm' data-mt-frida>Aplicar FRIDA ▶</button></div>";
+    else { var nv={B:"BAIXO",M:"MÉDIO",E:"ELEVADO"}[fr.nivel]||fr.nivel; h+="<div class='mt-fok'>✓ FRIDA aplicado · risco "+nv+(fr.nivel==="E"?" · sugestão: encaminhar ao CRAV e à DEAM hoje":"")+"</div>"; }
+    h+="</div>";
+  }
+  // Decisão
+  h+="<div class='mt-bl'>";
+  var encsAbertos=_mtEncsOc(o.id).filter(_mtEncAberto);
+  if(M.pilha==="cobrar"){
+    h+="<p class='mt-perg'>Encaminhamentos aguardando devolutiva</p>";
+    encsAbertos.forEach(function(e){
+      var p=_mtPrazo(e), venc=p&&p<hoje();
+      h+="<div class='mt-enc'><div><b>"+esc(e.orgao||e.tipo||"?")+"</b> · enviado "+_mtBr(_mtIso(e.data_envio||e.data))+" · prazo "+_mtBr(p)+(e.prazo?"":" (padrão 15 dias)")+(venc?" · <b style='color:var(--verm)'>atrasada</b>":"")+(e.cobrancas&&e.cobrancas.length?" · cobrado "+e.cobrancas.length+"×":"")+"</div>";
+      if(M.painel==="volta:"+e.id){
+        h+="<textarea id='mt-volta' placeholder='O que o órgão respondeu? Ex.: vítima compareceu e iniciou acompanhamento.'>"+esc(M.rasc.volta||"")+"</textarea>";
+        h+="<div class='mt-row'><button class='mt-btn ok' data-mt-volta-ok='"+esc(e.id)+"'>Registrar devolutiva</button><button class='mt-btn sec' data-mt-volta-ok='"+esc(e.id)+"' data-mt-encerra='1'>Registrar e encerrar caso</button></div>";
+      } else {
+        h+="<div class='mt-row'><button class='mt-btn ok' data-mt-volta='"+esc(e.id)+"'>Devolutiva chegou</button><button class='mt-btn sec' data-mt-cobrei='"+esc(e.id)+"'>Cobrei hoje (+7 dias)</button></div>";
+      }
+      h+="</div>";
+    });
+  } else {
+    var trav = vd && !fr;
+    h+="<p class='mt-perg'>O que você fez ou vai fazer?</p><div class='mt-acoes'>";
+    h+="<button class='mt-ac pri' data-mt-painel='liguei'"+(trav?" disabled":"")+"><b>📞 Liguei</b><span>Registrar a ligação</span></button>";
+    h+="<button class='mt-ac' data-mt-painel='encaminhar'"+(trav?" disabled":"")+"><b>📤 Encaminhar</b><span>CRAV, CRAS, DEAM, Conselho…</span></button>";
+    h+="<button class='mt-ac' data-mt-painel='depois'"+(trav?" disabled":"")+"><b>📅 Ligar depois</b><span>Volta para “Ligar hoje” no dia marcado</span></button>";
+    h+="<button class='mt-ac' data-mt-painel='registrar'"+(trav?" disabled":"")+"><b>🗂 Só registrar</b><span>Não precisa de ação</span></button>";
+    h+="</div>";
+    if(trav) h+="<p class='mt-dica' style='margin-top:8px'>As opções liberam depois do FRIDA.</p>";
+    if(M.painel) h+=_mtPainelHtml(o);
+  }
+  h+="</div>";
+  // Linha do tempo
+  h+="<div class='mt-bl' style='border-bottom:0'><div class='mt-rot'>Linha do tempo</div><ul class='mt-tempo'>";
+  _mtTempo(o).forEach(function(t){ h+="<li><span class='d'>"+_mtBr(t.d)+"</span><div class='o'><b>"+esc(t.t)+"</b>"+(t.s?"<span>"+esc(t.s)+"</span>":"")+"</div></li>"; });
+  h+="</ul></div>";
+  return h;
+}
+
+function _mtPainelHtml(o){
+  var M=state._mt, r=M.rasc, h="<div class='mt-pn'>";
+  function datas(tit){
+    if(!r.quando) r.quando=_mtDia(1);
+    return "<h4>"+tit+"</h4><div class='mt-chips'>"+[[1,"Amanhã"],[2,"Em 2 dias"],[7,"Em 1 semana"]].map(function(x){ var d=_mtDia(x[0]); return "<button class='mt-chip"+(r.quando===d?" on":"")+"' data-mt-quando='"+d+"'>"+x[1]+" ("+_mtBr(d)+")</button>"; }).join("")+"</div>";
+  }
+  if(M.painel==="liguei"){
+    h+="<h4>Atendeu?</h4><div class='mt-chips'><button class='mt-chip"+(r.atendeu==="sim"?" on":"")+"' data-mt-atendeu='sim'>Sim, conversamos</button><button class='mt-chip"+(r.atendeu==="nao"?" on":"")+"' data-mt-atendeu='nao'>Não atendeu</button></div>";
+    if(r.atendeu==="sim"){
+      h+="<label class='mt-rot' for='mt-conversa'>O que conversaram</label><textarea id='mt-conversa' placeholder='Ex.: está segura na casa da mãe, quer apoio psicológico, vai pedir medida protetiva…'>"+esc(r.conversa||"")+"</textarea>";
+      h+="<h4>E agora?</h4><div class='mt-row'><button class='mt-btn ok' data-mt-fim='encerrar'>Resolvido, encerrar caso</button><button class='mt-btn sec' data-mt-painel='encaminhar'>Encaminhar também</button><button class='mt-btn sec' data-mt-painel='depois'>Ligar de novo</button></div>";
+    } else if(r.atendeu==="nao"){
+      h+=datas("Tentar de novo quando?");
+      h+="<div class='mt-row'><button class='mt-btn ok' data-mt-fim='nao_atendeu'>Salvar tentativa</button></div>";
+    }
+  }
+  if(M.painel==="encaminhar"){
+    var sug=[]; if(_mtIsMenor(o)) sug.push("Conselho Tutelar"); var fr=_mtFrida(o.id); if(_mtIsVD(o)) sug.push("CRAV"); if(fr&&fr.nivel==="E") sug.push("DEAM");
+    if(!r.orgaos) r.orgaos=sug.slice();
+    if(!r.prazo) r.prazo=15;
+    if(r.atendeu==="sim") h+="<p class='mt-dica'>A ligação também será registrada.</p>";
+    h+="<h4>Para qual órgão?</h4>";
+    if(sug.length) h+="<p class='mt-dica sug'>Já marcado pelo caso: "+sug.join(", ")+"</p>";
+    h+="<div class='mt-chips'>"+_MT_ORGAOS.map(function(g){ return "<button class='mt-chip"+(r.orgaos.indexOf(g)>=0?" on":"")+"' data-mt-orgao='"+g+"'>"+g+"</button>"; }).join("")+"</div>";
+    h+="<h4>Prazo para a devolutiva</h4><div class='mt-chips'>"+[7,15,30].map(function(n){ return "<button class='mt-chip"+(r.prazo===n?" on":"")+"' data-mt-prazo='"+n+"'>"+n+" dias ("+_mtBr(_mtDia(n))+")</button>"; }).join("")+"</div>";
+    h+="<p class='mt-dica'>O encaminhamento aparece no Painel de Encaminhamentos, onde saem o ofício e o link de devolutiva. Se o prazo vencer, o caso volta em <b>Cobrar</b>.</p>";
+    h+="<div class='mt-row'><button class='mt-btn ok' data-mt-fim='encaminhar'"+(r.orgaos.length?"":" disabled")+">Encaminhar"+(r.orgaos.length?" ("+r.orgaos.length+")":"")+"</button></div>";
+  }
+  if(M.painel==="depois"){
+    if(r.atendeu==="sim") h+="<p class='mt-dica'>A ligação de hoje também será registrada.</p>";
+    h+=datas("Ligar quando?");
+    h+="<div class='mt-row'><button class='mt-btn ok' data-mt-fim='depois'>Marcar retorno</button></div>";
+  }
+  if(M.painel==="registrar"){
+    h+="<h4>Por que não precisa de ação?</h4><div class='mt-chips'>"+["Vítima não quer atendimento","Já atendida por outro órgão","Fato sem vítima","Fora da nossa área","Sem contato possível"].map(function(m){ return "<button class='mt-chip"+(r.motivo===m?" on":"")+"' data-mt-motivo='"+m+"'>"+m+"</button>"; }).join("")+"</div>";
+    h+="<div class='mt-row'><button class='mt-btn ok' data-mt-fim='registrar'"+(r.motivo?"":" disabled")+">Encerrar caso</button></div>";
+  }
+  return h+"</div>";
+}
+
+// Linha do tempo montada dos registros reais do app (funciona em qualquer aparelho)
+function _mtTempo(o){
+  var t=[{d:_mtIso(o.data),t:"Chegou",s:(o.numero?"BO nº "+o.numero:"")+(o.origem?" · "+o.origem:"")}];
+  (state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id&&f.nivel;}).forEach(function(f){ t.push({d:_mtIso(f.data||""),t:"FRIDA aplicado",s:"Risco "+({B:"baixo",M:"médio",E:"elevado"}[f.nivel]||f.nivel)}); });
+  if(o._triadoEm) t.push({d:o._triadoEm.slice(0,10),t:"Triado",s:"Situação: "+String(o.situacao||"").replace(/_/g," ")});
+  _mtLigacoesOc(o.id).forEach(function(a){
+    if(a.status==="Agendado") t.push({d:a.data,t:"Ligação marcada",s:a.responsavel?"Com "+a.responsavel:""});
+    else t.push({d:(a.data_confirmacao||a.data||"").slice(0,10),t:a.status==="Realizado"?"Ligou — conversou":"Ligou — não atendeu",s:a.resultado||""});
+  });
+  _mtEncsOc(o.id).forEach(function(e){
+    t.push({d:_mtIso(e.data_envio||e.data),t:"Encaminhado: "+(e.orgao||e.tipo||"?"),s:"Prazo "+_mtBr(_mtPrazo(e))});
+    (e.cobrancas||[]).forEach(function(c){ t.push({d:c,t:"Cobrou "+(e.orgao||e.tipo),s:""}); });
+    if(e.relato_devolutiva) t.push({d:_mtIso(e.data_devolutiva||""),t:"Devolutiva: "+(e.orgao||e.tipo),s:e.relato_devolutiva});
+  });
+  if(o.situacao==="encerrada"&&o.mt_encerradoEm) t.push({d:o.mt_encerradoEm,t:"Encerrado",s:o.observacoes_triagem||""});
+  return t.sort(function(a,b){ return (b.d||"").localeCompare(a.d||""); });
+}
+
+// ── Gravação ───────────────────────────────────────────────
+function _mtNovaLigacao(o, status, data, texto){
+  if(!state.db.agendamentos) state.db.agendamentos=[];
+  var ag={id:"ag_mt_"+Date.now()+"_"+Math.random().toString(36).slice(2,5), criadoEm:new Date().toISOString(),
+    ocorrenciaId:o.id, vitima_id:o.vitima_id||"", vitima_nome:o.vitima_nome||"",
+    tipo:_MT_TEL, subtipo:"telefone", data:data, hora:"", responsavel:"", status:status,
+    endereco:o.vitima_telefone||"", objetivo:"Contato telefônico com a vítima"};
+  if(status!=="Agendado"){ ag.resultado=texto||""; ag.data_confirmacao=new Date().toISOString(); }
+  state.db.agendamentos.push(ag);
+  enviarSheets("agendamentos", ag);
+  return ag;
+}
+function _mtRegistrarLigacao(o, atendeu, texto){
+  // Se havia retorno marcado para hoje, ele vira a ligação feita
+  var pend=_mtLigarPendente(o.id);
+  if(pend && pend.data<=hoje()){
+    pend.status=atendeu?"Realizado":"NaoRealizado"; pend.resultado=texto||""; pend.data_confirmacao=new Date().toISOString();
+  } else _mtNovaLigacao(o, atendeu?"Realizado":"NaoRealizado", hoje(), texto);
+  if(atendeu && texto){
+    o.resumo_atendimento=(o.resumo_atendimento?o.resumo_atendimento+"\n":"")+_mtBr(hoje())+": "+texto;
+    o.data_atendimento=hoje();
+  }
+}
+function _mtSituacao(o, sit){
+  if(o.situacao===sit) return;
+  o.situacao=sit;
+  if(!o._triadoEm) o._triadoEm=new Date().toISOString();
+  if(sit==="em_acompanhamento" && typeof garantirCasoAcompanhamento==="function") garantirCasoAcompanhamento(o);
+  if(sit==="encerrada") o.mt_encerradoEm=hoje();
+  _sheetsGet({acao:"atualizarSituacaoOc", id:o.id, situacao:sit}).catch(function(){});
+}
+function _mtSalvarTudo(o){
+  o._editadoLocal=true; o._editadoEm=Date.now();
+  salvarLocal();
+  if(typeof _salvarModulos==="function") _salvarModulos();
+  if(o) enviarSheets("ocorrencias", o);
+  agendarSyncSheets();
+}
+
+function _mtConcluir(o, tipo){
+  var M=state._mt, r=M.rasc, msg="";
+  var conversa=(r.conversa||"").trim();
+  if(tipo==="encerrar"){
+    _mtRegistrarLigacao(o,true,conversa); o.observacoes_triagem="Resolvido na ligação";
+    _mtSituacao(o,"encerrada"); msg="Caso encerrado";
+  }
+  if(tipo==="nao_atendeu"){
+    _mtRegistrarLigacao(o,false,""); _mtNovaLigacao(o,"Agendado",r.quando);
+    _mtSituacao(o,"em_acompanhamento"); msg="Tentativa salva · volta em "+_mtBr(r.quando);
+  }
+  if(tipo==="depois"){
+    if(r.atendeu==="sim") _mtRegistrarLigacao(o,true,conversa);
+    _mtNovaLigacao(o,"Agendado",r.quando);
+    _mtSituacao(o,"em_acompanhamento"); msg="Retorno marcado para "+_mtBr(r.quando);
+  }
+  if(tipo==="encaminhar"){
+    if(r.atendeu==="sim") _mtRegistrarLigacao(o,true,conversa);
+    if(!state.encaminhamentos) state.encaminhamentos=[];
+    var prazo=_mtDia(r.prazo||15);
+    r.orgaos.forEach(function(g){
+      var enc={id:"enc_"+Date.now()+"_"+Math.random().toString(36).slice(2,6), vitima_id:o.vitima_id||"",
+        vitima_nome:o.vitima_nome||o.nome_vitima||"", ocorrencia_id:o.id, tipo:g, orgao:g,
+        descricao:conversa, data:hoje(), status:"pendente", data_envio:hoje(), prazo:prazo,
+        criadoEm:new Date().toISOString(), origem:"Minha Mesa"};
+      state.encaminhamentos.push(enc);
+      _sheetsGet({acao:"salvar", tipo:"encaminhamento", dados:JSON.stringify(enc)}).catch(function(){});
+    });
+    if(r.orgaos.indexOf("Conselho Tutelar")>=0) o.menor_envolvido=o.menor_envolvido||_mtIsMenor(o);
+    _mtSituacao(o,"em_acompanhamento"); msg="Encaminhado a "+r.orgaos.join(", ");
+  }
+  if(tipo==="registrar"){
+    o.observacoes_triagem=r.motivo; _mtSituacao(o,"encerrada"); msg="Caso registrado e encerrado";
+  }
+  _mtSalvarTudo(o);
+  M.feitos++;
+  _mtProximo(msg);
+}
+function _mtProximo(msg){
+  var M=state._mt;
+  M.painel=null; M.rasc={}; M.relatoTodo=false; M.manter=false;
+  var nx=_mtPilha(M.pilha)[0];
+  var celular=window.matchMedia&&window.matchMedia("(max-width:820px)").matches;
+  M.sel = nx && !celular ? nx.id : null;
+  _mtRender();
+  showToast(msg+(nx&&!celular?" · próximo caso aberto":(nx?"":" · pilha zerada")));
+}
+function _mtRender(){
+  var m=document.getElementById("main");
+  if(m && state.tela==="mesa_triagem") renderMesaTriagem(m);
+}
+function _mtSalvarEnc(e){
+  try{ localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos)); }catch(x){}
+  _sheetsGet({acao:"salvar", tipo:"encaminhamento", dados:JSON.stringify(e)}).catch(function(){});
+  salvarLocal();
+}
+
+document.addEventListener("input",function(ev){
+  if(state.tela!=="mesa_triagem") return;
+  if(ev.target.id==="mt-conversa") state._mt.rasc.conversa=ev.target.value;
+  if(ev.target.id==="mt-volta") state._mt.rasc.volta=ev.target.value;
+});
+document.addEventListener("change",function(ev){
+  if(state.tela!=="mesa_triagem" || !ev.target.hasAttribute("data-mt-jur")) return;
+  state._mt.jur=ev.target.checked; state._mt.sel=null; _mtRender();
+});
+document.addEventListener("click",function(ev){
+  if(state.tela!=="mesa_triagem") return;
+  var b=ev.target.closest&&ev.target.closest("#mt-root button"); if(!b) return;
+  var M=state._mt, d=b.dataset, o=M.sel?_mtOc(M.sel):null;
+  if(d.mtPilha){ M.pilha=d.mtPilha; M.sel=null; M.painel=null; M.rasc={}; _mtRender(); return; }
+  if(d.mtCaso){ M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
+  if("mtVoltar" in d){ M.sel=null; M.painel=null; _mtRender(); return; }
+  if(!o) return;
+  if("mtRelato" in d){ M.relatoTodo=!M.relatoTodo; _mtRender(); return; }
+  if("mtFrida" in d){
+    abrirMonitorVCM(o.id);
+    // Quando o modal do FRIDA fechar, atualiza a Mesa
+    var iv=setInterval(function(){ if(!document.getElementById("modal-frida")){ clearInterval(iv); M.manter=true; _mtRender(); M.manter=false; } },500);
+    return;
+  }
+  if(d.mtPainel){ M.painel=d.mtPainel; M.rasc={atendeu:M.rasc.atendeu, conversa:M.rasc.conversa}; _mtRender(); return; }
+  if(d.mtAtendeu){ M.rasc.atendeu=d.mtAtendeu; _mtRender(); return; }
+  if(d.mtOrgao){ var a=M.rasc.orgaos, i=a.indexOf(d.mtOrgao); if(i>=0) a.splice(i,1); else a.push(d.mtOrgao); _mtRender(); return; }
+  if(d.mtPrazo){ M.rasc.prazo=+d.mtPrazo; _mtRender(); return; }
+  if(d.mtQuando){ M.rasc.quando=d.mtQuando; _mtRender(); return; }
+  if(d.mtMotivo){ M.rasc.motivo=d.mtMotivo; _mtRender(); return; }
+  if(d.mtFim){ _mtConcluir(o, d.mtFim); return; }
+  if(d.mtCobrei){
+    var e=(state.encaminhamentos||[]).find(function(x){return x.id===d.mtCobrei;}); if(!e) return;
+    e.cobrancas=(e.cobrancas||[]).concat([hoje()]); e.prazo=_mtDia(7);
+    _mtSalvarEnc(e); M.feitos++; _mtProximo("Cobrança registrada · novo prazo "+_mtBr(e.prazo)); return;
+  }
+  if(d.mtVolta){ M.painel="volta:"+d.mtVolta; M.rasc={}; _mtRender(); return; }
+  if(d.mtVoltaOk){
+    var ev2=(state.encaminhamentos||[]).find(function(x){return x.id===d.mtVoltaOk;}); if(!ev2) return;
+    ev2.relato_devolutiva=(M.rasc.volta||"").trim()||"Devolutiva recebida"; ev2.data_devolutiva=hoje(); ev2.status="concluido";
+    _mtSalvarEnc(ev2);
+    if(d.mtEncerra){ o.observacoes_triagem="Encerrado após devolutiva do "+(ev2.orgao||ev2.tipo); _mtSituacao(o,"encerrada"); _mtSalvarTudo(o); }
+    M.feitos++; _mtProximo("Devolutiva registrada"+(d.mtEncerra?" · caso encerrado":"")); return;
+  }
+});
+
 function renderTela() {
   const main=document.getElementById("main");
   if(!main)return;
@@ -16567,6 +16991,10 @@ function renderTela() {
     renderFilaDia(main);
     return;
   }
+  if(tela==="mesa_triagem"){
+    renderMesaTriagem(main);
+    return;
+  }
   if(tela==="vitima"){
     renderFichaVitima(main, state._vitimaAtual||"");
     return;
@@ -17174,6 +17602,7 @@ function render(){
         var _anim  = !_ativo&&(_nTri>0||_nVcm>0)?"animation:piscar-suave 2s infinite;":"";
         return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='if(!state._filaTab)state._filaTab=\"triagem\";setTela(\"fila_auxiliar\")' style='"+_anim+"'>Fila do Dia"+_badge+"</button>";
       })()}
+      <button class="nav-btn${state.tela==="mesa_triagem"?" active":""}" onclick="setTela('mesa_triagem')">🧪 Minha Mesa (teste)</button>
       <p class="nav-label">Gestão Comunitária</p>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" onclick="setTela('projetossociais')">Projetos Sociais</button>
       <button class="nav-btn${state.tela==="conselho"?" active":""}" onclick="setTela('conselho')">Conselho Comunitário</button>
@@ -17196,6 +17625,7 @@ function render(){
         var _anim  = !_ativo&&(_nTri>0||_nVcm>0)?"animation:piscar-suave 2s infinite;":"";
         return "<button class='nav-btn"+(_ativo?" active":"")+"' onclick='if(!state._filaTab)state._filaTab=\"triagem\";setTela(\"fila_auxiliar\")' style='"+_anim+"'>Fila do Dia"+_badge+"</button>";
       })()}
+      <button class="nav-btn${state.tela==="mesa_triagem"?" active":""}" onclick="setTela('mesa_triagem')">🧪 Minha Mesa (teste)</button>
       <p class="nav-label">Gestão Comunitária</p>
       <button class="nav-btn${state.tela==="projetossociais"?" active":""}" onclick="setTela('projetossociais')">Projetos Sociais</button>
       <button class="nav-btn${state.tela==="conselho"?" active":""}" onclick="setTela('conselho')">Conselho Comunitário</button>
