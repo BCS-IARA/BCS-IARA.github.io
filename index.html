@@ -15260,6 +15260,24 @@ function _mtOc(id){
   return (state.db.ocorrencias||[]).find(function(o){ return String(o.id)===String(id); })
       || (state.ocorrenciasArquivadas||[]).find(function(o){ return String(o.id)===String(id); });
 }
+// Telefones da vítima: BO, ficha da vítima (state.vitimas) e lista vitimas[] — sem repetir
+function _mtTelefones(o){
+  var t=[o.vitima_telefone];
+  var v=o.vitima_id?(state.vitimas||[]).find(function(x){return x.id===o.vitima_id;}):null;
+  if(v) t.push(v.telefone, v.telefone2, v.celular);
+  (Array.isArray(o.vitimas)?o.vitimas:[]).forEach(function(x){ if(x) t.push(x.telefone); });
+  var vistos={}, out=[];
+  t.forEach(function(x){ x=String(x||"").trim(); var d=x.replace(/\D/g,""); if(d.length<8||vistos[d]) return; vistos[d]=1; out.push(x); });
+  return out;
+}
+function _mtTelBarra(o){
+  var tels=_mtTelefones(o);
+  if(!tels.length) return "<div class='mt-telbar vazio'>📵 Sem telefone da vítima no BO — confira a ficha ou o SIGESPOL</div>";
+  return "<div class='mt-telbar'>"+tels.map(function(t){
+    var dig=t.replace(/\D/g,"");
+    return "<div class='mt-telitem'><a class='mt-telnum' href='tel:"+esc(dig)+"'>📞 "+esc(t)+"</a><button class='mt-btn sec mt-telcp' data-mt-copiar='"+esc(t)+"'>Copiar</button></div>";
+  }).join("")+"</div>";
+}
 function _mtArquivada(o){ return !(state.db.ocorrencias||[]).some(function(x){ return x.id===o.id; }); }
 // Busca em todas as ocorrências (ativas + arquivadas): nome da vítima/autor, BO, telefone, bairro, tipo
 function _mtNorm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
@@ -15362,6 +15380,12 @@ function _mtCss(){
   "#mt-root .mt-p{background:var(--papel-2);border-radius:8px;padding:10px 12px;min-width:0} #mt-root .mt-p.a{background:#F3DCD2}"+
   "#mt-root .mt-rot{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tinta-2);margin-bottom:3px}"+
   "#mt-root .mt-p .n{font-weight:700;font-size:15px} #mt-root .mt-p .s{font-size:12px;color:var(--tinta-2)}"+
+  "#mt-root .mt-telbar{display:flex;flex-wrap:wrap;gap:10px;padding:12px 18px;background:#E1EBD6;border-bottom:1px solid var(--papel-3)}"+
+  "#mt-root .mt-telbar.vazio{background:var(--papel-2);color:var(--tinta-2);font-size:13px;font-style:italic}"+
+  "#mt-root .mt-telitem{display:flex;align-items:center;gap:8px;flex-wrap:wrap}"+
+  "#mt-root .mt-telnum{font-size:24px;font-weight:800;color:var(--verde-2);text-decoration:none;font-variant-numeric:tabular-nums;letter-spacing:.02em;user-select:all}"+
+  "#mt-root .mt-telcp{padding:5px 12px;font-size:12px}"+
+  "#mt-root .mt-item .tl{font-size:12px;font-weight:700;color:var(--verde-2);margin-top:2px;font-variant-numeric:tabular-nums}"+
   "#mt-root .mt-tel{display:inline-block;margin-top:6px;font-weight:700;font-size:13px;background:var(--papel);border:1px solid var(--papel-3);border-radius:6px;padding:3px 8px;user-select:all}"+
   "#mt-root .mt-txt{font-size:14px;line-height:1.55;max-width:70ch;margin:4px 0 0;white-space:pre-wrap}"+
   "#mt-root .mt-mais{background:none;border:0;color:var(--ambar-2);font-weight:700;font-size:12px;cursor:pointer;padding:4px 0}"+
@@ -15437,6 +15461,7 @@ function _mtListaHtml(lista,P){
       h+="<div class='mt-res"+(M.sel===o.id?" on":"")+"'><button class='mt-item"+(vd?" vd":"")+"' data-mt-caso='"+esc(o.id)+"'>";
       h+="<div>"+(vd?"<span class='mt-selo vd'>VD</span>":"")+"<span class='t'>"+esc((o.tipo||"Ocorrência").substring(0,40))+"</span></div>";
       h+="<div class='v'>👤 "+esc(o.vitima_nome||"Vítima não identificada")+(o.suspeito_nome?" · 🎯 "+esc(o.suspeito_nome):"")+"</div>";
+      var _tl2=_mtTelefones(o)[0]; if(_tl2) h+="<div class='tl'>📞 "+esc(_tl2)+"</div>";
       h+="<div class='q'>"+_mtBr(_mtIso(o.data))+"/"+(_mtIso(o.data).slice(0,4)||"")+(o.numero?" · BO "+esc(String(o.numero)):"")+" · "+esc(arq?"Arquivado":(SIT[o.situacao]||o.situacao||""))+(nEnc?" · devolutivas "+nDev+"/"+nEnc:"")+"</div></button>";
       h+="<button class='mt-pdfmini' data-mt-pdf-id='"+esc(o.id)+"' title='PDF do atendimento'>📄 PDF</button></div>";
     });
@@ -15453,6 +15478,7 @@ function _mtListaHtml(lista,P){
     h+="<button class='mt-item"+(vd?" vd":"")+(M.sel===o.id?" on":"")+"' data-mt-caso='"+esc(o.id)+"'>";
     h+="<div>"+(vd?"<span class='mt-selo vd'>VD</span>":"")+(me?"<span class='mt-selo me'>MENOR</span>":"")+(M.pilha==="cobrar"?"<span class='mt-selo at'>ATRASADA</span>":"")+"<span class='t'>"+esc((o.tipo||"Ocorrência").substring(0,40))+"</span></div>";
     h+="<div class='v'>👤 "+esc(o.vitima_nome||"Vítima não identificada")+(o.vitima_idade?" ("+esc(String(o.vitima_idade))+")":"")+"</div>";
+    var _tl=_mtTelefones(o)[0]; h+="<div class='tl'>"+(_tl?"📞 "+esc(_tl):"<span style='opacity:.6'>📵 sem telefone</span>")+"</div>";
     h+="<div class='q'>"+q+"</div></button>";
   });
   return h;
@@ -15466,10 +15492,10 @@ function _mtCasoHtml(o){
   h+=(vd?"<span class='mt-selo vd'>VD</span>":"")+(me?"<span class='mt-selo me'>MENOR</span>":"");
   h+="<span class='m'>"+esc(o.data||"—")+(o.hora?" "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+(o.numero?" · BO nº "+esc(String(o.numero)):"")+"</span>";
   h+="<button class='mt-btn sec' style='margin-left:auto;padding:6px 12px;font-size:12px' data-mt-pdf>📄 PDF do atendimento</button></div>";
+  h+=_mtTelBarra(o);
   // Quem
   h+="<div class='mt-bl'><div class='mt-pes'>";
   h+="<div class='mt-p'><div class='mt-rot'>Vítima</div><div class='n'>"+esc(o.vitima_nome||"Não identificada")+"</div><div class='s'>"+[o.vitima_idade?o.vitima_idade+" anos":"",o.vitima_sexo||""].filter(Boolean).map(esc).join(" · ")+"</div>";
-  h+=(o.vitima_telefone?"<div class='mt-tel'>📞 "+esc(o.vitima_telefone)+"</div>":"<div class='s' style='margin-top:6px;font-style:italic'>Sem telefone no BO</div>");
   if(o.vitima_id) h+="<div><button class='mt-mais' onclick='state._vitimaAtual=\""+esc(o.vitima_id)+"\";setTela(\"vitima\")'>Ver ficha da vítima →</button></div>";
   h+="</div>";
   h+="<div class='mt-p a'><div class='mt-rot'>Autor</div><div class='n'>"+esc(o.suspeito_nome||"Não identificado")+"</div><div class='s'>"+[o.suspeito_idade?o.suspeito_idade+" anos":"",o.suspeito_endereco||""].filter(Boolean).map(esc).join(" · ")+"</div></div>";
@@ -15536,6 +15562,7 @@ function _mtPainelHtml(o){
       "<label class='mt-chip"+(ehRapida?"":" on")+"' style='display:inline-flex;gap:6px;align-items:center;white-space:nowrap'>Outra data: <input type='date' id='mt-quando-manual' min='"+hoje()+"' value='"+(ehRapida?"":esc(r.quando))+"' style='border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px'></label></div>";
   }
   if(M.painel==="liguei"){
+    var _tp=_mtTelefones(o); if(_tp.length) h+="<div style='font-size:13px;color:var(--tinta-2)'>Número: <b style='font-size:17px;color:var(--tinta);font-variant-numeric:tabular-nums;user-select:all'>"+_tp.map(esc).join(" · ")+"</b></div>";
     if(!r.dataLig) r.dataLig=hoje();
     h+="<h4>Quando foi a ligação?</h4><div class='mt-chips' style='align-items:center'><button class='mt-chip"+(r.dataLig===hoje()?" on":"")+"' data-mt-datalig='"+hoje()+"'>Hoje</button><button class='mt-chip"+(r.dataLig===_mtDia(-1)?" on":"")+"' data-mt-datalig='"+_mtDia(-1)+"'>Ontem</button><label class='mt-chip"+(r.dataLig!==hoje()&&r.dataLig!==_mtDia(-1)?" on":"")+"' style='display:inline-flex;gap:6px;align-items:center;white-space:nowrap'>Outra data: <input type='date' id='mt-datalig-manual' max='"+hoje()+"' value='"+(r.dataLig!==hoje()&&r.dataLig!==_mtDia(-1)?esc(r.dataLig):"")+"' style='border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px'></label></div>";
     h+="<h4>Atendeu?</h4><div class='mt-chips'><button class='mt-chip"+(r.atendeu==="sim"?" on":"")+"' data-mt-atendeu='sim'>Sim, conversamos</button><button class='mt-chip"+(r.atendeu==="nao"?" on":"")+"' data-mt-atendeu='nao'>Não atendeu</button></div>";
@@ -15810,6 +15837,11 @@ document.addEventListener("click",function(ev){
   var b=ev.target.closest&&ev.target.closest("#mt-root button"); if(!b) return;
   var M=state._mt, d=b.dataset, o=M.sel?_mtOc(M.sel):null;
   if(d.mtPdfId){ _mtGerarPdf(d.mtPdfId); return; }
+  if(d.mtCopiar){
+    var _t=d.mtCopiar;
+    try{ navigator.clipboard.writeText(_t).then(function(){ showToast("Número copiado: "+_t); },function(){ showToast("Número: "+_t); }); }catch(x){ showToast("Número: "+_t); }
+    return;
+  }
   if(d.mtPilha){ M.busca=""; M.pilha=d.mtPilha; M.sel=null; M.painel=null; M.rasc={}; _mtRender(); return; }
   if(d.mtCaso){ M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
   if("mtVoltar" in d){ M.sel=null; M.painel=null; _mtRender(); return; }
