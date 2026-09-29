@@ -15194,7 +15194,30 @@ function _mtIso(s){
 function _mtHa(s){ var n=Math.round((new Date(hoje()+"T12:00")-new Date(_mtIso(s)+"T12:00"))/864e5); return isNaN(n)?"":n<=0?"hoje":n===1?"há 1 dia":"há "+n+" dias"; }
 function _mtIsVD(o){ return !!(o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"")); }
 function _mtIsMenor(o){ return !!(o.menor_envolvido||(o.vitima_idade&&parseInt(o.vitima_idade)<18)); }
-function _mtOc(id){ return (state.db.ocorrencias||[]).find(function(o){ return String(o.id)===String(id); }); }
+function _mtOc(id){
+  return (state.db.ocorrencias||[]).find(function(o){ return String(o.id)===String(id); })
+      || (state.ocorrenciasArquivadas||[]).find(function(o){ return String(o.id)===String(id); });
+}
+function _mtArquivada(o){ return !(state.db.ocorrencias||[]).some(function(x){ return x.id===o.id; }); }
+// Busca em todas as ocorrências (ativas + arquivadas): nome da vítima/autor, BO, telefone, bairro, tipo
+function _mtNorm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
+function _mtBuscar(q){
+  var t=_mtNorm(q).trim(); if(t.length<2) return [];
+  var dig=t.replace(/\D/g,"");
+  var termos=t.split(/\s+/);
+  var vistos={}, out=[];
+  (state.db.ocorrencias||[]).concat(state.ocorrenciasArquivadas||[]).forEach(function(o){
+    if(!o||!o.id||vistos[o.id]) return;
+    var txt=_mtNorm([o.vitima_nome,o.nome_vitima,o.suspeito_nome,o.tipo,o.bairro,o.numero,o.local].join(" "));
+    var ok=termos.every(function(w){ return txt.indexOf(w)>=0; });
+    if(!ok && dig.length>=4){
+      var nums=String(o.vitima_telefone||"").replace(/\D/g,"")+" "+String(o.numero||"").replace(/\D/g,"");
+      ok=nums.indexOf(dig)>=0;
+    }
+    if(ok){ vistos[o.id]=1; out.push(o); }
+  });
+  return out.sort(function(a,b){ return _mtIso(b.data).localeCompare(_mtIso(a.data)); }).slice(0,60);
+}
 function _mtFrida(ocId){
   return (state.db.frida||[]).filter(function(f){ return f.ocorrenciaId===ocId && f.nivel && f.nivel!=="?"; })
     .sort(function(a,b){ return (b.data||"").localeCompare(a.data||""); })[0]||null;
@@ -15255,6 +15278,12 @@ function _mtCss(){
   "#mt-root .mt-lcab{padding:9px 14px;border-bottom:1px solid var(--papel-3);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tinta-2);position:sticky;top:0;background:var(--papel)}"+
   "#mt-root .mt-item{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--papel-3);border-left:4px solid transparent;background:transparent;padding:9px 12px;cursor:pointer;color:var(--tinta)}"+
   "#mt-root .mt-item.vd{border-left-color:var(--verm)}"+
+  "#mt-root .mt-busca{margin:0 0 12px}#mt-root .mt-busca input{width:100%;box-sizing:border-box;border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:10px;padding:11px 14px;font:inherit;font-size:14px}"+
+  "#mt-root .mt-busca input:focus{border-color:var(--ambar);outline:none}"+
+  "#mt-root .mt-res{display:flex;align-items:stretch;border-bottom:1px solid var(--papel-3)}#mt-root .mt-res .mt-item{border-bottom:0;flex:1;min-width:0}"+
+  "#mt-root .mt-res.on{background:var(--ambar-claro)}"+
+  "#mt-root .mt-pdfmini{border:0;border-left:1px solid var(--papel-3);background:transparent;color:var(--ambar-2);font-weight:700;font-size:12px;padding:0 12px;cursor:pointer;white-space:nowrap}"+
+  "#mt-root .mt-pdfmini:hover{background:var(--ambar-claro)}"+
   "#mt-root .mt-item.on{background:var(--ambar-claro);border-left-color:var(--ambar)}"+
   "#mt-root .mt-item .t{font-weight:700;font-size:13px}"+
   "#mt-root .mt-item .v{font-size:12px;color:var(--tinta-2);margin-top:2px}"+
@@ -15318,15 +15347,40 @@ function _renderMesaTriagem(main){
   var M=state._mt;
   var P=[{k:"novo",r:"Novos",d:"para triar"},{k:"ligar",r:"Ligar hoje",d:"retornos marcados até hoje"},{k:"cobrar",r:"Cobrar",d:"devolutiva com prazo vencido"}];
   var lista=_mtPilha(M.pilha);
-  if(M.sel && !lista.some(function(o){return o.id===M.sel;}) && !M.manter) M.sel=null;
+  if(M.sel && !M.busca && !lista.some(function(o){return o.id===M.sel;}) && !M.manter) M.sel=null;
   var h="<div id='mt-root'>";
   h+="<div class='mt-cab'><h2>Minha Mesa</h2><span class='mt-teste'>🧪 em teste · grava nos mesmos dados do app</span></div>";
   h+="<div class='mt-pilhas'>"+P.map(function(p){ return "<button class='mt-pilha"+(M.pilha===p.k?" on":"")+"' data-mt-pilha='"+p.k+"'><b>"+_mtPilha(p.k).length+"</b><span>"+p.r+"</span><small>"+p.d+"</small></button>"; }).join("")+"</div>";
   h+="<div class='mt-sub'><span>"+(M.feitos?"Hoje você já resolveu <b>"+M.feitos+"</b> "+(M.feitos===1?"caso":"casos")+".":"Ordem: violência doméstica, depois menores, depois os mais antigos.")+"</span>";
   if(M.pilha==="novo") h+="<label style='display:flex;gap:5px;align-items:center;cursor:pointer'><input type='checkbox' data-mt-jur "+(M.jur!==false?"checked":"")+"> Só bairros da jurisdição</label>";
   h+="</div>";
+  h+="<div class='mt-busca'><input id='mt-busca' type='search' autocomplete='off' placeholder='🔍 Buscar ocorrência: nome, nº do BO, telefone, bairro…' value='"+esc(M.busca||"")+"'></div>";
   h+="<div class='mt-grid"+(M.sel?" aberto":"")+"'>";
-  h+="<div class='mt-lista'><div class='mt-lcab'>"+P.find(function(p){return p.k===M.pilha;}).r+" · "+lista.length+"</div>";
+  h+="<div class='mt-lista' id='mt-lista'>"+_mtListaHtml(lista,P)+"</div>";
+  h+="<div class='mt-caso'>"+_mtCasoHtml(M.sel?_mtOc(M.sel):null)+"</div>";
+  h+="</div></div>";
+  main.innerHTML=h;
+}
+
+function _mtListaHtml(lista,P){
+  var M=state._mt, h="";
+  if(M.busca && M.busca.trim().length>=2){
+    var res=_mtBuscar(M.busca);
+    var SIT={nova:"Aguardando triagem",em_acompanhamento:"Em atendimento",encerrada:"Encerrado",historico:"Histórico",arquivada:"Arquivado"};
+    h+="<div class='mt-lcab'>Resultados da busca · "+res.length+(res.length===60?"+":"")+"</div>";
+    if(!res.length) h+="<div class='mt-vazio'><b>Nada encontrado</b>Tente o nome, o número do BO ou o telefone.</div>";
+    res.forEach(function(o){
+      var vd=_mtIsVD(o), arq=_mtArquivada(o);
+      var nEnc=_mtEncsOc(o.id).length, nDev=_mtEncsOc(o.id).filter(function(e){return e.relato_devolutiva;}).length;
+      h+="<div class='mt-res"+(M.sel===o.id?" on":"")+"'><button class='mt-item"+(vd?" vd":"")+"' data-mt-caso='"+esc(o.id)+"'>";
+      h+="<div>"+(vd?"<span class='mt-selo vd'>VD</span>":"")+"<span class='t'>"+esc((o.tipo||"Ocorrência").substring(0,40))+"</span></div>";
+      h+="<div class='v'>👤 "+esc(o.vitima_nome||"Vítima não identificada")+(o.suspeito_nome?" · 🎯 "+esc(o.suspeito_nome):"")+"</div>";
+      h+="<div class='q'>"+_mtBr(_mtIso(o.data))+"/"+(_mtIso(o.data).slice(0,4)||"")+(o.numero?" · BO "+esc(String(o.numero)):"")+" · "+esc(arq?"Arquivado":(SIT[o.situacao]||o.situacao||""))+(nEnc?" · devolutivas "+nDev+"/"+nEnc:"")+"</div></button>";
+      h+="<button class='mt-pdfmini' data-mt-pdf-id='"+esc(o.id)+"' title='PDF do atendimento'>📄 PDF</button></div>";
+    });
+    return h;
+  }
+  h+="<div class='mt-lcab'>"+P.find(function(p){return p.k===M.pilha;}).r+" · "+lista.length+"</div>";
   if(!lista.length) h+="<div class='mt-vazio'><b>Nada aqui</b>Pilha zerada. Veja as outras pilhas acima.</div>";
   lista.forEach(function(o){
     var vd=_mtIsVD(o), me=_mtIsMenor(o);
@@ -15339,10 +15393,7 @@ function _renderMesaTriagem(main){
     h+="<div class='v'>👤 "+esc(o.vitima_nome||"Vítima não identificada")+(o.vitima_idade?" ("+esc(String(o.vitima_idade))+")":"")+"</div>";
     h+="<div class='q'>"+q+"</div></button>";
   });
-  h+="</div>";
-  h+="<div class='mt-caso'>"+_mtCasoHtml(M.sel?_mtOc(M.sel):null)+"</div>";
-  h+="</div></div>";
-  main.innerHTML=h;
+  return h;
 }
 
 function _mtCasoHtml(o){
@@ -15379,7 +15430,9 @@ function _mtCasoHtml(o){
   // Decisão
   h+="<div class='mt-bl'>";
   var encsAbertos=_mtEncsOc(o.id).filter(_mtEncAberto);
-  if(M.pilha==="cobrar"){
+  if(_mtArquivada(o)){
+    h+="<p class='mt-dica'>🗄 Ocorrência arquivada — só consulta. Use o botão <b>📄 PDF do atendimento</b> para o relatório completo.</p>";
+  } else if(M.pilha==="cobrar" || (M.busca && encsAbertos.length && o.situacao!=="nova")){
     h+="<p class='mt-perg'>Encaminhamentos aguardando devolutiva</p>";
     encsAbertos.forEach(function(e){
       var p=_mtPrazo(e), venc=p&&p<hoje();
@@ -15636,6 +15689,7 @@ function _mtConcluir(o, tipo){
 }
 function _mtProximo(msg){
   var M=state._mt;
+  if(M.busca){ M.painel=null; M.rasc={}; _mtRender(); showToast(msg); return; } // na busca, fica no mesmo caso
   M.painel=null; M.rasc={}; M.relatoTodo=false; M.manter=false;
   var nx=_mtPilha(M.pilha)[0];
   var celular=window.matchMedia&&window.matchMedia("(max-width:820px)").matches;
@@ -15657,6 +15711,15 @@ document.addEventListener("input",function(ev){
   if(state.tela!=="mesa_triagem") return;
   if(ev.target.id==="mt-conversa") state._mt.rasc.conversa=ev.target.value;
   if(ev.target.id==="mt-volta") state._mt.rasc.volta=ev.target.value;
+  if(ev.target.id==="mt-busca"){
+    state._mt.busca=ev.target.value;
+    var el=document.getElementById("mt-lista");
+    if(el) el.innerHTML=_mtListaHtml(_mtPilha(state._mt.pilha),[{k:"novo",r:"Novos"},{k:"ligar",r:"Ligar hoje"},{k:"cobrar",r:"Cobrar"}]);
+  }
+});
+document.addEventListener("keydown",function(ev){
+  if(state.tela!=="mesa_triagem" || ev.target.id!=="mt-busca" || ev.key!=="Escape") return;
+  state._mt.busca=""; state._mt.sel=null; _mtRender();
 });
 document.addEventListener("change",function(ev){
   if(state.tela!=="mesa_triagem" || !ev.target.hasAttribute("data-mt-jur")) return;
@@ -15666,7 +15729,8 @@ document.addEventListener("click",function(ev){
   if(state.tela!=="mesa_triagem") return;
   var b=ev.target.closest&&ev.target.closest("#mt-root button"); if(!b) return;
   var M=state._mt, d=b.dataset, o=M.sel?_mtOc(M.sel):null;
-  if(d.mtPilha){ M.pilha=d.mtPilha; M.sel=null; M.painel=null; M.rasc={}; _mtRender(); return; }
+  if(d.mtPdfId){ _mtGerarPdf(d.mtPdfId); return; }
+  if(d.mtPilha){ M.busca=""; M.pilha=d.mtPilha; M.sel=null; M.painel=null; M.rasc={}; _mtRender(); return; }
   if(d.mtCaso){ M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
   if("mtVoltar" in d){ M.sel=null; M.painel=null; _mtRender(); return; }
   if(!o) return;
