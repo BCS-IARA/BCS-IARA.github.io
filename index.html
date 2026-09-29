@@ -376,7 +376,8 @@ function salvarLocal() {
     _salvarModulos(); // persiste campos de módulo em chave separada, imune ao sync
     // Salvar cada coleção em chave separada para evitar QuotaExceededError
     // (787 OCs + 7322 agendamentos num único JSON ultrapassava o limite de 10MB)
-    try{ localStorage.setItem("bcs_db_oc",    JSON.stringify(state.db.ocorrencias||[])); }catch(e){ console.warn("[BCS] Quota OC",e); }
+    var _ocGravou=false;
+    try{ localStorage.setItem("bcs_db_oc",    JSON.stringify(state.db.ocorrencias||[])); _ocGravou=true; }catch(e){ console.warn("[BCS] Quota OC",e); }
     try{ localStorage.setItem("bcs_db_at",    JSON.stringify(state.db.atendimentos||[])); }catch(e){ console.warn("[BCS] Quota AT",e); }
     try{ localStorage.setItem("bcs_db_vis",   JSON.stringify(state.db.visitas||[])); }catch(e){ console.warn("[BCS] Quota VIS",e); }
     (function(){
@@ -400,8 +401,11 @@ function salvarLocal() {
       }
     })();
     // Manter bcs_db_light apenas com OCs para compatibilidade reversa
-    const light={ ocorrencias:state.db.ocorrencias };
-    try{ localStorage.setItem("bcs_db_light",JSON.stringify(light)); }catch(e){ console.warn("[BCS] Quota light",e); }
+    // bcs_db_light era uma 2ª cópia de todas as ocorrências (formato antigo) — só é lida
+    // quando bcs_db_oc não existe. Mantê-la dobrava o uso do armazenamento e fazia a
+    // gravação estourar a cota; agora é removida assim que bcs_db_oc grava.
+    if(_ocGravou){ try{ localStorage.removeItem("bcs_db_light"); }catch(e){} }
+    else { const light={ ocorrencias:state.db.ocorrencias }; try{ localStorage.setItem("bcs_db_light",JSON.stringify(light)); }catch(e){ console.warn("[BCS] Quota light",e); } }
     // Manter bcs_sigespol_backup sincronizado com edições locais
     try{
       var _spRaw = localStorage.getItem("bcs_sigespol_backup");
@@ -859,12 +863,13 @@ function _salvarLocalSemSync(){
     var _ocSemTexto=(db.ocorrencias||[]).map(function(o){
       var x=Object.assign({},o); delete x.texto_original; return x;
     });
-    try{ localStorage.setItem("bcs_db_oc",  JSON.stringify(_ocSemTexto)); }catch(e){ console.warn("[BCS] Quota OC",e); }
+    var _ocGravou2=false;
+    try{ localStorage.setItem("bcs_db_oc",  JSON.stringify(_ocSemTexto)); _ocGravou2=true; }catch(e){ console.warn("[BCS] Quota OC",e); }
     try{ localStorage.setItem("bcs_db_at",  JSON.stringify(db.atendimentos||[])); }catch(e){ console.warn("[BCS] Quota AT",e); }
     try{ localStorage.setItem("bcs_db_vis", JSON.stringify(db.visitas||[])); }catch(e){ console.warn("[BCS] Quota VIS",e); }
     try{ localStorage.setItem("bcs_db_ag",  JSON.stringify(db.agendamentos||[])); }catch(e){ console.warn("[BCS] Quota AG",e); }
-    var light={ ocorrencias:_ocSemTexto };
-    try{ localStorage.setItem("bcs_db_light",JSON.stringify(light)); }catch(e){ console.warn("[BCS] Quota light",e); }
+    if(_ocGravou2){ try{ localStorage.removeItem("bcs_db_light"); }catch(e){} }
+    else { var light={ ocorrencias:_ocSemTexto }; try{ localStorage.setItem("bcs_db_light",JSON.stringify(light)); }catch(e){ console.warn("[BCS] Quota light",e); } }
     if(state.eventosAvulsos) localStorage.setItem("bcs_eventos_avulsos",JSON.stringify(state.eventosAvulsos));
     if(state.projetos) localStorage.setItem("bcs_projetos",JSON.stringify(state.projetos));
     if(state.rascunhos) localStorage.setItem("bcs_rascunhos",JSON.stringify(state.rascunhos));
@@ -898,6 +903,55 @@ function _salvarLocalSemSync(){
   }catch(e){ console.error("[BCS] _salvarLocalSemSync:",e); }
 }
 
+
+// ── Decisões sobre ocorrências (situação / arquivamento) ─────────────────
+// Guardadas numa chave PEQUENA e separada ("bcs_oc_decisoes"), gravada antes de
+// qualquer outra. Motivo: com o localStorage do aparelho cheio, a gravação da
+// lista inteira de ocorrências (bcs_db_oc) falhava em silêncio; ao recarregar,
+// a versão antiga voltava e, como no merge com o Sheets o local vence, a
+// ocorrência triada/arquivada reaparecia como "nova". As decisões são
+// reaplicadas ao abrir o app, após cada sync com o Sheets e têm prioridade
+// sobre o resumo de situações do Sheets quando são mais recentes que ele.
+function _ocDecisoesLer(){ try{ return JSON.parse(localStorage.getItem("bcs_oc_decisoes")||"{}")||{}; }catch(e){ return {}; } }
+function _ocDecisao(id, situacao, arquivada){
+  if(!id) return;
+  var m=_ocDecisoesLer();
+  m[String(id).trim()]={s:situacao||"", arq:!!arquivada, t:Date.now()};
+  var ks=Object.keys(m);
+  if(ks.length>4000){ ks.sort(function(a,b){return m[a].t-m[b].t;}).slice(0,ks.length-4000).forEach(function(k){ delete m[k]; }); }
+  var json=JSON.stringify(m);
+  try{ localStorage.setItem("bcs_oc_decisoes", json); }
+  catch(e){
+    // Sem espaço: descarta a cópia legada duplicada (bcs_db_light) e tenta de novo
+    try{ localStorage.removeItem("bcs_db_light"); localStorage.setItem("bcs_oc_decisoes", json); }
+    catch(e2){ console.warn("[BCS] Não foi possível guardar a decisão no aparelho",e2); }
+  }
+}
+function _ocAplicarDecisoes(){
+  var m=_ocDecisoesLer(), ids=Object.keys(m); if(!ids.length) return false;
+  var mudou=false;
+  if(!state.ocorrenciasArquivadas) state.ocorrenciasArquivadas=[];
+  var arqIds={}; state.ocorrenciasArquivadas.forEach(function(o){ if(o&&o.id) arqIds[String(o.id).trim()]=1; });
+  var manter=[];
+  (state.db.ocorrencias||[]).forEach(function(o){
+    var d=o&&o.id?m[String(o.id).trim()]:null;
+    if(d&&d.arq){
+      if(!arqIds[String(o.id).trim()]){ state.ocorrenciasArquivadas.push(Object.assign({},o,{situacao:d.s||"arquivada",arquivadaEm:new Date(d.t).toISOString()})); arqIds[String(o.id).trim()]=1; }
+      mudou=true; return;
+    }
+    if(d&&d.s&&o.situacao!==d.s){ o.situacao=d.s; mudou=true; }
+    manter.push(o);
+  });
+  if(mudou) state.db.ocorrencias=manter;
+  return mudou;
+}
+// "dd/MM/yyyy HH:mm:ss" (marca de tempo do Sheets) → ms; outros formatos via Date
+function _ocTsSheets(s){
+  var m=String(s||"").match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if(m) return new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+(m[6]||0)).getTime();
+  var t=Date.parse(s); return isNaN(t)?0:t;
+}
+
 // Sincroniza a SITUAÇÃO das ocorrências entre aparelhos.
 // Não existe (ainda) um pull completo de ocorrências do Sheets — cada
 // aparelho só empurra o que cria/edita localmente. Isso fazia mudanças de
@@ -915,12 +969,15 @@ async function _sincronizarSituacoesOc(){
     var ocsPorId = {};
     (state.db.ocorrencias||[]).forEach(function(o){ if(o.id) ocsPorId[String(o.id)]=o; });
     var mudou = false;
+    var _dec = _ocDecisoesLer();
     r.dados.forEach(function(rem){
       var loc = ocsPorId[rem.id];
       if(!loc) return; // registro só existe no Sheets — fora do escopo desta correção
       var tsVisto = vistos[rem.id];
       if(rem.dataLancamento && rem.dataLancamento!==tsVisto){
         vistos[rem.id] = rem.dataLancamento;
+        var _d = _dec[String(rem.id).trim()];
+        if(_d && _d.t >= _ocTsSheets(rem.dataLancamento)) return; // decisão deste aparelho é mais nova
         if(rem.situacao && rem.situacao!==loc.situacao){
           loc.situacao = rem.situacao;
           mudou = true;
@@ -1574,6 +1631,7 @@ async function carregarDoSheets() {
       });
     }
 
+    _ocAplicarDecisoes(); // triagens/arquivamentos feitos aqui não voltam como "nova"
     _arquivarOcsAntigas();
     salvarLocal();
     const n = state.db.ocorrencias.length;
@@ -1697,6 +1755,7 @@ let state = {
 
 // Inicializar arrays vazios se undefined
 if(!state.db.ocorrencias) state.db.ocorrencias = [];
+try{ _ocAplicarDecisoes(); }catch(e){ console.warn("[BCS] decisões:",e); }
 if(!state.db.atendimentos) state.db.atendimentos = [];
 if(!state.db.visitas) state.db.visitas = [];
 if(!state.db.agendamentos) state.db.agendamentos = [];
@@ -13617,6 +13676,7 @@ window._enviarTriagemHist = function(ocId, btn){
   oc.situacao = "nova";
   oc._autoArquivada = false;
   oc._reaberta = true; // permite entrar na fila mesmo antes do corte de data
+  _ocDecisao(ocId, "nova", false);
   salvarLocal();
   _sheetsGet({acao:"atualizarSituacaoOc", id:ocId, situacao:"nova"}).catch(function(){});
   showToast("✓ OC enviada para triagem");
@@ -15143,6 +15203,7 @@ window._salvarTriagem = function(ocId) {
   // Situação final
   var situacao = (document.getElementById("tri-situacao")||{value:"em_acompanhamento"}).value||"em_acompanhamento";
   oc.situacao = situacao;
+  _ocDecisao(ocId, situacao, false);
   if(situacao==="em_acompanhamento") garantirCasoAcompanhamento(oc);
   oc._triadoEm = new Date().toISOString();
 
@@ -15161,6 +15222,7 @@ function _triarOc(id, situacao) {
   var idx = (state.db.ocorrencias||[]).findIndex(function(o){ return o.id===id; });
   if(idx<0) return;
   state.db.ocorrencias[idx].situacao = situacao;
+  _ocDecisao(id, situacao, false);
   if(situacao==="em_acompanhamento") garantirCasoAcompanhamento(state.db.ocorrencias[idx]);
   salvarLocal();
   // Envia para o backend
@@ -15634,6 +15696,7 @@ function _mtRegistrarLigacao(o, atendeu, texto){
   }
 }
 function _mtSituacao(o, sit){
+  _ocDecisao(o.id, sit, false);
   if(o.situacao===sit) return;
   o.situacao=sit;
   if(!o._triadoEm) o._triadoEm=new Date().toISOString();
@@ -20678,7 +20741,9 @@ function encerrarOcorrencia(ocId, modalPai){
     // Arquiva também
     if(!state.ocorrenciasArquivadas) state.ocorrenciasArquivadas = [];
     if(oc) state.ocorrenciasArquivadas.push({...oc, arquivadaEm:new Date().toISOString(), motivoEncerramento:motivo});
+    _ocDecisao(ocId, "arquivada", true);
     salvarLocal();
+    _sheetsGet({acao:"atualizarSituacaoOc", id:ocId, situacao:"arquivada"}).catch(function(){});
     alert("Caso encerrado com sucesso!");
     modal.remove();
     if(modalPai) modalPai.remove();
@@ -21989,10 +22054,12 @@ function renderOcorrenciasGestor(el, perfil_atual){
           var oc = state.db.ocorrencias.find(function(x){return x.id===id;});
           if(oc){
             if(!state.ocorrenciasArquivadas) state.ocorrenciasArquivadas = [];
-            state.ocorrenciasArquivadas.push({...oc, arquivadaEm: new Date().toISOString()});
+            state.ocorrenciasArquivadas.push({...oc, situacao:"arquivada", arquivadaEm: new Date().toISOString()});
           }
+          _ocDecisao(id, "arquivada", true);
           state.db.ocorrencias = state.db.ocorrencias.filter(function(x){return x.id!==id;});
           salvarLocal();
+          _sheetsGet({acao:"atualizarSituacaoOc", id:id, situacao:"arquivada"}).catch(function(){});
           renderOcorrenciasGestor(el, state._ocPerfil);
         }
       } else if(act==="excluir"){
