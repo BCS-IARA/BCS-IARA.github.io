@@ -23837,13 +23837,22 @@ function _invAbrirConferencia2(conf, sincronizar){
       if(btnC){btnC.disabled=true;btnC.textContent="🔄 Carregando…";}
       _syncPromise.then(function(confAtual){
         mc.remove();
-        _invRenderConferencia(confAtual||_confRef);
+        _invRenderConferenciaSeguro(confAtual||_confRef);
       });
     } else {
       mc.remove();
-      _invRenderConferencia(_confRef);
+      _invRenderConferenciaSeguro(_confRef);
     }
   };
+}
+// Se a montagem da tela falhar, avisa o motivo em vez de voltar calado para a lista
+function _invRenderConferenciaSeguro(conf){
+  try{ _invRenderConferencia(conf); }
+  catch(e){
+    console.error("[INV] Falha ao abrir conferência:",e);
+    var m=document.getElementById("modal-inv-conf"); if(m) m.remove();
+    showToast("Erro ao abrir conferência: "+((e&&e.message)||e),"error");
+  }
 }
 function _invRenderConferencia(conf){
   // Normalizar conf.itens: pode chegar como string JSON quando vindo do Sheets
