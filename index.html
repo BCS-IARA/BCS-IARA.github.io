@@ -15351,7 +15351,8 @@ function _mtCasoHtml(o){
   var vd=_mtIsVD(o), me=_mtIsMenor(o), fr=_mtFrida(o.id);
   var h="<div class='mt-ccab'><button class='mt-voltar' data-mt-voltar>← Lista</button><h3>"+esc(o.tipo||"Ocorrência")+"</h3>";
   h+=(vd?"<span class='mt-selo vd'>VD</span>":"")+(me?"<span class='mt-selo me'>MENOR</span>":"");
-  h+="<span class='m'>"+esc(o.data||"—")+(o.hora?" "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+(o.numero?" · BO nº "+esc(String(o.numero)):"")+"</span></div>";
+  h+="<span class='m'>"+esc(o.data||"—")+(o.hora?" "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+(o.numero?" · BO nº "+esc(String(o.numero)):"")+"</span>";
+  h+="<button class='mt-btn sec' style='margin-left:auto;padding:6px 12px;font-size:12px' data-mt-pdf>📄 PDF do atendimento</button></div>";
   // Quem
   h+="<div class='mt-bl'><div class='mt-pes'>";
   h+="<div class='mt-p'><div class='mt-rot'>Vítima</div><div class='n'>"+esc(o.vitima_nome||"Não identificada")+"</div><div class='s'>"+[o.vitima_idade?o.vitima_idade+" anos":"",o.vitima_sexo||""].filter(Boolean).map(esc).join(" · ")+"</div>";
@@ -15468,6 +15469,94 @@ function _mtTempo(o){
   return t.sort(function(a,b){ return (b.d||"").localeCompare(a.d||""); });
 }
 
+
+// PDF consolidado do atendimento: dados do BO, FRIDA, ligações, encaminhamentos
+// (com devolutiva ou aguardando) e linha do tempo — mesmo padrão dos outros PDFs do app
+function _mtGerarPdf(ocId){
+  var o=_mtOc(ocId); if(!o){ showToast("Ocorrência não encontrada","error"); return; }
+  function E(v){ return esc(v==null||v===""?"—":String(v)); }
+  function dt(v){ var i=_mtIso(v); return i?i.split("-").reverse().join("/"):"—"; }
+  var SIT={nova:"Aguardando triagem",em_acompanhamento:"Em atendimento",encerrada:"Encerrado",historico:"Histórico",arquivada:"Arquivado"};
+  var frs=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id&&f.nivel;}).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var ligs=_mtLigacoesOc(o.id).slice().sort(function(a,b){return _mtIso(a.data_confirmacao||a.data).localeCompare(_mtIso(b.data_confirmacao||b.data));});
+  var encs=_mtEncsOc(o.id);
+  var nDev=encs.filter(function(e){return e.relato_devolutiva;}).length;
+  var brasao=new URL("brasao-pdf.jpg", location.href).href;
+  var agora=new Date().toLocaleString("pt-BR");
+  var h="<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Atendimento — "+E(o.vitima_nome)+"</title><style>";
+  h+="*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;padding:16mm 18mm}";
+  h+=".cab{display:flex;align-items:center;gap:14px;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:14px}.cab img{width:58px;height:auto}";
+  h+=".cab h1{font-size:14px;margin-bottom:2px}.cab p{font-size:11px;color:#444}";
+  h+="h2{font-size:15px;margin:4px 0 2px}.sub{font-size:11px;color:#555;margin-bottom:10px}";
+  h+=".sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#333;border-bottom:1px solid #bbb;padding-bottom:3px;margin:16px 0 8px}";
+  h+=".grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 16px}.c label{display:block;font-size:9px;font-weight:700;text-transform:uppercase;color:#777}.c span{font-size:12px}";
+  h+=".txt{font-size:12px;line-height:1.55;white-space:pre-wrap}";
+  h+="table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ccc;padding:5px 6px;text-align:left;vertical-align:top}th{background:#f1f1f1;font-size:10px;text-transform:uppercase}";
+  h+=".ok{color:#2e6b2e;font-weight:700}.pend{color:#a8492e;font-weight:700}";
+  h+=".resumo{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}.resumo div{border:1px solid #ccc;border-radius:4px;padding:6px 10px;font-size:11px}.resumo b{font-size:14px;display:block}";
+  h+=".ass{margin-top:40px;display:flex;justify-content:space-around;text-align:center;font-size:11px}.ass div{border-top:1px solid #333;padding-top:4px;width:40%}";
+  h+=".rod{margin-top:18px;font-size:9px;color:#777;text-align:center}";
+  h+="@media print{body{padding:10mm 12mm}.nao-imp{display:none}}</style></head><body>";
+  h+="<div class='cab'><img src='"+brasao+"' onerror=\"this.style.display='none'\"><div><h1>POLÍCIA MILITAR DA BAHIA — 77ª CIPM</h1><p>Base Comunitária de Segurança · Relatório Consolidado de Atendimento</p></div></div>";
+  h+="<h2>"+E(o.tipo)+"</h2><div class='sub'>BO nº "+E(o.numero)+" · "+dt(o.data)+(o.hora?" "+E(o.hora):"")+" · "+E(o.bairro)+" · Situação: <b>"+E(SIT[o.situacao]||o.situacao)+"</b></div>";
+  h+="<div class='resumo'><div><b>"+ligs.filter(function(a){return a.status!=="Agendado";}).length+"</b>ligações feitas</div><div><b>"+encs.length+"</b>encaminhamentos</div><div><b>"+nDev+" de "+encs.length+"</b>devolutivas recebidas</div>"+(frs.length?"<div><b>"+({B:"Baixo",M:"Médio",E:"Elevado"}[frs[frs.length-1].nivel]||frs[frs.length-1].nivel)+"</b>risco FRIDA</div>":"")+"</div>";
+  // Vítima / autor
+  h+="<div class='sec'>Vítima</div><div class='grid'>";
+  [["Nome",o.vitima_nome],["Idade",o.vitima_idade],["Sexo",o.vitima_sexo],["Telefone",o.vitima_telefone],["Endereço",o.vitima_endereco||o.local],["Bairro",o.bairro]].forEach(function(c){ h+="<div class='c'><label>"+c[0]+"</label><span>"+E(c[1])+"</span></div>"; });
+  h+="</div><div class='sec'>Autor</div><div class='grid'>";
+  [["Nome",o.suspeito_nome||"Não identificado"],["Idade",o.suspeito_idade],["Endereço",o.suspeito_endereco]].forEach(function(c){ h+="<div class='c'><label>"+c[0]+"</label><span>"+E(c[1])+"</span></div>"; });
+  h+="</div>";
+  // Fato
+  var rel=o.descricao_dinamica||o.texto_original||o.descricao||"";
+  h+="<div class='sec'>O que aconteceu (BO)</div><p class='txt'>"+E(rel)+"</p>";
+  if(o.medidas) h+="<div class='sec'>Medidas adotadas no BO</div><p class='txt'>"+E(o.medidas)+"</p>";
+  // FRIDA
+  if(frs.length){
+    h+="<div class='sec'>Avaliação de risco (FRIDA)</div><table><tr><th>Data</th><th>Nível</th><th>Respostas \"sim\"</th></tr>";
+    frs.forEach(function(f){ h+="<tr><td>"+dt(f.data)+"</td><td>"+E({B:"Baixo",M:"Médio",E:"Elevado"}[f.nivel]||f.nivel)+"</td><td>"+E(f.sim!=null?f.sim:"")+"</td></tr>"; });
+    h+="</table>";
+  }
+  // Ligações
+  h+="<div class='sec'>Contatos telefônicos</div>";
+  if(!ligs.length) h+="<p class='txt'>Nenhum contato telefônico registrado.</p>";
+  else {
+    h+="<table><tr><th style='width:70px'>Data</th><th style='width:120px'>Resultado</th><th>O que foi conversado</th></tr>";
+    ligs.forEach(function(a){
+      var r=a.status==="Realizado"?"<span class='ok'>Atendeu</span>":a.status==="NaoRealizado"?"<span class='pend'>Não atendeu</span>":"Retorno marcado";
+      h+="<tr><td>"+dt(a.status==="Agendado"?a.data:(a.data_confirmacao||a.data))+"</td><td>"+r+"</td><td class='txt'>"+E(a.resultado||(a.status==="Agendado"?"Ligação prevista para "+dt(a.data):""))+"</td></tr>";
+    });
+    h+="</table>";
+  }
+  if(o.resumo_atendimento) h+="<div class='sec'>Resumo do atendimento</div><p class='txt'>"+E(o.resumo_atendimento)+"</p>";
+  // Encaminhamentos e devolutivas
+  h+="<div class='sec'>Encaminhamentos e devolutivas</div>";
+  if(!encs.length) h+="<p class='txt'>Nenhum encaminhamento.</p>";
+  else {
+    h+="<table><tr><th>Órgão</th><th style='width:66px'>Enviado</th><th style='width:66px'>Prazo</th><th>Cobranças</th><th>Devolutiva</th></tr>";
+    encs.forEach(function(e){
+      var cob=Array.isArray(e.cobrancas)&&e.cobrancas.length?e.cobrancas.map(dt).join(", "):"—";
+      var dev;
+      if(e.relato_devolutiva) dev="<span class='ok'>Recebida em "+dt(e.data_devolutiva)+"</span><br><span class='txt'>"+E(e.relato_devolutiva)+"</span>"+(e.responsavel_devolutiva?"<br><i>Resp.: "+E(e.responsavel_devolutiva)+"</i>":"");
+      else if(e.status==="cancelado") dev="Cancelado";
+      else { var p=_mtPrazo(e); dev="<span class='pend'>Aguardando"+(p&&p<hoje()?" — prazo vencido":"")+"</span>"; }
+      h+="<tr><td><b>"+E(e.orgao||e.tipo)+"</b>"+(e.descricao?"<br><span class='txt'>"+E(e.descricao)+"</span>":"")+"</td><td>"+dt(e.data_envio||e.data)+"</td><td>"+dt(_mtPrazo(e))+"</td><td>"+cob+"</td><td>"+dev+"</td></tr>";
+    });
+    h+="</table>";
+  }
+  if(o.observacoes_triagem) h+="<div class='sec'>Observações</div><p class='txt'>"+E(o.observacoes_triagem)+"</p>";
+  // Linha do tempo
+  h+="<div class='sec'>Linha do tempo</div><table><tr><th style='width:70px'>Data</th><th>Passo</th><th>Detalhe</th></tr>";
+  _mtTempo(o).slice().reverse().forEach(function(t){ h+="<tr><td>"+dt(t.d)+"</td><td>"+E(t.t)+"</td><td class='txt'>"+esc(t.s||"")+"</td></tr>"; });
+  h+="</table>";
+  h+="<div class='ass'><div>Responsável pelo atendimento</div><div>Comandante da Base</div></div>";
+  h+="<div class='rod'>Documento gerado pelo IARA em "+agora+" · uso restrito — contém dados pessoais sensíveis</div>";
+  h+="<div class='nao-imp' style='text-align:center;margin-top:20px'><button onclick='window.print()' style='background:#1B3A6B;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:13px;cursor:pointer'>🖨 Imprimir / Salvar PDF</button></div>";
+  h+="</body></html>";
+  var w=window.open("","_blank","width=900,height=950");
+  if(!w){ showToast("Libere pop-ups para gerar o PDF","error"); return; }
+  w.document.write(h); w.document.close();
+}
+
 // ── Gravação ───────────────────────────────────────────────
 function _mtNovaLigacao(o, status, data, texto){
   if(!state.db.agendamentos) state.db.agendamentos=[];
@@ -15581,6 +15670,7 @@ document.addEventListener("click",function(ev){
   if(d.mtCaso){ M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
   if("mtVoltar" in d){ M.sel=null; M.painel=null; _mtRender(); return; }
   if(!o) return;
+  if("mtPdf" in d){ _mtGerarPdf(o.id); return; }
   if("mtRelato" in d){ M.relatoTodo=!M.relatoTodo; _mtRender(); return; }
   if("mtFrida" in d){
     abrirMonitorVCM(o.id);
