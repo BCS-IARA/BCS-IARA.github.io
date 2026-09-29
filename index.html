@@ -23814,16 +23814,20 @@ function _invAbrirConferencia2(conf, sincronizar){
     var pol=polOpts.find(function(p){return String(p.matricula)===String(mat);});
     if(!pol){showToast("Selecione o conferente","error");return;}
     window._invConferenteAtual={nome:pol.nome,matricula:String(pol.matricula),posto:pol.posto||""};
+    // Abre a tela na hora com os dados locais — não trava esperando o Sheets responder.
+    // O _sheetsGet tem timeout de 20s e só trata onerror; uma resposta que "carrega" mas
+    // não chama o callback (ex: deploy do Apps Script expirado/HTML de erro) ficava
+    // pendurada e a tela nunca abria, sem nenhum aviso pro usuário.
+    mc.remove();
+    _invRenderConferencia(_confRef);
     if(_syncPromise){
-      var btnC=document.getElementById("btn-conf-conferente");
-      if(btnC){btnC.disabled=true;btnC.textContent="🔄 Carregando…";}
       _syncPromise.then(function(confAtual){
-        mc.remove();
-        _invRenderConferencia(confAtual||_confRef);
+        // Só reabre com dados novos se a tela ainda estiver aberta nesta mesma conferência
+        var m=document.getElementById("modal-inv-conf");
+        if(!m||!confAtual||confAtual===_confRef) return;
+        m.remove();
+        _invRenderConferencia(confAtual);
       });
-    } else {
-      mc.remove();
-      _invRenderConferencia(_confRef);
     }
   };
 }

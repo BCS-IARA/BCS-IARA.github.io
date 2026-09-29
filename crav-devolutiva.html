@@ -188,23 +188,95 @@ var ORGAOS = {
     ],
     funcoes: ["Delegado(a)","Investigador(a)","Escrivão(ã)","Agente","Outro"]
   },
-  dean: {
-    nome:  "DEAN",
-    label: "Delegacia Especializada no Atendimento ao Menor",
-    ico:   "🧒",
-    cor:   "#b45309",
-    borda: "#fcd34d",
-    bg:    "#1a1000",
-    bgCard:"#2a1800",
-    texto: "#fef9c3",
-    label_cor:"#fcd34d",
-    titulo_cor:"#f59e0b",
+  deam: {
+    nome:  "DEAM",
+    label: "Delegacia Especializada de Atendimento à Mulher",
+    ico:   "👩‍⚖️",
+    cor:   "#be123c",
+    borda: "#fda4af",
+    bg:    "#1a0508",
+    bgCard:"#2a0a10",
+    texto: "#ffe4e6",
+    label_cor:"#fda4af",
+    titulo_cor:"#fb7185",
     tipos: [
-      "📋 Registro de BO","👦 Atendimento ao menor","📚 Encaminhamento à escola",
-      "🏛 Medida socioeducativa","🏠 Acolhimento institucional","⚖️ Encaminhamento ao MP",
-      "🎙 Oitiva do menor","🔍 Encaminhamento ao CT","🧠 Atendimento psicossocial"
+      "📋 Registro de BO","🔍 Instauração de inquérito","🛡 Medida protetiva solicitada",
+      "🎙 Oitiva da vítima","🎙 Oitiva do autor","🔬 Perícia realizada",
+      "📁 Indiciamento","⚖️ Encaminhamento ao MP","🏠 Acolhimento institucional"
     ],
-    funcoes: ["Delegado(a)","Investigador(a)","Escrivão(ã)","Assistente Social","Outro"]
+    funcoes: ["Delegada(o)","Investigador(a)","Escrivão(ã)","Assistente Social","Outro"]
+  },
+  cras: {
+    nome:  "CRAS",
+    label: "Centro de Referência de Assistência Social",
+    ico:   "🏠",
+    cor:   "#0d9488",
+    borda: "#5eead4",
+    bg:    "#001a17",
+    bgCard:"#00251f",
+    texto: "#ccfbf1",
+    label_cor:"#5eead4",
+    titulo_cor:"#2dd4bf",
+    tipos: [
+      "🤝 Acompanhamento familiar","📋 Cadastro / atualização CadÚnico","🏠 Visita domiciliar",
+      "🍲 Encaminhamento a benefício social","👨‍👩‍👧 Orientação socioassistencial",
+      "🔍 Encaminhamento ao CREAS","📚 Encaminhamento a curso / oficina","⚠️ Situação de vulnerabilidade identificada"
+    ],
+    funcoes: ["Assistente Social","Psicólogo(a)","Coordenador(a)","Educador(a) Social","Outro"]
+  },
+  creas: {
+    nome:  "CREAS",
+    label: "Centro de Referência Especializado de Assistência Social",
+    ico:   "🛡",
+    cor:   "#c2410c",
+    borda: "#fdba74",
+    bg:    "#1a0d00",
+    bgCard:"#2a1600",
+    texto: "#ffedd5",
+    label_cor:"#fdba74",
+    titulo_cor:"#fb923c",
+    tipos: [
+      "🛡 Atendimento PAEFI","🏠 Visita domiciliar","⚖️ Encaminhamento jurídico",
+      "🧠 Atendimento psicológico","👨‍👩‍👧 Acompanhamento familiar","🏛 Encaminhamento ao MP",
+      "📚 Encaminhamento a curso / oficina","🔒 Acompanhamento de medida protetiva"
+    ],
+    funcoes: ["Assistente Social","Psicólogo(a)","Advogado(a)","Coordenador(a)","Outro"]
+  },
+  ubs: {
+    nome:  "UBS",
+    label: "Unidade Básica de Saúde",
+    ico:   "🩺",
+    cor:   "#0891b2",
+    borda: "#67e8f9",
+    bg:    "#001318",
+    bgCard:"#001e26",
+    texto: "#cffafe",
+    label_cor:"#67e8f9",
+    titulo_cor:"#22d3ee",
+    tipos: [
+      "🩺 Consulta médica","💊 Acompanhamento de tratamento","🧠 Encaminhamento saúde mental / CAPS",
+      "🏠 Visita domiciliar (ACS)","🤰 Acompanhamento pré-natal","💉 Vacinação",
+      "📋 Atualização de prontuário"
+    ],
+    funcoes: ["Médico(a)","Enfermeiro(a)","Agente Comunitário de Saúde","Psicólogo(a)","Coordenador(a)","Outro"]
+  },
+  escola: {
+    nome:  "Escola",
+    label: "Unidade Escolar",
+    ico:   "🏫",
+    cor:   "#4338ca",
+    borda: "#a5b4fc",
+    bg:    "#0a0a1a",
+    bgCard:"#12122a",
+    texto: "#e0e7ff",
+    label_cor:"#a5b4fc",
+    titulo_cor:"#818cf8",
+    tipos: [
+      "📚 Acompanhamento pedagógico","👨‍👩‍👧 Reunião com responsáveis","🚸 Verificação de frequência",
+      "🧠 Encaminhamento psicopedagógico","⚠️ Notificação de risco / violência",
+      "🏛 Encaminhamento ao Conselho Tutelar","📋 Registro em ficha escolar"
+    ],
+    funcoes: ["Diretor(a)","Coordenador(a) Pedagógico(a)","Professor(a)","Orientador(a) Educacional","Outro"]
   },
   outros: {
     nome:  "Outro Órgão",
@@ -225,6 +297,14 @@ var ORGAOS = {
     funcoes: ["Assistente Social","Psicólogo(a)","Advogado(a)","Agente","Coordenador(a)","Outro"]
   }
 };
+
+// Apelidos — variações de escrita que podem chegar de links antigos, texto
+// livre, ou nomes com espaço/pontuação que a normalização abaixo não bate.
+ORGAOS.dean            = ORGAOS.deam; // chave antiga (erro de digitação), mantém link já gerado funcionando
+ORGAOS.constutelar     = ORGAOS.conselho_tutelar; // "Cons. Tutelar" → cons+tutelar
+ORGAOS.conselhotutelar = ORGAOS.conselho_tutelar;
+ORGAOS.ct              = ORGAOS.conselho_tutelar;
+ORGAOS.delegaciadamulher = ORGAOS.deam;
 
 // ── Lê URL params ──────────────────────────────────────
 var params  = new URLSearchParams(location.search);
@@ -392,6 +472,6 @@ function mostrarStatus(ok, msg){
   el.scrollIntoView({behavior:"smooth", block:"center"});
 }
 </script>
-<div id="_ver" style="text-align:center;padding:8px;font-size:9px;color:#555;opacity:.4">v74</div>
+<div id="_ver" style="text-align:center;padding:8px;font-size:9px;color:#555;opacity:.4">v75 — +CRAS/CREAS/UBS/Escola, DEAM corrigido</div>
 </body>
 </html>
