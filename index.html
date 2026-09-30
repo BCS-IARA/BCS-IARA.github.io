@@ -14555,6 +14555,15 @@ function _nomeEncLimpo(e){
   return nome||"—";
 }
 
+// Nome do órgão → código esperado pelo crav-devolutiva.html (crav, conselho_tutelar, delegacia, dean, outros)
+function _orgaoSlugDev(nome){
+  var n=String(nome||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if(n.indexOf("crav")>=0) return "crav";
+  if(n.indexOf("conselho")>=0 && n.indexOf("tutelar")>=0) return "conselho_tutelar";
+  if(n.indexOf("deam")>=0 || n.indexOf("dean")>=0 || n.indexOf("delegacia da mulher")>=0) return "dean";
+  if(n.indexOf("delegacia")>=0) return "delegacia";
+  return "outros";
+}
 window._gerarPdfEncaminhamento = function(encId) {
   var e = (state.encaminhamentos||[]).find(function(x){ return x.id===encId; });
   if(!e){ showToast("Encaminhamento não encontrado","error"); return; }
@@ -14563,7 +14572,8 @@ window._gerarPdfEncaminhamento = function(encId) {
   // Constrói/recupera token e link do CRAV
   if(!e.token) e.token = "enc_"+e.id+"_"+Date.now();
   var _base = window.location.origin + window.location.pathname.replace("index.html","");
-  var _link = _base + "crav-devolutiva.html?enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"")+"&servico="+encodeURIComponent(e.orgao||"crav")+"&nome="+encodeURIComponent(nomeVit)+"&token="+e.token;
+  var _slug = _orgaoSlugDev(e.orgao||e.tipo);
+  var _link = _base + "crav-devolutiva.html?enc="+encodeURIComponent(e.id)+"&orgao="+_slug+"&servico="+_slug+"&nome="+encodeURIComponent(nomeVit)+"&token="+e.token;
   var _qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&ecc=M&data="+encodeURIComponent(_link);
   // Data formatada
   var _dtEnv = e.data_envio||e.data||"";
@@ -14577,8 +14587,8 @@ window._gerarPdfEncaminhamento = function(encId) {
   var _unidade = "77ª CIPM — BCS / Barreiras-BA";
   var _dataHoje = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   // OC vinculada
-  var oc = e.ocorrencia_id ? (state.db.ocorrencias||[]).find(function(o){ return o.id===e.ocorrencia_id; }) : null;
-  var _boNum = oc ? (oc.numero_bo||oc.num_bo||oc.bo||oc.id||"") : "";
+  var oc = e.ocorrencia_id ? ((typeof _mtOc==="function"?_mtOc(e.ocorrencia_id):null) || (state.db.ocorrencias||[]).find(function(o){ return o.id===e.ocorrencia_id; })) : null;
+  var _boNum = oc ? (oc.numero_bo||oc.num_bo||oc.bo||oc.numero||oc.id||"") : "";
   var _boData = oc ? (oc.data||"") : "";
   var _boDataFmt = (function(d){
     if(!d) return "";
@@ -15549,7 +15559,7 @@ function _renderMesaTriagem(main){
   var M=state._mt;
   var P=[{k:"novo",r:"Novos",d:"para triar"},{k:"ligar",r:"Ligar hoje",d:"retornos marcados até hoje"},{k:"cobrar",r:"Cobrar",d:"devolutiva com prazo vencido"}];
   var lista=_mtPilha(M.pilha);
-  if(M.sel && !M.busca && !lista.some(function(o){return o.id===M.sel;}) && !M.manter) M.sel=null;
+  if(M.sel && !M.busca && M.sel!==M.fixo && !lista.some(function(o){return o.id===M.sel;}) && !M.manter) M.sel=null;
   var h="<div id='mt-root'>";
   h+="<div class='mt-cab'><h2>Minha Mesa</h2><span class='mt-teste'>🧪 em teste · grava nos mesmos dados do app</span>";
   var _at=_mtAtendente();
@@ -15645,6 +15655,8 @@ function _mtCasoHtml(o){
     });
     h+="</div>";
   }
+  // Encaminhamentos deste caso: ofício com QR e marcar como enviado
+  if(M.pilha!=="cobrar" && !_mtArquivada(o)) h+=_mtEncsHtml(o);
   // Última conversa + combinado para esta ligação
   h+=_mtUltimaHtml(o);
   // Decisão
@@ -15661,7 +15673,7 @@ function _mtCasoHtml(o){
         h+="<textarea id='mt-volta' placeholder='O que o órgão respondeu? Ex.: vítima compareceu e iniciou acompanhamento.'>"+esc(M.rasc.volta||"")+"</textarea>";
         h+="<div class='mt-row'><button class='mt-btn ok' data-mt-volta-ok='"+esc(e.id)+"'>Registrar devolutiva</button><button class='mt-btn sec' data-mt-volta-ok='"+esc(e.id)+"' data-mt-encerra='1'>Registrar e encerrar caso</button></div>";
       } else {
-        h+="<div class='mt-row'><button class='mt-btn ok' data-mt-volta='"+esc(e.id)+"'>Devolutiva chegou</button><button class='mt-btn sec' data-mt-cobrei='"+esc(e.id)+"'>Cobrei hoje (+7 dias)</button></div>";
+        h+="<div class='mt-row'><button class='mt-btn ok' data-mt-volta='"+esc(e.id)+"'>Devolutiva chegou</button><button class='mt-btn sec' data-mt-cobrei='"+esc(e.id)+"'>Cobrei hoje (+7 dias)</button><button class='mt-btn sec' data-mt-oficio='"+esc(e.id)+"'>📄 Ofício com QR</button></div>";
       }
       h+="</div>";
     });
@@ -15684,6 +15696,22 @@ function _mtCasoHtml(o){
   return h;
 }
 
+function _mtEncEnviado(e){ return !!(e.enviado_em || (e.status && e.status!=="pendente" && e.status!=="a_encaminhar")); }
+function _mtEncsHtml(o){
+  var encs=_mtEncsOc(o.id); if(!encs.length) return "";
+  var h="<div class='mt-bl'><div class='mt-rot'>📤 Encaminhamentos deste caso</div><div style='display:flex;flex-direction:column;gap:8px;margin-top:6px'>";
+  encs.forEach(function(e){
+    var env=_mtEncEnviado(e), dev=!!e.relato_devolutiva;
+    var st= dev ? "<b style='color:var(--verde-2)'>✅ devolutiva recebida</b>"
+          : env ? "<b style='color:var(--ambar-2)'>📨 enviado"+(e.enviado_em?" em "+_mtBr(_mtIso(e.enviado_em)):"")+(e.enviado_por?" por "+esc(e.enviado_por):"")+" · aguardando devolutiva até "+_mtBr(_mtPrazo(e))+"</b>"
+          : "<b style='color:var(--verm-2)'>⏳ a enviar</b>";
+    h+="<div class='mt-enc'><div><b>"+esc(e.orgao||e.tipo||"?")+"</b> · "+st+"</div><div class='mt-row'>";
+    h+="<button class='mt-btn "+(env?"sec":"ok")+"' data-mt-oficio='"+esc(e.id)+"'>📄 Ofício com QR (PDF)</button>";
+    if(!env && !dev) h+="<button class='mt-btn sec' data-mt-enviado='"+esc(e.id)+"'>✅ Marcar como enviado</button>";
+    h+="</div></div>";
+  });
+  return h+"</div><p class='mt-dica' style='margin-top:6px'>Baixe o ofício, envie por e-mail ao órgão e marque como enviado. O QR/link do ofício abre o formulário de devolutiva — a resposta chega no 🔔.</p></div>";
+}
 function _mtUltimaHtml(o){
   var cont=_mtContatos(o.id), pend=_mtLigarPendente(o.id);
   if(!cont.length && !(pend&&pend.recado)) return "";
@@ -15863,7 +15891,7 @@ function _mtGerarPdf(ocId){
       if(e.relato_devolutiva) dev="<span class='ok'>Recebida em "+dt(e.data_devolutiva)+"</span><br><span class='txt'>"+E(e.relato_devolutiva)+"</span>"+(e.responsavel_devolutiva?"<br><i>Resp.: "+E(e.responsavel_devolutiva)+"</i>":"");
       else if(e.status==="cancelado") dev="Cancelado";
       else { var p=_mtPrazo(e); dev="<span class='pend'>Aguardando"+(p&&p<hoje()?" — prazo vencido":"")+"</span>"; }
-      h+="<tr><td><b>"+E(e.orgao||e.tipo)+"</b>"+(e.descricao?"<br><span class='txt'>"+E(e.descricao)+"</span>":"")+"</td><td>"+dt(e.data_envio||e.data)+"</td><td>"+dt(_mtPrazo(e))+"</td><td>"+cob+"</td><td>"+dev+"</td></tr>";
+      h+="<tr><td><b>"+E(e.orgao||e.tipo)+"</b>"+(e.enviado_por?"<br><i>enviado por "+E(e.enviado_por)+"</i>":"")+(e.descricao?"<br><span class='txt'>"+E(e.descricao)+"</span>":"")+"</td><td>"+dt(e.data_envio||e.data)+"</td><td>"+dt(_mtPrazo(e))+"</td><td>"+cob+"</td><td>"+dev+"</td></tr>";
     });
     h+="</table>";
   }
@@ -15964,12 +15992,16 @@ function _mtConcluir(o, tipo){
       var enc={id:"enc_"+Date.now()+"_"+Math.random().toString(36).slice(2,6), vitima_id:o.vitima_id||"",
         vitima_nome:o.vitima_nome||o.nome_vitima||"", ocorrencia_id:o.id, tipo:g, orgao:g,
         descricao:conversa, data:hoje(), status:"pendente", data_envio:hoje(), prazo:prazo,
-        criadoEm:new Date().toISOString(), origem:"Minha Mesa", responsavel:_mtAtendente()};
+        criadoEm:new Date().toISOString(), origem:"Minha Mesa", responsavel:_mtAtendente(), prazo_dias:(r.prazo||15)};
       state.encaminhamentos.push(enc);
       _sheetsGet({acao:"salvar", tipo:"encaminhamento", dados:JSON.stringify(enc)}).catch(function(){});
     });
     if(r.orgaos.indexOf("Conselho Tutelar")>=0) o.menor_envolvido=o.menor_envolvido||_mtIsMenor(o);
     _mtSituacao(o,"em_acompanhamento"); msg="Encaminhado a "+r.orgaos.join(", ");
+    _mtSalvarTudo(o); M.feitos++;
+    M.painel=null; M.rasc={}; M.fixo=o.id; M.sel=o.id; _mtRender();
+    showToast(msg+" · agora gere o ofício com QR e marque como enviado");
+    return;
   }
   if(tipo==="registrar"){
     o.observacoes_triagem=r.motivo; _mtCancelarPendentes(o); _mtSituacao(o,"encerrada"); msg="Caso registrado e encerrado";
@@ -16046,8 +16078,8 @@ document.addEventListener("click",function(ev){
     try{ navigator.clipboard.writeText(_t).then(function(){ showToast("Número copiado: "+_t); },function(){ showToast("Número: "+_t); }); }catch(x){ showToast("Número: "+_t); }
     return;
   }
-  if(d.mtPilha){ M.busca=""; M.pilha=d.mtPilha; M.sel=null; M.painel=null; M.rasc={}; _mtRender(); return; }
-  if(d.mtCaso){ M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
+  if(d.mtPilha){ M.fixo=null; M.busca=""; M.pilha=d.mtPilha; M.sel=null; M.painel=null; M.rasc={}; _mtRender(); return; }
+  if(d.mtCaso){ M.fixo=null; M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
   if("mtVoltar" in d){ M.sel=null; M.painel=null; _mtRender(); return; }
   if(!o) return;
   if("mtPdf" in d){ _mtGerarPdf(o.id); return; }
@@ -16066,6 +16098,17 @@ document.addEventListener("click",function(ev){
   if(d.mtDatalig){ M.rasc.dataLig=d.mtDatalig; _mtRender(); return; }
   if(d.mtMotivo){ M.rasc.motivo=d.mtMotivo; _mtRender(); return; }
   if(d.mtFim){ _mtConcluir(o, d.mtFim); return; }
+  if(d.mtOficio){ try{ _gerarPdfEncaminhamento(d.mtOficio); }catch(err){ showToast("Não abriu o ofício — libere pop-ups para o IARA","error"); } return; }
+  if(d.mtEnviado){
+    if(!_mtAtendente()){ showToast("Informe o seu nome em “Atendente”, no topo da Mesa","error"); return; }
+    var en=(state.encaminhamentos||[]).find(function(x){return x.id===d.mtEnviado;}); if(!en) return;
+    en.status="aguardando_devolutiva"; en.enviado_em=new Date().toISOString(); en.enviado_por=_mtAtendente();
+    en.data_envio=hoje(); en.prazo=_mtDia(+en.prazo_dias||15);
+    try{ localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos)); }catch(x){}
+    salvarLocal();
+    _sheetsGet({acao:"atualizarEncaminhamento", id:en.id, campos:JSON.stringify({status:en.status, data_envio:en.data_envio, prazo:en.prazo})}).catch(function(){});
+    _mtRender(); showToast("✓ "+(en.orgao||"Encaminhamento")+" marcado como enviado · devolutiva até "+_mtBr(en.prazo)); return;
+  }
   if(d.mtDevlida){ _sinoMarcarLida(d.mtDevlida); _mtRender(); return; }
   if(d.mtCumprido){ M.rasc.cumprido=d.mtCumprido; _mtRender(); return; }
   if("mtSemcontato" in d){ M.painel="registrar"; M.rasc={motivo:"Sem contato possível"}; _mtRender(); return; }
@@ -25920,7 +25963,8 @@ function renderDevolutivas(main){
     e.data_envio = new Date().toISOString().slice(0,10);
     e.status = "aguardando_devolutiva";
     localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos));
-    var _link=window.location.origin+window.location.pathname.replace("index.html","")+"crav-devolutiva.html?enc="+encodeURIComponent(e.id)+"&orgao="+encodeURIComponent(e.orgao||"")+"&servico="+encodeURIComponent(e.orgao||"crav")+"&nome="+encodeURIComponent(_nomeEncLimpo(e))+"&token="+e.token;
+    var _slugRe=_orgaoSlugDev(e.orgao||e.tipo);
+    var _link=window.location.origin+window.location.pathname.replace("index.html","")+"crav-devolutiva.html?enc="+encodeURIComponent(e.id)+"&orgao="+_slugRe+"&servico="+_slugRe+"&nome="+encodeURIComponent(_nomeEncLimpo(e))+"&token="+e.token;
     navigator.clipboard.writeText(_link).then(function(){showToast("Novo link gerado e copiado!","success");}).catch(function(){});
     renderDevolutivas(main);
   };
