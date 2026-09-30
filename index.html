@@ -915,6 +915,14 @@ function _salvarLocalSemSync(){
 function _ocDecisoesLer(){ try{ return JSON.parse(localStorage.getItem("bcs_oc_decisoes")||"{}")||{}; }catch(e){ return {}; } }
 function _ocDecisao(id, situacao, arquivada){
   if(!id) return;
+  if(arquivada || situacao==="encerrada" || situacao==="arquivada"){
+    (state.db.agendamentos||[]).forEach(function(a){
+      if(a && a.tipo==="Atendimento Telefônico" && a.status==="Agendado" && String(a.ocorrenciaId||"")===String(id)){
+        a.status="Cancelado"; a.data_confirmacao=new Date().toISOString();
+        try{ enviarSheets("agendamentos", a); }catch(e){}
+      }
+    });
+  }
   var m=_ocDecisoesLer();
   m[String(id).trim()]={s:situacao||"", arq:!!arquivada, t:Date.now()};
   var ks=Object.keys(m);
@@ -15274,6 +15282,8 @@ function _mtOc(id){
 // Telefones da vítima: BO, ficha da vítima (state.vitimas) e lista vitimas[] — sem repetir
 function _mtTelefones(o){
   var t=[o.vitima_telefone];
+  // SIGESPOL às vezes traz o telefone dentro do nome: "MARCIA ... (77) 998569451 (37)"
+  String(o.vitima_nome||"").replace(/\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}/g,function(m){ t.push(m); return m; });
   var v=o.vitima_id?(state.vitimas||[]).find(function(x){return x.id===o.vitima_id;}):null;
   if(v) t.push(v.telefone, v.telefone2, v.celular);
   (Array.isArray(o.vitimas)?o.vitimas:[]).forEach(function(x){ if(x) t.push(x.telefone); });
@@ -15288,6 +15298,12 @@ function _mtTelBarra(o){
     var dig=t.replace(/\D/g,"");
     return "<div class='mt-telitem'><a class='mt-telnum' href='tel:"+esc(dig)+"'>📞 "+esc(t)+"</a><button class='mt-btn sec mt-telcp' data-mt-copiar='"+esc(t)+"'>Copiar</button></div>";
   }).join("")+"</div>";
+}
+// Caso fechado (arquivado ou encerrado) não volta para "Ligar hoje" nem "Cobrar"
+function _mtFechado(o){
+  if(_mtArquivada(o) || o.situacao==="encerrada" || o.situacao==="arquivada") return true;
+  var d=(typeof _ocDecisoesLer==="function")?_ocDecisoesLer()[String(o.id).trim()]:null;
+  return !!(d && (d.arq || d.s==="encerrada" || d.s==="arquivada"));
 }
 function _mtArquivada(o){ return !(state.db.ocorrencias||[]).some(function(x){ return x.id===o.id; }); }
 // Busca em todas as ocorrências (ativas + arquivadas): nome da vítima/autor, BO, telefone, bairro, tipo
@@ -15347,14 +15363,14 @@ function _mtPilha(k){
     (state.db.agendamentos||[]).forEach(function(a){
       var ad=_mtIso(a.data);
       if(a.tipo!==_MT_TEL || a.status!=="Agendado" || !ad || ad>hoje()) return;
-      var o=_mtOc(a.ocorrenciaId); if(!o || vistos[o.id]) return;
+      var o=_mtOc(a.ocorrenciaId); if(!o || vistos[o.id] || _mtFechado(o)) return;
       vistos[o.id]=1; lista.push(o);
     });
   } else if(k==="cobrar"){
     var vistos2={};
     (state.encaminhamentos||[]).forEach(function(e){
       if(!_mtEncAtrasado(e)) return;
-      var o=_mtOc(e.ocorrencia_id||e.ocorrenciaId); if(!o || vistos2[o.id]) return;
+      var o=_mtOc(e.ocorrencia_id||e.ocorrenciaId); if(!o || vistos2[o.id] || _mtFechado(o)) return;
       vistos2[o.id]=1; lista.push(o);
     });
   }
