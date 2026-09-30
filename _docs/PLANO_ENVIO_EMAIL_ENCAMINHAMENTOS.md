@@ -1,6 +1,6 @@
 # Plano — Envio de encaminhamentos por e-mail direto do IARA
 
-**Situação:** aguardando os e-mails dos órgãos (o usuário vai levantar).
+**Situação:** fluxo manual implantado (30/09/2026). Envio automático aguardando os e-mails dos órgãos e o acesso ao Apps Script.
 **Registrado em:** 30/09/2026
 
 ## Objetivo
@@ -23,13 +23,23 @@ Hoje os encaminhamentos são mandados por e-mail fora do sistema. Os órgãos at
 - **Plano B, se o envio automático falhar:** botões "📄 Baixar ofício", "✉ Abrir e-mail" (com destinatário, assunto e texto já preenchidos) e "✅ Marcar como enviado".
 - **PDF consolidado do caso:** cada encaminhamento mostra o nº do ofício e os dados de envio.
 
-## Pendências — antes de implementar
+## Já implantado (fluxo manual, 30/09/2026)
+
+- **Pilha "📤 Encaminhamentos" na Minha Mesa**, com os filtros ⏳ A enviar · 🔴 Vencidos · 📨 Aguardando · ✅ Devolutiva chegou, filtro por órgão e ações na própria linha.
+- **Cadastro de e-mails dos órgãos** (botão "✉ E-mails dos órgãos"), salvo no aparelho e no Sheets (chave `bcs_orgaos`). O CRAV já vem preenchido. Quando um órgão ainda não tem e-mail, o botão ✉ pergunta o endereço e guarda para as próximas vezes.
+- **Botão ✉ E-mail**, que abre o e-mail com destinatário, assunto e texto preenchidos, incluindo o link de devolutiva. O PDF do ofício ainda precisa ser anexado à mão. Para encaminhamento já enviado, abre um e-mail de cobrança.
+- **Marcar como enviado:** grava `enviado_em` e `enviado_por`, e o prazo conta a partir do envio.
+- **Botão único** para marcar como enviados os encaminhamentos antigos criados antes de hoje.
+
+O envio automático vai reaproveitar esse cadastro de e-mails (`bcs_orgaos`).
+
+## Pendências — antes do envio automático
 
 - [ ] **E-mails dos órgãos.** Lista a preencher:
 
   | Órgão | E-mail | Telefone | Responsável |
   |---|---|---|---|
-  | CRAV | | | |
+  | CRAV | crav.pmvc@gmail.com | | |
   | CRAS | | | |
   | CREAS | | | |
   | DEAM | | | |

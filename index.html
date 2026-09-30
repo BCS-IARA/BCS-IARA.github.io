@@ -15557,20 +15557,34 @@ function _renderMesaTriagem(main){
   if(!state._mt) state._mt={pilha:"novo", sel:null, painel:null, rasc:{}, feitos:0};
   _mtCss();
   var M=state._mt;
-  var P=[{k:"novo",r:"Novos",d:"para triar"},{k:"ligar",r:"Ligar hoje",d:"retornos marcados até hoje"},{k:"cobrar",r:"Cobrar",d:"devolutiva com prazo vencido"}];
-  var lista=_mtPilha(M.pilha);
-  if(M.sel && !M.busca && M.sel!==M.fixo && !lista.some(function(o){return o.id===M.sel;}) && !M.manter) M.sel=null;
+  if(M.pilha==="cobrar") M.pilha="enc"; // pilha antiga virou filtro "Vencidos"
+  var P=_MT_PILHAS;
+  var lista=M.pilha==="enc"?[]:_mtPilha(M.pilha);
+  if(M.sel && M.pilha!=="enc" && !M.busca && M.sel!==M.fixo && !lista.some(function(o){return o.id===M.sel;}) && !M.manter) M.sel=null;
   var h="<div id='mt-root'>";
   h+="<div class='mt-cab'><h2>Minha Mesa</h2><span class='mt-teste'>🧪 em teste · grava nos mesmos dados do app</span>";
   var _at=_mtAtendente();
   var _pols=(state.policiais||[]).filter(function(p){return (p.status||"ativo")==="ativo";}).map(function(p){return ((p.posto?p.posto+" ":"")+(p.nome||"")).trim();}).filter(Boolean).sort();
   h+="<label class='mt-atend"+(_at?"":" falta")+"'>👤 Atendente: <input id='mt-atendente' list='mt-atend-lista' placeholder='seu nome' value='"+esc(_at)+"'><datalist id='mt-atend-lista'>"+_pols.map(function(n){return "<option value='"+esc(n)+"'>";}).join("")+"</datalist></label>";
   h+="</div>";
-  h+="<div class='mt-pilhas'>"+P.map(function(p){ return "<button class='mt-pilha"+(M.pilha===p.k?" on":"")+"' data-mt-pilha='"+p.k+"'><b>"+_mtPilha(p.k).length+"</b><span>"+p.r+"</span><small>"+p.d+"</small></button>"; }).join("")+"</div>";
+  h+="<div class='mt-pilhas'>"+P.map(function(p){ var n=p.k==="enc"?_mtEncContador():_mtPilha(p.k).length; return "<button class='mt-pilha"+(M.pilha===p.k?" on":"")+"' data-mt-pilha='"+p.k+"'><b>"+n+"</b><span>"+p.r+"</span><small>"+p.d+"</small></button>"; }).join("")+"</div>";
   h+="<div class='mt-sub'><span>"+(M.feitos?"Hoje você já resolveu <b>"+M.feitos+"</b> "+(M.feitos===1?"caso":"casos")+".":"Ordem: da mais nova para a mais antiga. VD e MENOR aparecem marcados.")+"</span>";
   if(M.pilha==="novo") h+="<label style='display:flex;gap:5px;align-items:center;cursor:pointer'><input type='checkbox' data-mt-jur "+(M.jur!==false?"checked":"")+"> Só bairros da jurisdição</label>";
   h+="</div>";
   h+="<div class='mt-busca'><input id='mt-busca' type='search' autocomplete='off' placeholder='🔍 Buscar em tudo: nome, testemunha, trecho do relato, nº do BO, telefone…' value='"+esc(M.busca||"")+"'></div>";
+  if(M.pilha==="enc" && !(M.busca && M.busca.trim().length>=2)){
+    // Pilha Encaminhamentos: lista por encaminhamento em largura total; caso abre por cima
+    if(M.sel && _mtOc(M.sel)){
+      h+="<button class='mt-btn sec' style='margin-bottom:10px' data-mt-voltarenc>← Voltar para Encaminhamentos</button>";
+      h+="<div class='mt-caso'>"+_mtCasoHtml(_mtOc(M.sel))+"</div>";
+    } else {
+      M.sel=null;
+      h+="<div class='mt-lista' id='mt-lista' style='max-height:none'>"+_mtEncListaHtml()+"</div>";
+    }
+    h+="</div>";
+    main.innerHTML=h;
+    return;
+  }
   h+="<div class='mt-grid"+(M.sel?" aberto":"")+"'>";
   h+="<div class='mt-lista' id='mt-lista'>"+_mtListaHtml(lista,P)+"</div>";
   h+="<div class='mt-caso'>"+_mtCasoHtml(M.sel?_mtOc(M.sel):null)+"</div>";
@@ -15656,7 +15670,7 @@ function _mtCasoHtml(o){
     h+="</div>";
   }
   // Encaminhamentos deste caso: ofício com QR e marcar como enviado
-  if(M.pilha!=="cobrar" && !_mtArquivada(o)) h+=_mtEncsHtml(o);
+  if(!_mtArquivada(o)) h+=_mtEncsHtml(o);
   // Última conversa + combinado para esta ligação
   h+=_mtUltimaHtml(o);
   // Decisão
@@ -15664,19 +15678,6 @@ function _mtCasoHtml(o){
   var encsAbertos=_mtEncsOc(o.id).filter(_mtEncAberto);
   if(_mtArquivada(o)){
     h+="<p class='mt-dica'>🗄 Ocorrência arquivada — só consulta. Use o botão <b>📄 PDF do atendimento</b> para o relatório completo.</p>";
-  } else if(M.pilha==="cobrar" || (M.busca && encsAbertos.length && o.situacao!=="nova")){
-    h+="<p class='mt-perg'>Encaminhamentos aguardando devolutiva</p>";
-    encsAbertos.forEach(function(e){
-      var p=_mtPrazo(e), venc=p&&p<hoje();
-      h+="<div class='mt-enc'><div><b>"+esc(e.orgao||e.tipo||"?")+"</b> · enviado "+_mtBr(_mtIso(e.data_envio||e.data))+" · prazo "+_mtBr(p)+(e.prazo?"":" (padrão 15 dias)")+(venc?" · <b style='color:var(--verm)'>atrasada</b>":"")+(Array.isArray(e.cobrancas)&&e.cobrancas.length?" · cobrado "+e.cobrancas.length+"×":"")+"</div>";
-      if(M.painel==="volta:"+e.id){
-        h+="<textarea id='mt-volta' placeholder='O que o órgão respondeu? Ex.: vítima compareceu e iniciou acompanhamento.'>"+esc(M.rasc.volta||"")+"</textarea>";
-        h+="<div class='mt-row'><button class='mt-btn ok' data-mt-volta-ok='"+esc(e.id)+"'>Registrar devolutiva</button><button class='mt-btn sec' data-mt-volta-ok='"+esc(e.id)+"' data-mt-encerra='1'>Registrar e encerrar caso</button></div>";
-      } else {
-        h+="<div class='mt-row'><button class='mt-btn ok' data-mt-volta='"+esc(e.id)+"'>Devolutiva chegou</button><button class='mt-btn sec' data-mt-cobrei='"+esc(e.id)+"'>Cobrei hoje (+7 dias)</button><button class='mt-btn sec' data-mt-oficio='"+esc(e.id)+"'>📄 Ofício com QR</button></div>";
-      }
-      h+="</div>";
-    });
   } else {
     var trav = false; // FRIDA é opcional: não trava as ações
     h+="<p class='mt-perg'>O que você fez ou vai fazer?</p><div class='mt-acoes'>";
@@ -15698,19 +15699,190 @@ function _mtCasoHtml(o){
 
 function _mtEncEnviado(e){ return !!(e.enviado_em || (e.status && e.status!=="pendente" && e.status!=="a_encaminhar")); }
 function _mtEncsHtml(o){
-  var encs=_mtEncsOc(o.id); if(!encs.length) return "";
+  var M=state._mt, encs=_mtEncsOc(o.id); if(!encs.length) return "";
   var h="<div class='mt-bl'><div class='mt-rot'>📤 Encaminhamentos deste caso</div><div style='display:flex;flex-direction:column;gap:8px;margin-top:6px'>";
   encs.forEach(function(e){
     var env=_mtEncEnviado(e), dev=!!e.relato_devolutiva;
     var st= dev ? "<b style='color:var(--verde-2)'>✅ devolutiva recebida</b>"
           : env ? "<b style='color:var(--ambar-2)'>📨 enviado"+(e.enviado_em?" em "+_mtBr(_mtIso(e.enviado_em)):"")+(e.enviado_por?" por "+esc(e.enviado_por):"")+" · aguardando devolutiva até "+_mtBr(_mtPrazo(e))+"</b>"
           : "<b style='color:var(--verm-2)'>⏳ a enviar</b>";
-    h+="<div class='mt-enc'><div><b>"+esc(e.orgao||e.tipo||"?")+"</b> · "+st+"</div><div class='mt-row'>";
-    h+="<button class='mt-btn "+(env?"sec":"ok")+"' data-mt-oficio='"+esc(e.id)+"'>📄 Ofício com QR (PDF)</button>";
-    if(!env && !dev) h+="<button class='mt-btn sec' data-mt-enviado='"+esc(e.id)+"'>✅ Marcar como enviado</button>";
-    h+="</div></div>";
+    var fase=_mtEncFase(e);
+    h+="<div class='mt-enc'><div><b>"+esc(e.orgao||e.tipo||"?")+"</b> · "+st+(fase==="vencido"?" <b style='color:var(--verm)'>· prazo vencido</b>":"")+(Array.isArray(e.cobrancas)&&e.cobrancas.length?" · cobrado "+e.cobrancas.length+"×":"")+"</div>";
+    if(M.painel==="volta:"+e.id){
+      h+="<textarea id='mt-volta' placeholder='O que o órgão respondeu? Ex.: vítima compareceu e iniciou acompanhamento.'>"+esc(M.rasc.volta||"")+"</textarea>";
+      h+="<div class='mt-row'><button class='mt-btn ok' data-mt-volta-ok='"+esc(e.id)+"'>Registrar devolutiva</button><button class='mt-btn sec' data-mt-volta-ok='"+esc(e.id)+"' data-mt-encerra='1'>Registrar e encerrar caso</button></div>";
+    } else {
+      h+="<div class='mt-row'>";
+      h+="<button class='mt-btn "+(env?"sec":"ok")+"' data-mt-oficio='"+esc(e.id)+"'>📄 Ofício com QR (PDF)</button>";
+      if(!dev) h+="<button class='mt-btn sec' data-mt-email='"+esc(e.id)+"'>"+(env?"✉ E-mail de cobrança":"✉ E-mail")+"</button>";
+      if(!env && !dev) h+="<button class='mt-btn sec' data-mt-enviado='"+esc(e.id)+"'>✅ Marcar como enviado</button>";
+      if(env && !dev){ h+="<button class='mt-btn sec' data-mt-cobrei='"+esc(e.id)+"'>Cobrei hoje (+7 dias)</button><button class='mt-btn sec' data-mt-volta='"+esc(e.id)+"'>Devolutiva chegou</button>"; }
+      h+="</div>";
+    }
+    h+="</div>";
   });
   return h+"</div><p class='mt-dica' style='margin-top:6px'>Baixe o ofício, envie por e-mail ao órgão e marque como enviado. O QR/link do ofício abre o formulário de devolutiva — a resposta chega no 🔔.</p></div>";
+}
+var _MT_PILHAS=[{k:"novo",r:"Novos",d:"para triar"},{k:"ligar",r:"Ligar hoje",d:"retornos marcados até hoje"},{k:"enc",r:"Encaminhamentos",d:"a enviar + prazo vencido"}];
+
+// Cadastro de órgãos (e-mail/telefone). Guardado no aparelho e no Sheets (bcs_orgaos) —
+// base para o envio automático por e-mail no futuro.
+var _MT_ORGAOS_PADRAO={"CRAV":{email:"crav.pmvc@gmail.com"}};
+function _mtOrgaos(){
+  if(!state.orgaosContato){
+    var m={}; try{ m=JSON.parse(localStorage.getItem("bcs_orgaos")||"{}")||{}; }catch(e){}
+    Object.keys(_MT_ORGAOS_PADRAO).forEach(function(k){ if(!m[k]) m[k]=Object.assign({},_MT_ORGAOS_PADRAO[k]); });
+    state.orgaosContato=m;
+    if(!state._orgaosLidosSheets && typeof lerDadoAppSheets==="function"){
+      state._orgaosLidosSheets=true;
+      lerDadoAppSheets("bcs_orgaos").then(function(r){
+        if(r && typeof r==="object" && !Array.isArray(r)){
+          Object.keys(r).forEach(function(k){ if(r[k]&&r[k].email&&(!state.orgaosContato[k]||!state.orgaosContato[k].email||r[k].atualizadoEm>(state.orgaosContato[k].atualizadoEm||""))) state.orgaosContato[k]=r[k]; });
+          try{ localStorage.setItem("bcs_orgaos", JSON.stringify(state.orgaosContato)); }catch(e){}
+          if(state.tela==="mesa_triagem") _mtRender();
+        }
+      }).catch(function(){});
+    }
+  }
+  return state.orgaosContato;
+}
+function _mtOrgaoChave(nome){
+  var n=String(nome||"").trim(), m=_mtOrgaos();
+  if(m[n]) return n;
+  var nn=_mtNorm(n); var k=Object.keys(m).find(function(x){ return _mtNorm(x)===nn; });
+  return k||n;
+}
+function _mtOrgaoEmail(nome){ var c=_mtOrgaos()[_mtOrgaoChave(nome)]; return (c&&c.email)||""; }
+function _mtSalvarOrgaoEmail(nome, email){
+  var m=_mtOrgaos(), k=_mtOrgaoChave(nome);
+  m[k]=Object.assign({}, m[k]||{}, {email:String(email||"").trim(), atualizadoEm:new Date().toISOString()});
+  try{ localStorage.setItem("bcs_orgaos", JSON.stringify(m)); }catch(e){}
+  if(typeof salvarDadoAppSheets==="function") salvarDadoAppSheets("bcs_orgaos", m).catch(function(){});
+}
+function _mtLinkDevolutiva(e){
+  if(!e.token) e.token="enc_"+e.id+"_"+Date.now();
+  var base=window.location.origin+window.location.pathname.replace("index.html","");
+  var slug=(typeof _orgaoSlugDev==="function")?_orgaoSlugDev(e.orgao||e.tipo):"outros";
+  var nome=(typeof _nomeEncLimpo==="function")?_nomeEncLimpo(e):(e.vitima_nome||"");
+  return base+"crav-devolutiva.html?enc="+encodeURIComponent(e.id)+"&orgao="+slug+"&servico="+slug+"&nome="+encodeURIComponent(nome)+"&token="+e.token;
+}
+// Fase do encaminhamento: enviar | aguardando | vencido | devolutiva (não lida) | fim
+function _mtEncFase(e){
+  if(e.relato_devolutiva){
+    var nova=(typeof _sinoNovas==="function")&&_sinoNovas().some(function(x){return x.id===e.id;});
+    return nova?"devolutiva":"fim";
+  }
+  if(e.status==="concluido"||e.status==="cancelado"||e.status==="devolutiva_lida") return "fim";
+  if(!_mtEncEnviado(e)) return "enviar";
+  var p=_mtPrazo(e); return (p&&p<hoje())?"vencido":"aguardando";
+}
+function _mtEncsAtivos(){
+  return (state.encaminhamentos||[]).filter(function(e){
+    if(!e||!e.id) return false;
+    var o=_mtOc(e.ocorrencia_id||e.ocorrenciaId||"");
+    if(o && _mtFechado(o) && !e.relato_devolutiva) return false; // caso encerrado/arquivado
+    return _mtEncFase(e)!=="fim";
+  });
+}
+function _mtEncContador(){ return _mtEncsAtivos().filter(function(e){ var f=_mtEncFase(e); return f==="enviar"||f==="vencido"; }).length; }
+var _MT_ENC_FILTROS=[["enviar","⏳ A enviar"],["vencido","🔴 Vencidos"],["aguardando","📨 Aguardando"],["devolutiva","✅ Devolutiva chegou"]];
+function _mtEncListaHtml(){
+  var M=state._mt; if(!M.encFiltro) M.encFiltro="enviar";
+  var todos=_mtEncsAtivos();
+  var cont={}; _MT_ENC_FILTROS.forEach(function(f){ cont[f[0]]=0; });
+  todos.forEach(function(e){ var f=_mtEncFase(e); if(cont[f]!=null) cont[f]++; });
+  var orgs={}; todos.forEach(function(e){ orgs[e.orgao||e.tipo||"?"]=1; });
+  var h="<div class='mt-lcab' style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:static'>";
+  h+="<div class='mt-chips'>"+_MT_ENC_FILTROS.map(function(f){ return "<button class='mt-chip"+(M.encFiltro===f[0]?" on":"")+"' data-mt-encfiltro='"+f[0]+"'>"+f[1]+" ("+cont[f[0]]+")</button>"; }).join("")+"</div>";
+  h+="<select id='mt-encorgao' style='margin-left:auto;border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:6px 8px;font:inherit;font-size:12px'><option value=''>Todos os órgãos</option>"+Object.keys(orgs).sort().map(function(g){ return "<option"+(M.encOrgao===g?" selected":"")+">"+esc(g)+"</option>"; }).join("")+"</select>";
+  h+="<button class='mt-btn sec' style='padding:6px 10px;font-size:12px' data-mt-orgaosmodal>✉ E-mails dos órgãos</button>";
+  h+="</div>";
+  var lista=todos.filter(function(e){ return _mtEncFase(e)===M.encFiltro && (!M.encOrgao || (e.orgao||e.tipo||"?")===M.encOrgao); });
+  lista.sort(function(a,b){
+    if(M.encFiltro==="vencido"||M.encFiltro==="aguardando") return _mtPrazo(a).localeCompare(_mtPrazo(b));
+    if(M.encFiltro==="devolutiva") return _mtIso(b.data_devolutiva).localeCompare(_mtIso(a.data_devolutiva));
+    return _mtIso(a.data||a.criadoEm).localeCompare(_mtIso(b.data||b.criadoEm)); // a enviar: mais antigo primeiro
+  });
+  if(M.encFiltro==="enviar"){
+    var antigos=todos.filter(function(e){ return _mtEncFase(e)==="enviar" && _mtIso(e.data||e.criadoEm)<hoje(); }).length;
+    if(antigos) h+="<div class='mt-enc' style='margin:10px 14px;background:var(--ambar-claro)'><div>Há <b>"+antigos+"</b> encaminhamento(s) criado(s) antes de hoje sem registro de envio — provavelmente enviados pelo fluxo antigo.</div><div class='mt-row'><button class='mt-btn sec' data-mt-antigosenviados>Marcar os "+antigos+" anteriores a hoje como enviados</button></div></div>";
+  }
+  if(!lista.length) return h+"<div class='mt-vazio'><b>Nada aqui</b>Nenhum encaminhamento neste filtro.</div>";
+  lista.forEach(function(e){
+    var o=_mtOc(e.ocorrencia_id||e.ocorrenciaId||"");
+    var nome=(o&&o.vitima_nome)||e.vitima_nome||"Vítima não identificada";
+    var fase=_mtEncFase(e), p=_mtPrazo(e);
+    var dias=p?Math.round((new Date(p+"T12:00")-new Date(hoje()+"T12:00"))/864e5):null;
+    var linha = fase==="enviar" ? "Criado "+_mtBr(_mtIso(e.data||e.criadoEm))+(e.responsavel?" por "+esc(e.responsavel):"")+" · prazo de "+(e.prazo_dias||15)+" dias após o envio"
+              : fase==="devolutiva" ? "Respondeu em "+_mtBr(_mtIso(e.data_devolutiva))+(e.responsavel_devolutiva?" · "+esc(e.responsavel_devolutiva):"")
+              : "Enviado "+_mtBr(_mtIso(e.enviado_em||e.data_envio||e.data))+(e.enviado_por?" por "+esc(e.enviado_por):"")+" · prazo "+_mtBr(p)+(dias!=null?(dias<0?" <b style='color:var(--verm)'>(vencido há "+(-dias)+" dia"+(-dias>1?"s":"")+")</b>":" ("+(dias===0?"vence hoje":"faltam "+dias+" dia"+(dias>1?"s":""))+")"):"")+(Array.isArray(e.cobrancas)&&e.cobrancas.length?" · cobrado "+e.cobrancas.length+"×":"");
+    h+="<div class='mt-enc' style='margin:10px 14px'>";
+    h+="<div><b>"+esc(e.orgao||e.tipo||"?")+"</b> · "+esc(nome)+(o&&o.numero?" · BO "+esc(String(o.numero)):"")+(o&&o.tipo?" · "+esc(o.tipo):"")+"</div>";
+    h+="<div style='font-size:12px;color:var(--tinta-2)'>"+linha+"</div>";
+    if(fase==="devolutiva") h+="<div class='conv' style='font-size:13px;background:var(--papel);border-radius:6px;padding:6px 8px;white-space:pre-wrap'>"+esc(e.relato_devolutiva)+"</div>";
+    h+="<div class='mt-row'>";
+    if(fase==="enviar"){
+      h+="<button class='mt-btn ok' data-mt-oficio='"+esc(e.id)+"'>📄 Ofício com QR</button>";
+      h+="<button class='mt-btn sec' data-mt-email='"+esc(e.id)+"'>✉ E-mail"+(_mtOrgaoEmail(e.orgao||e.tipo)?"":" (sem e-mail)")+"</button>";
+      h+="<button class='mt-btn sec' data-mt-enviado='"+esc(e.id)+"'>✅ Marcar como enviado</button>";
+    } else if(fase==="devolutiva"){
+      if(o) h+="<button class='mt-btn ok' data-mt-pdf-id='"+esc(o.id)+"'>📄 PDF consolidado</button>";
+      h+="<button class='mt-btn sec' data-mt-devlidaenc='"+esc(e.id)+"'>✓ Marcar como lida</button>";
+    } else {
+      h+="<button class='mt-btn sec' data-mt-cobreienc='"+esc(e.id)+"'>Cobrei hoje (+7 dias)</button>";
+      h+="<button class='mt-btn sec' data-mt-email='"+esc(e.id)+"'>✉ E-mail de cobrança</button>";
+      h+="<button class='mt-btn sec' data-mt-oficio='"+esc(e.id)+"'>📄 Ofício</button>";
+    }
+    if(o) h+="<button class='mt-btn sec' data-mt-abrircaso='"+esc(o.id)+"'>Abrir caso</button>";
+    h+="</div></div>";
+  });
+  return h;
+}
+function _mtAbrirEmail(e, cobranca){
+  var email=_mtOrgaoEmail(e.orgao||e.tipo);
+  if(!email){
+    var dig=prompt("E-mail do "+(e.orgao||e.tipo||"órgão")+" (fica salvo para os próximos envios):","");
+    if(dig==null) return;
+    dig=dig.trim(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(dig)){ showToast("E-mail inválido","error"); return; }
+    _mtSalvarOrgaoEmail(e.orgao||e.tipo, dig); email=dig;
+  }
+  var o=_mtOc(e.ocorrencia_id||e.ocorrenciaId||"");
+  var nome=(o&&o.vitima_nome)||e.vitima_nome||"";
+  var link=_mtLinkDevolutiva(e);
+  var assunto=(cobranca?"Cobrança de devolutiva — ":"Ofício de encaminhamento — ")+(e.orgao||e.tipo||"")+" — "+nome+(o&&o.numero?" — BO "+o.numero:"");
+  var corpo = cobranca
+    ? "Prezados,\n\nSolicitamos a devolutiva do encaminhamento enviado em "+_mtBr(_mtIso(e.enviado_em||e.data_envio||e.data))+" referente a "+nome+(o&&o.numero?" (BO nº "+o.numero+")":"")+".\n\nA resposta pode ser registrada diretamente pelo formulário:\n"+link+"\n\nAtenciosamente,\n"+(_mtAtendente()||"")+"\nBase Comunitária de Segurança — 77ª CIPM / PMBA"
+    : "Prezados,\n\nEncaminhamos, em anexo, o ofício referente a "+nome+(o&&o.numero?" (BO nº "+o.numero+")":"")+" para acompanhamento por este órgão.\n\nApós o atendimento, pedimos que a devolutiva seja registrada pelo formulário:\n"+link+"\n\nAtenciosamente,\n"+(_mtAtendente()||"")+"\nBase Comunitária de Segurança — 77ª CIPM / PMBA";
+  var url="mailto:"+email+"?subject="+encodeURIComponent(assunto)+"&body="+encodeURIComponent(corpo);
+  var a=document.createElement("a"); a.href=url; a.style.display="none"; document.body.appendChild(a); a.click(); a.remove();
+  showToast(cobranca?"E-mail de cobrança aberto":"E-mail aberto — anexe o PDF do ofício antes de enviar");
+}
+function _mtOrgaosModal(){
+  var ant=document.getElementById("mt-orgaos-modal"); if(ant) ant.remove();
+  var m=_mtOrgaos(); var nomes=_MT_ORGAOS.slice(); Object.keys(m).forEach(function(k){ if(nomes.indexOf(k)<0) nomes.push(k); });
+  var IS="width:100%;box-sizing:border-box;border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px";
+  var h="<div style='background:var(--papel);color:var(--tinta);border-radius:14px;max-width:560px;width:100%;padding:18px 20px'><h3 style='margin:0 0 4px'>✉ E-mails dos órgãos</h3><p style='margin:0 0 12px;font-size:12px;color:var(--tinta-2)'>Usados no botão ✉ E-mail e, no futuro, no envio automático.</p><div style='display:flex;flex-direction:column;gap:8px'>";
+  nomes.forEach(function(n,i){ h+="<label style='display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:13px;font-weight:700'>"+esc(n)+"<input type='email' data-orgao-nome='"+esc(n)+"' value='"+esc((m[n]&&m[n].email)||"")+"' placeholder='email@exemplo.com' style='"+IS+"'></label>"; });
+  h+="</div><div class='mt-row' style='display:flex;gap:8px;justify-content:flex-end;margin-top:14px'><button class='mt-btn sec' data-orgaos-fechar style='border:1.5px solid var(--papel-3);background:transparent;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;color:var(--tinta)'>Cancelar</button><button data-orgaos-salvar style='background:var(--verde);color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer'>Salvar</button></div></div>";
+  var w=document.createElement("div"); w.id="mt-orgaos-modal"; w.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9300;display:flex;align-items:flex-start;justify-content:center;padding:40px 14px;overflow-y:auto";
+  w.innerHTML=h;
+  w.addEventListener("click",function(ev){
+    if(ev.target===w || ev.target.hasAttribute("data-orgaos-fechar")){ w.remove(); return; }
+    if(ev.target.hasAttribute("data-orgaos-salvar")){
+      var ruim=null;
+      w.querySelectorAll("input[data-orgao-nome]").forEach(function(inp){
+        var v=inp.value.trim(), n=inp.getAttribute("data-orgao-nome");
+        if(v && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){ ruim=n; return; }
+        var atual=(m[n]&&m[n].email)||"";
+        if(v!==atual) m[n]=Object.assign({}, m[n]||{}, {email:v, atualizadoEm:new Date().toISOString()});
+      });
+      if(ruim){ showToast("E-mail inválido em "+ruim,"error"); return; }
+      try{ localStorage.setItem("bcs_orgaos", JSON.stringify(m)); }catch(e){}
+      if(typeof salvarDadoAppSheets==="function") salvarDadoAppSheets("bcs_orgaos", m).catch(function(){});
+      w.remove(); showToast("✓ E-mails dos órgãos salvos"); _mtRender();
+    }
+  });
+  document.body.appendChild(w);
 }
 function _mtUltimaHtml(o){
   var cont=_mtContatos(o.id), pend=_mtLigarPendente(o.id);
@@ -16040,7 +16212,12 @@ document.addEventListener("input",function(ev){
     clearTimeout(window._mtBuscaT);
     window._mtBuscaT=setTimeout(function(){
       var el=document.getElementById("mt-lista");
-      if(el) el.innerHTML=_mtListaHtml(_mtPilha(state._mt.pilha),[{k:"novo",r:"Novos"},{k:"ligar",r:"Ligar hoje"},{k:"cobrar",r:"Cobrar"}]);
+      if(el && state._mt.pilha!=="enc") el.innerHTML=_mtListaHtml(_mtPilha(state._mt.pilha),_MT_PILHAS);
+      else {
+        // pilha Encaminhamentos troca de layout ao buscar — redesenha e devolve o foco à busca
+        _mtRender();
+        var ib=document.getElementById("mt-busca"); if(ib){ ib.focus(); var L=ib.value.length; try{ ib.setSelectionRange(L,L); }catch(e){} }
+      }
     },200);
   }
 });
@@ -16050,6 +16227,7 @@ document.addEventListener("keydown",function(ev){
 });
 document.addEventListener("change",function(ev){
   if(state.tela!=="mesa_triagem") return;
+  if(ev.target.id==="mt-encorgao"){ state._mt.encOrgao=ev.target.value; _mtRender(); return; }
   if(ev.target.id==="mt-atendente"){
     var v=ev.target.value.trim(); state._mt.atendente=v;
     try{ localStorage.setItem("bcs_mt_atendente", v); }catch(e){}
@@ -16073,12 +16251,45 @@ document.addEventListener("click",function(ev){
   var b=ev.target.closest&&ev.target.closest("#mt-root button"); if(!b) return;
   var M=state._mt, d=b.dataset, o=M.sel?_mtOc(M.sel):null;
   if(d.mtPdfId){ _mtGerarPdf(d.mtPdfId); return; }
+  if(d.mtEncfiltro){ M.encFiltro=d.mtEncfiltro; _mtRender(); return; }
+  if("mtOrgaosmodal" in d){ _mtOrgaosModal(); return; }
+  if("mtVoltarenc" in d){ M.sel=null; M.painel=null; M.rasc={}; _mtRender(); return; }
+  if(d.mtAbrircaso){ M.sel=d.mtAbrircaso; M.painel=null; M.rasc={}; _mtRender(); window.scrollTo({top:0}); return; }
+  if(d.mtEmail){ var em=(state.encaminhamentos||[]).find(function(x){return x.id===d.mtEmail;}); if(em) _mtAbrirEmail(em, _mtEncEnviado(em)); return; }
+  if(d.mtDevlidaenc){ _sinoMarcarLida(d.mtDevlidaenc); _mtRender(); return; }
+  if(d.mtCobreienc){
+    var ec=(state.encaminhamentos||[]).find(function(x){return x.id===d.mtCobreienc;}); if(!ec) return;
+    ec.cobrancas=(Array.isArray(ec.cobrancas)?ec.cobrancas:[]).concat([hoje()]); ec.prazo=_mtDia(7);
+    _mtSalvarEnc(ec); _mtRender(); showToast("Cobrança registrada · novo prazo "+_mtBr(ec.prazo)); return;
+  }
+  if(d.mtOficio){ try{ _gerarPdfEncaminhamento(d.mtOficio); }catch(err){ showToast("Não abriu o ofício — libere pop-ups para o IARA","error"); } return; }
+  if(d.mtEnviado){
+    if(!_mtAtendente()){ showToast("Informe o seu nome em “Atendente”, no topo da Mesa","error"); return; }
+    var en=(state.encaminhamentos||[]).find(function(x){return x.id===d.mtEnviado;}); if(!en) return;
+    en.status="aguardando_devolutiva"; en.enviado_em=new Date().toISOString(); en.enviado_por=_mtAtendente();
+    en.data_envio=hoje(); en.prazo=_mtDia(+en.prazo_dias||15);
+    try{ localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos)); }catch(x){}
+    salvarLocal();
+    _sheetsGet({acao:"atualizarEncaminhamento", id:en.id, campos:JSON.stringify({status:en.status, data_envio:en.data_envio, prazo:en.prazo})}).catch(function(){});
+    _mtRender(); showToast("✓ "+(en.orgao||"Encaminhamento")+" marcado como enviado · devolutiva até "+_mtBr(en.prazo)); return;
+  }
+  if("mtAntigosenviados" in d){
+    var ant=_mtEncsAtivos().filter(function(e){ return _mtEncFase(e)==="enviar" && _mtIso(e.data||e.criadoEm)<hoje(); });
+    if(!ant.length) return;
+    if(!confirm("Marcar "+ant.length+" encaminhamento(s) anterior(es) a hoje como enviados? Use só se eles já foram mandados pelo fluxo antigo.")) return;
+    ant.forEach(function(e){
+      e.status="aguardando_devolutiva"; e.enviado_em=(_mtIso(e.data_envio||e.data||e.criadoEm)||hoje())+"T12:00:00"; e.enviado_por="(fluxo anterior)";
+      _sheetsGet({acao:"atualizarEncaminhamento", id:e.id, campos:JSON.stringify({status:e.status})}).catch(function(){});
+    });
+    try{ localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos)); }catch(x){}
+    salvarLocal(); _mtRender(); showToast("✓ "+ant.length+" encaminhamento(s) marcados como enviados"); return;
+  }
   if(d.mtCopiar){
     var _t=d.mtCopiar;
     try{ navigator.clipboard.writeText(_t).then(function(){ showToast("Número copiado: "+_t); },function(){ showToast("Número: "+_t); }); }catch(x){ showToast("Número: "+_t); }
     return;
   }
-  if(d.mtPilha){ M.fixo=null; M.busca=""; M.pilha=d.mtPilha; M.sel=null; M.painel=null; M.rasc={}; _mtRender(); return; }
+  if(d.mtPilha){ M.fixo=null; M.busca=""; M.pilha=d.mtPilha; M.sel=null; if(d.mtPilha==="enc" && !M.encFiltro) M.encFiltro="enviar"; M.painel=null; M.rasc={}; _mtRender(); return; }
   if(d.mtCaso){ M.fixo=null; M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
   if("mtVoltar" in d){ M.sel=null; M.painel=null; _mtRender(); return; }
   if(!o) return;
@@ -16098,17 +16309,7 @@ document.addEventListener("click",function(ev){
   if(d.mtDatalig){ M.rasc.dataLig=d.mtDatalig; _mtRender(); return; }
   if(d.mtMotivo){ M.rasc.motivo=d.mtMotivo; _mtRender(); return; }
   if(d.mtFim){ _mtConcluir(o, d.mtFim); return; }
-  if(d.mtOficio){ try{ _gerarPdfEncaminhamento(d.mtOficio); }catch(err){ showToast("Não abriu o ofício — libere pop-ups para o IARA","error"); } return; }
-  if(d.mtEnviado){
-    if(!_mtAtendente()){ showToast("Informe o seu nome em “Atendente”, no topo da Mesa","error"); return; }
-    var en=(state.encaminhamentos||[]).find(function(x){return x.id===d.mtEnviado;}); if(!en) return;
-    en.status="aguardando_devolutiva"; en.enviado_em=new Date().toISOString(); en.enviado_por=_mtAtendente();
-    en.data_envio=hoje(); en.prazo=_mtDia(+en.prazo_dias||15);
-    try{ localStorage.setItem("bcs_encaminhamentos",JSON.stringify(state.encaminhamentos)); }catch(x){}
-    salvarLocal();
-    _sheetsGet({acao:"atualizarEncaminhamento", id:en.id, campos:JSON.stringify({status:en.status, data_envio:en.data_envio, prazo:en.prazo})}).catch(function(){});
-    _mtRender(); showToast("✓ "+(en.orgao||"Encaminhamento")+" marcado como enviado · devolutiva até "+_mtBr(en.prazo)); return;
-  }
+
   if(d.mtDevlida){ _sinoMarcarLida(d.mtDevlida); _mtRender(); return; }
   if(d.mtCumprido){ M.rasc.cumprido=d.mtCumprido; _mtRender(); return; }
   if("mtSemcontato" in d){ M.painel="registrar"; M.rasc={motivo:"Sem contato possível"}; _mtRender(); return; }
