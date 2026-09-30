@@ -15374,8 +15374,9 @@ function _mtPilha(k){
       vistos2[o.id]=1; lista.push(o);
     });
   }
-  function peso(o){ return (_mtIsVD(o)?0:_mtIsMenor(o)?1:2); }
-  return lista.sort(function(a,b){ return peso(a)-peso(b) || _mtIso(a.data).localeCompare(_mtIso(b.data)); });
+  // Mais nova → mais antiga (data + hora do fato); VD e MENOR continuam sinalizados pelos selos
+  function chave(o){ return _mtIso(o.data)+" "+String(o.hora||"").slice(0,5); }
+  return lista.sort(function(a,b){ return chave(b).localeCompare(chave(a)); });
 }
 
 function _mtCss(){
@@ -15494,7 +15495,7 @@ function _renderMesaTriagem(main){
   h+="<label class='mt-atend"+(_at?"":" falta")+"'>👤 Atendente: <input id='mt-atendente' list='mt-atend-lista' placeholder='seu nome' value='"+esc(_at)+"'><datalist id='mt-atend-lista'>"+_pols.map(function(n){return "<option value='"+esc(n)+"'>";}).join("")+"</datalist></label>";
   h+="</div>";
   h+="<div class='mt-pilhas'>"+P.map(function(p){ return "<button class='mt-pilha"+(M.pilha===p.k?" on":"")+"' data-mt-pilha='"+p.k+"'><b>"+_mtPilha(p.k).length+"</b><span>"+p.r+"</span><small>"+p.d+"</small></button>"; }).join("")+"</div>";
-  h+="<div class='mt-sub'><span>"+(M.feitos?"Hoje você já resolveu <b>"+M.feitos+"</b> "+(M.feitos===1?"caso":"casos")+".":"Ordem: violência doméstica, depois menores, depois os mais antigos.")+"</span>";
+  h+="<div class='mt-sub'><span>"+(M.feitos?"Hoje você já resolveu <b>"+M.feitos+"</b> "+(M.feitos===1?"caso":"casos")+".":"Ordem: da mais nova para a mais antiga. VD e MENOR aparecem marcados.")+"</span>";
   if(M.pilha==="novo") h+="<label style='display:flex;gap:5px;align-items:center;cursor:pointer'><input type='checkbox' data-mt-jur "+(M.jur!==false?"checked":"")+"> Só bairros da jurisdição</label>";
   h+="</div>";
   h+="<div class='mt-busca'><input id='mt-busca' type='search' autocomplete='off' placeholder='🔍 Buscar ocorrência: nome, nº do BO, telefone, bairro…' value='"+esc(M.busca||"")+"'></div>";
