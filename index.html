@@ -5256,7 +5256,7 @@ function gerarFichaVCMPDF(oc){
     if(o.reincidente) tags.push("<span class='tag tag-reinc'>REINCIDENTE</span>");
     if(tags.length) h+="<div class='tags'>"+tags.join("")+"</div>";
     // Dinâmica / relato completo
-    var relato=(o.descricao_dinamica||o.texto_original||o.descricao||"").trim();
+    var relato=_relatoCompleto(o);
     if(relato){
       h+="<div class='campo-lab'>Relato do Atendimento</div>";
       h+="<div class='campo-val'>"+esc(relato)+"</div>";
@@ -8793,6 +8793,22 @@ function _bannerImportacao(main){
 // ══════════════════════════════════════════════════════
 //  PARSER DE NARRATIVA (3 seções: Descrição / Dinâmica / Medidas)
 // ══════════════════════════════════════════════════════
+// Relato completo da ocorrência. Em parte das importações do SIGESPOL o texto foi
+// dividido: "descricao" ficou com o relato inteiro e "descricao_dinamica" só com um trecho
+// do meio/fim (às vezes uma palavra, ex.: "Averiguação"). As telas mostravam só a dinâmica
+// e o começo do relato sumia. Aqui juntamos as partes, descartando as que já estão
+// contidas em outra, na ordem descrição → dinâmica → texto original.
+function _relatoCompleto(o){
+  if(!o) return "";
+  var partes=[o.descricao, o.descricao_dinamica, o.texto_original].map(function(x){ return String(x||"").trim(); });
+  function n(x){ return x.replace(/\s+/g," ").toLowerCase(); }
+  var cand=partes.map(function(t,i){ return {t:t,i:i,n:n(t)}; }).filter(function(c){ return c.t; });
+  cand.sort(function(a,b){ return b.n.length-a.n.length; });
+  var fic=[];
+  cand.forEach(function(c){ if(!fic.some(function(f){ return f.n.indexOf(c.n)>=0; })) fic.push(c); });
+  fic.sort(function(a,b){ return a.i-b.i; });
+  return fic.map(function(c){ return c.t; }).join("\n\n");
+}
 function _parsearNarrativa(texto){
   var r={descricao:"", descricao_dinamica:"", medidas:""};
   if(!texto) return r;
@@ -10559,7 +10575,7 @@ function renderProjetosSociais(main){
       if(o.suspeito_nome) h.push("<div><span style='"+fcS+"'>Autor/Suspeito</span><span style='"+fcV+"'>"+esc(o.suspeito_nome)+"</span></div>");
       if(o.objetos) h.push("<div style='grid-column:1/-1'><span style='"+fcS+"'>Objetos</span><span style='"+fcV+"'>"+esc(o.objetos)+"</span></div>");
       h.push("</div>");
-      var dinamica=o.descricao_dinamica||o.texto_original||o.descricao||"";
+      var dinamica=_relatoCompleto(o);
       if(dinamica) h.push("<div style='background:#060d1c;border:1px solid #1a3358;border-radius:6px;padding:10px;margin-bottom:10px'><span style='"+fcS+"'>Dinâmica dos Fatos</span><p style='color:#c8d8f0;font-size:11px;line-height:1.7;margin:0;white-space:pre-wrap'>"+esc(dinamica)+"</p></div>");
     } else {
       var relato=(o.texto_original||o.descricao_dinamica||o.descricao||"").trim();
@@ -14865,7 +14881,7 @@ function renderTriagem(main) {
       h += "<label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>Medidas Adotadas</label>";
       h += "<textarea id='tri-medidas' rows='3' placeholder='Providências tomadas: BO lavrado, orientação dada, encaminhamento, medida protetiva, etc.' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(o.medidas||"")+"</textarea>";
     } else {
-    var relato = o.descricao_dinamica||o.texto_original||o.descricao||"";
+    var relato = _relatoCompleto(o);
     h += "<label style='font-size:10px;font-weight:700;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px'>Relato / Dinâmica dos fatos</label>";
     h += "<textarea id='tri-relato' rows='4' style='width:100%;padding:8px 10px;border:1.5px solid var(--papel-3);border-radius:6px;background:var(--papel);color:var(--tinta);font-size:13px;font-family:Georgia,serif;resize:vertical;box-sizing:border-box;line-height:1.6'>"+esc(relato)+"</textarea>";
     }
@@ -15645,7 +15661,7 @@ function _mtCasoHtml(o){
   h+="</div>";
   h+="<div class='mt-p a'><div class='mt-rot'>Autor</div><div class='n'>"+esc(o.suspeito_nome||"Não identificado")+"</div><div class='s'>"+[o.suspeito_idade?o.suspeito_idade+" anos":"",o.suspeito_endereco||""].filter(Boolean).map(esc).join(" · ")+"</div></div>";
   h+="</div>";
-  var relato=o.descricao_dinamica||o.texto_original||o.descricao||"";
+  var relato=_relatoCompleto(o);
   var curto=relato.length>420 && !M.relatoTodo;
   h+="<div class='mt-rot' style='margin-top:14px'>O que aconteceu</div><p class='mt-txt'>"+esc(curto?relato.slice(0,420)+"…":relato||"Sem relato no BO.")+"</p>";
   if(relato.length>420) h+="<button class='mt-mais' data-mt-relato>"+(curto?"Ler relato completo":"Mostrar menos")+"</button>";
@@ -16028,7 +16044,7 @@ function _mtGerarPdf(ocId){
   [["Nome",o.suspeito_nome||"Não identificado"],["Idade",o.suspeito_idade],["Endereço",o.suspeito_endereco]].forEach(function(c){ h+="<div class='c'><label>"+c[0]+"</label><span>"+E(c[1])+"</span></div>"; });
   h+="</div>";
   // Fato
-  var rel=o.descricao_dinamica||o.texto_original||o.descricao||"";
+  var rel=_relatoCompleto(o);
   h+="<div class='sec'>O que aconteceu (BO)</div><p class='txt'>"+E(rel)+"</p>";
   if(o.medidas) h+="<div class='sec'>Medidas adotadas no BO</div><p class='txt'>"+E(o.medidas)+"</p>";
   // FRIDA
@@ -22638,7 +22654,7 @@ function renderOcorrenciasGestor(el, perfil_atual){
       if(o.posto_servico) h.push("<div><span style='"+fcS+"'>Posto de Serviço</span><span style='"+fcV+"'>"+esc(o.posto_servico)+"</span></div>");
       if(o.dados_quantitativos) h.push("<div><span style='"+fcS+"'>Dados Quantitativos</span><span style='"+fcV+"'>"+esc(o.dados_quantitativos)+"</span></div>");
       h.push("</div>");
-      var dinamica=o.descricao_dinamica||o.texto_original||o.descricao||"";
+      var dinamica=_relatoCompleto(o);
       if(dinamica){
         var _MAXD=220, _prevD=dinamica.length>_MAXD, _escId="din-"+o.id;
         var _prevTxt=_prevD?dinamica.slice(0,_MAXD):dinamica;
