@@ -15308,20 +15308,80 @@ function _mtFechado(o){
 function _mtArquivada(o){ return !(state.db.ocorrencias||[]).some(function(x){ return x.id===o.id; }); }
 // Busca em todas as ocorrências (ativas + arquivadas): nome da vítima/autor, BO, telefone, bairro, tipo
 function _mtNorm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
+// Texto completo da ocorrência para a busca: todos os campos de texto (relato, medidas,
+// envolvidos/testemunhas, vítimas, autores, policiais, observações...), mais as conversas
+// das ligações e as devolutivas. Guardado em cache por objeto enquanto ele não muda.
+var _mtTxtCache = (typeof WeakMap!=="undefined") ? new WeakMap() : null;
+function _mtTextoBruto(o){
+  var partes=[], vistos=0;
+  (function walk(v, prof, chave){
+    if(v==null || prof>4 || vistos>400) return;
+    if(chave && chave.charAt(0)==="_") return;
+    if(typeof v==="string"){ v=v.trim(); if(v && v.length<20000 && v.indexOf("data:")!==0){ partes.push(v); vistos++; } return; }
+    if(typeof v==="number"){ partes.push(String(v)); return; }
+    if(Array.isArray(v)){ v.forEach(function(x){ walk(x, prof+1, ""); }); return; }
+    if(typeof v==="object"){ Object.keys(v).forEach(function(k){ if(k!=="foto"&&k!=="assinatura") walk(v[k], prof+1, k); }); }
+  })(o, 0, "");
+  return partes.join(" · ");
+}
+function _mtTextoOc(o){
+  var ver=(o._editadoEm||0)+"|"+String(o.resumo_atendimento||"").length+"|"+String(o.descricao_dinamica||o.texto_original||"").length+"|"+(o.situacao||"");
+  var c=_mtTxtCache&&_mtTxtCache.get(o);
+  if(c && c.ver===ver) return c;
+  var bruto=_mtTextoBruto(o);
+  c={ver:ver, bruto:bruto, norm:_mtNorm(bruto)};
+  if(_mtTxtCache) _mtTxtCache.set(o,c);
+  return c;
+}
+// Regex que ignora acento e maiúscula, para achar o trecho no texto original
+function _mtRegexTermo(t){
+  var mapa={a:"[aáàâãä]",e:"[eéèêë]",i:"[iíìîï]",o:"[oóòôõö]",u:"[uúùûü]",c:"[cç]",n:"[nñ]"};
+  return t.split("").map(function(ch){ return mapa[ch]||ch.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }).join("");
+}
+function _mtTrecho(bruto, termos){
+  for(var k=0;k<termos.length;k++){
+    var re; try{ re=new RegExp(_mtRegexTermo(termos[k]),"i"); }catch(e){ continue; }
+    var m=re.exec(bruto); if(!m) continue;
+    var ini=Math.max(0,m.index-60), fim=Math.min(bruto.length,m.index+m[0].length+80);
+    var tr=bruto.slice(ini,fim);
+    var html=esc(tr);
+    termos.forEach(function(w){ try{ html=html.replace(new RegExp("("+_mtRegexTermo(esc(w))+")","gi"),"<mark>$1</mark>"); }catch(e){} });
+    return (ini>0?"…":"")+html+(fim<bruto.length?"…":"");
+  }
+  return "";
+}
+var _mtTrechos={}; // id → trecho onde a busca achou (não fica gravado na ocorrência)
 function _mtBuscar(q){
   var t=_mtNorm(q).trim(); if(t.length<2) return [];
   var dig=t.replace(/\D/g,"");
-  var termos=t.split(/\s+/);
-  var vistos={}, out=[];
+  var termos=t.split(/\s+/).filter(Boolean);
+  // textos ligados à ocorrência: conversas das ligações e devolutivas/encaminhamentos
+  var extra={};
+  (state.db.agendamentos||[]).forEach(function(a){
+    if(!a||!a.ocorrenciaId||a.tipo!==_MT_TEL) return;
+    var xa=[a.resultado,a.recado,a.atendente].filter(Boolean).join(" · "); if(xa) extra[a.ocorrenciaId]=(extra[a.ocorrenciaId]?extra[a.ocorrenciaId]+" · ":"")+xa;
+  });
+  (state.encaminhamentos||[]).forEach(function(e){
+    var k=e&&(e.ocorrencia_id||e.ocorrenciaId); if(!k) return;
+    var xe=[e.orgao,e.descricao,e.relato_devolutiva,e.responsavel_devolutiva].filter(Boolean).join(" · "); if(xe) extra[k]=(extra[k]?extra[k]+" · ":"")+xe;
+  });
+  var vistos={}, out=[]; _mtTrechos={};
   (state.db.ocorrencias||[]).concat(state.ocorrenciasArquivadas||[]).forEach(function(o){
     if(!o||!o.id||vistos[o.id]) return;
-    var txt=_mtNorm([o.vitima_nome,o.nome_vitima,o.suspeito_nome,o.tipo,o.bairro,o.numero,o.local].join(" "));
-    var ok=termos.every(function(w){ return txt.indexOf(w)>=0; });
+    var c=_mtTextoOc(o);
+    var ex=extra[o.id]||"";
+    var norm=c.norm+(ex?" "+_mtNorm(ex):"");
+    var ok=termos.every(function(w){ return norm.indexOf(w)>=0; });
     if(!ok && dig.length>=4){
-      var nums=String(o.vitima_telefone||"").replace(/\D/g,"")+" "+String(o.numero||"").replace(/\D/g,"");
-      ok=nums.indexOf(dig)>=0;
+      ok=(c.bruto+" "+ex).replace(/\D/g," ").replace(/\s+/g,"").indexOf(dig)>=0 || c.bruto.replace(/\D/g,"").indexOf(dig)>=0;
     }
-    if(ok){ vistos[o.id]=1; out.push(o); }
+    if(ok){
+      vistos[o.id]=1;
+      // trecho só quando o termo não está no nome da vítima (senão é óbvio)
+      var nomeN=_mtNorm(o.vitima_nome||"");
+      _mtTrechos[o.id] = termos.every(function(w){ return nomeN.indexOf(w)>=0; }) ? "" : _mtTrecho(c.bruto+(ex?" · "+ex:""), termos);
+      out.push(o);
+    }
   });
   return out.sort(function(a,b){ return _mtIso(b.data).localeCompare(_mtIso(a.data)); }).slice(0,60);
 }
@@ -15402,6 +15462,8 @@ function _mtCss(){
   "#mt-root .mt-item{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--papel-3);border-left:4px solid transparent;background:transparent;padding:9px 12px;cursor:pointer;color:var(--tinta)}"+
   "#mt-root .mt-item.vd{border-left-color:var(--verm)}"+
   "#mt-root .mt-busca{margin:0 0 12px}#mt-root .mt-busca input{width:100%;box-sizing:border-box;border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:10px;padding:11px 14px;font:inherit;font-size:14px}"+
+  "#mt-root .mt-item .tr{font-size:11.5px;color:var(--tinta-2);margin-top:4px;line-height:1.45;background:var(--papel-2);border-radius:5px;padding:4px 7px;font-style:italic}"+
+  "#mt-root .mt-item .tr mark{background:#F2D27A;color:var(--tinta);font-style:normal;border-radius:2px;padding:0 1px}"+
   "#mt-root .mt-busca input:focus{border-color:var(--ambar);outline:none}"+
   "#mt-root .mt-res{display:flex;align-items:stretch;border-bottom:1px solid var(--papel-3)}#mt-root .mt-res .mt-item{border-bottom:0;flex:1;min-width:0}"+
   "#mt-root .mt-res.on{background:var(--ambar-claro)}"+
@@ -15498,7 +15560,7 @@ function _renderMesaTriagem(main){
   h+="<div class='mt-sub'><span>"+(M.feitos?"Hoje você já resolveu <b>"+M.feitos+"</b> "+(M.feitos===1?"caso":"casos")+".":"Ordem: da mais nova para a mais antiga. VD e MENOR aparecem marcados.")+"</span>";
   if(M.pilha==="novo") h+="<label style='display:flex;gap:5px;align-items:center;cursor:pointer'><input type='checkbox' data-mt-jur "+(M.jur!==false?"checked":"")+"> Só bairros da jurisdição</label>";
   h+="</div>";
-  h+="<div class='mt-busca'><input id='mt-busca' type='search' autocomplete='off' placeholder='🔍 Buscar ocorrência: nome, nº do BO, telefone, bairro…' value='"+esc(M.busca||"")+"'></div>";
+  h+="<div class='mt-busca'><input id='mt-busca' type='search' autocomplete='off' placeholder='🔍 Buscar em tudo: nome, testemunha, trecho do relato, nº do BO, telefone…' value='"+esc(M.busca||"")+"'></div>";
   h+="<div class='mt-grid"+(M.sel?" aberto":"")+"'>";
   h+="<div class='mt-lista' id='mt-lista'>"+_mtListaHtml(lista,P)+"</div>";
   h+="<div class='mt-caso'>"+_mtCasoHtml(M.sel?_mtOc(M.sel):null)+"</div>";
@@ -15520,6 +15582,7 @@ function _mtListaHtml(lista,P){
       h+="<div>"+(vd?"<span class='mt-selo vd'>VD</span>":"")+"<span class='t'>"+esc((o.tipo||"Ocorrência").substring(0,40))+"</span></div>";
       h+="<div class='v'>👤 "+esc(o.vitima_nome||"Vítima não identificada")+(o.suspeito_nome?" · 🎯 "+esc(o.suspeito_nome):"")+"</div>";
       var _tl2=_mtTelefones(o)[0]; if(_tl2) h+="<div class='tl'>📞 "+esc(_tl2)+"</div>";
+      if(_mtTrechos[o.id]) h+="<div class='tr'>"+_mtTrechos[o.id]+"</div>";
       h+="<div class='q'>"+_mtBr(_mtIso(o.data))+"/"+(_mtIso(o.data).slice(0,4)||"")+(o.numero?" · BO "+esc(String(o.numero)):"")+" · "+esc(arq?"Arquivado":(SIT[o.situacao]||o.situacao||""))+(nEnc?" · devolutivas "+nDev+"/"+nEnc:"")+"</div></button>";
       h+="<button class='mt-pdfmini' data-mt-pdf-id='"+esc(o.id)+"' title='PDF do atendimento'>📄 PDF</button></div>";
     });
@@ -15942,8 +16005,11 @@ document.addEventListener("input",function(ev){
   if(ev.target.id==="mt-recado") state._mt.rasc.recado=ev.target.value;
   if(ev.target.id==="mt-busca"){
     state._mt.busca=ev.target.value;
-    var el=document.getElementById("mt-lista");
-    if(el) el.innerHTML=_mtListaHtml(_mtPilha(state._mt.pilha),[{k:"novo",r:"Novos"},{k:"ligar",r:"Ligar hoje"},{k:"cobrar",r:"Cobrar"}]);
+    clearTimeout(window._mtBuscaT);
+    window._mtBuscaT=setTimeout(function(){
+      var el=document.getElementById("mt-lista");
+      if(el) el.innerHTML=_mtListaHtml(_mtPilha(state._mt.pilha),[{k:"novo",r:"Novos"},{k:"ligar",r:"Ligar hoje"},{k:"cobrar",r:"Cobrar"}]);
+    },200);
   }
 });
 document.addEventListener("keydown",function(ev){
