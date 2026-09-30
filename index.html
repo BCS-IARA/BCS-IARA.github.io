@@ -15652,7 +15652,8 @@ function _mtCasoHtml(o){
   var h="<div class='mt-ccab'><button class='mt-voltar' data-mt-voltar>← Lista</button><h3>"+esc(o.tipo||"Ocorrência")+"</h3>";
   h+=(vd?"<span class='mt-selo vd'>VD</span>":"")+(me?"<span class='mt-selo me'>MENOR</span>":"");
   h+="<span class='m'>"+esc(o.data||"—")+(o.hora?" "+esc(o.hora):"")+(o.bairro?" · "+esc(o.bairro):"")+(o.numero?" · BO nº "+esc(String(o.numero)):"")+"</span>";
-  h+="<button class='mt-btn sec' style='margin-left:auto;padding:6px 12px;font-size:12px' data-mt-pdf>📄 PDF do atendimento</button></div>";
+  h+="<span style='margin-left:auto;display:flex;gap:6px;flex-wrap:wrap'><button class='mt-btn sec' style='padding:6px 12px;font-size:12px' data-mt-editar>✏️ Editar ocorrência</button><button class='mt-btn sec' style='padding:6px 12px;font-size:12px' data-mt-pdf>📄 PDF do atendimento</button></span></div>";
+  if(M.editando===o.id){ h+=_mtEditarHtml(o); return h; }
   h+=_mtTelBarra(o);
   // Quem
   h+="<div class='mt-bl'><div class='mt-pes'>";
@@ -15713,6 +15714,66 @@ function _mtCasoHtml(o){
   return h;
 }
 
+// ── Edição dos campos da ocorrência ────────────────────────
+var _MT_ED_CAMPOS=[
+  {t:"Ocorrência"},
+  {k:"numero",l:"Nº do BO"},{k:"tipo",l:"Tipo"},{k:"data",l:"Data",tipo:"date"},{k:"hora",l:"Hora",tipo:"time"},
+  {k:"bairro",l:"Bairro"},{k:"local",l:"Local / endereço do fato",largo:1},
+  {t:"Vítima"},
+  {k:"vitima_nome",l:"Nome da vítima"},{k:"vitima_idade",l:"Idade da vítima"},{k:"vitima_sexo",l:"Sexo da vítima",ops:["","F","M"]},
+  {k:"vitima_telefone",l:"Telefone da vítima"},{k:"vitima_endereco",l:"Endereço da vítima",largo:1},
+  {t:"Autor"},
+  {k:"suspeito_nome",l:"Nome do autor"},{k:"suspeito_idade",l:"Idade do autor"},{k:"suspeito_endereco",l:"Endereço do autor",largo:1},
+  {t:"Relato"},
+  {k:"_relato",l:"Relato (o que aconteceu)",area:8,largo:1},
+  {k:"medidas",l:"Medidas adotadas",area:3,largo:1},
+  {k:"policiais",l:"Policiais / guarnição",largo:1}
+];
+function _mtEdValor(o,k){
+  if(k==="_relato") return _relatoCompleto(o);
+  if(k==="data") return _mtIso(o.data);
+  if(k==="hora") return String(o.hora||"").slice(0,5);
+  return o[k]==null?"":String(o[k]);
+}
+function _mtEditarHtml(o){
+  var IS="width:100%;box-sizing:border-box;border:1.5px solid var(--papel-3);background:var(--papel);color:var(--tinta);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px";
+  var h="<div class='mt-bl'><p class='mt-perg'>✏️ Editar ocorrência</p><div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px'>";
+  _MT_ED_CAMPOS.forEach(function(c){
+    if(c.t){ h+="<div style='grid-column:1/-1;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--ambar-2);margin-top:6px'>"+c.t+"</div>"; return; }
+    var v=_mtEdValor(o,c.k), id="mt-ed-"+c.k.replace(/^_/,"");
+    h+="<label style='display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:var(--tinta-2)"+(c.largo?";grid-column:1/-1":"")+"'>"+c.l;
+    if(c.area) h+="<textarea id='"+id+"' rows='"+c.area+"' style='"+IS+";resize:vertical;line-height:1.5'>"+esc(v)+"</textarea>";
+    else if(c.ops) h+="<select id='"+id+"' style='"+IS+"'>"+c.ops.map(function(x){ return "<option value='"+x+"'"+(v===x?" selected":"")+">"+(x==="F"?"Feminino":x==="M"?"Masculino":"—")+"</option>"; }).join("")+"</select>";
+    else h+="<input id='"+id+"' type='"+(c.tipo||"text")+"' value='"+esc(v)+"' style='"+IS+"'>";
+    h+="</label>";
+  });
+  h+="</div><div class='mt-row' style='margin-top:14px'><button class='mt-btn ok' data-mt-edsalvar>💾 Salvar alterações</button><button class='mt-btn sec' data-mt-edcancelar>Cancelar</button></div>";
+  h+="<p class='mt-dica' style='margin-top:6px'>As alterações são gravadas no aparelho e enviadas ao Sheets.</p></div>";
+  return h;
+}
+function _mtSalvarEdicao(o){
+  var mud=[];
+  _MT_ED_CAMPOS.forEach(function(c){
+    if(!c.k) return;
+    var el=document.getElementById("mt-ed-"+c.k.replace(/^_/,"")); if(!el) return;
+    var novo=el.value.trim(), antigo=_mtEdValor(o,c.k).trim();
+    if(novo===antigo) return;
+    mud.push(c.l);
+    if(c.k==="_relato"){
+      // relato editado vira o texto único — evita juntar a versão antiga com a nova
+      o.descricao=novo; o.descricao_dinamica=novo; o.texto_original=novo;
+    } else if(c.k==="data"){
+      // mantém o formato em que a data já estava (dd/mm/aaaa ou aaaa-mm-dd)
+      o.data=/^\d{2}\/\d{2}\/\d{4}/.test(String(o.data||""))&&novo ? novo.split("-").reverse().join("/") : novo;
+    } else o[c.k]=novo;
+  });
+  if(!mud.length){ showToast("Nada foi alterado"); return false; }
+  o.editadoPor=_mtAtendente()||""; o.editadoEm=new Date().toISOString();
+  o.historicoEdicoes=(Array.isArray(o.historicoEdicoes)?o.historicoEdicoes:[]).concat([{em:o.editadoEm, por:o.editadoPor, campos:mud}]).slice(-30);
+  _mtSalvarTudo(o);
+  showToast("✓ Ocorrência atualizada: "+mud.join(", "));
+  return true;
+}
 function _mtEncEnviado(e){ return !!(e.enviado_em || (e.status && e.status!=="pendente" && e.status!=="a_encaminhar")); }
 function _mtEncsHtml(o){
   var M=state._mt, encs=_mtEncsOc(o.id); if(!encs.length) return "";
@@ -16002,6 +16063,7 @@ function _mtTempo(o){
     (Array.isArray(e.cobrancas)?e.cobrancas:[]).forEach(function(c){ t.push({d:_mtIso(c),t:"Cobrou "+(e.orgao||e.tipo),s:""}); });
     if(e.relato_devolutiva) t.push({d:_mtIso(e.data_devolutiva||""),t:"Devolutiva: "+(e.orgao||e.tipo),s:e.relato_devolutiva});
   });
+  (Array.isArray(o.historicoEdicoes)?o.historicoEdicoes:[]).forEach(function(x){ t.push({d:_mtIso(x.em),t:"Ocorrência editada"+(x.por?" ("+x.por+")":""),s:(x.campos||[]).join(", ")}); });
   if(o.situacao==="encerrada"&&o.mt_encerradoEm) t.push({d:o.mt_encerradoEm,t:"Encerrado",s:o.observacoes_triagem||""});
   return t.sort(function(a,b){ return (b.d||"").localeCompare(a.d||""); });
 }
@@ -16306,10 +16368,13 @@ document.addEventListener("click",function(ev){
     return;
   }
   if(d.mtPilha){ M.fixo=null; M.busca=""; M.pilha=d.mtPilha; M.sel=null; if(d.mtPilha==="enc" && !M.encFiltro) M.encFiltro="enviar"; M.painel=null; M.rasc={}; _mtRender(); return; }
-  if(d.mtCaso){ M.fixo=null; M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
+  if(d.mtCaso){ M.editando=null; M.fixo=null; M.sel=d.mtCaso; M.painel=null; M.rasc={}; M.relatoTodo=false; _mtRender(); window.scrollTo({top:0}); return; }
   if("mtVoltar" in d){ M.sel=null; M.painel=null; _mtRender(); return; }
   if(!o) return;
   if("mtPdf" in d){ _mtGerarPdf(o.id); return; }
+  if("mtEditar" in d){ M.editando=(M.editando===o.id?null:o.id); M.painel=null; _mtRender(); return; }
+  if("mtEdcancelar" in d){ M.editando=null; _mtRender(); return; }
+  if("mtEdsalvar" in d){ if(_mtSalvarEdicao(o)){ M.editando=null; _mtRender(); } return; }
   if("mtRelato" in d){ M.relatoTodo=!M.relatoTodo; _mtRender(); return; }
   if("mtFrida" in d){
     abrirMonitorVCM(o.id);
