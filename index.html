@@ -18559,11 +18559,15 @@ function render(){
     ${state.perfil==="guarnicao"?`
       <p class="nav-label">Calendário</p>
       <button class="nav-btn${state.tela==="calendario"?" active":""}" onclick="setTela('calendario')">Calendário / Agenda</button>
+      <p class="nav-label">Central de Atend.</p>
+      <button class="nav-btn${state.tela==="mesa_triagem"?" active":""}" onclick="setTela('mesa_triagem')">🧪 Minha Mesa (teste)</button>
     `:state.perfil==="projetossociais"?`
       <p class="nav-label">Projetos Sociais</p>
       <button class="nav-btn${state.tela==="projetos"?" active":""}" onclick="setTela('projetos')">Projetos Sociais</button>
       <p class="nav-label">Agenda</p>
       <button class="nav-btn${state.tela==="calendario"?" active":""}" onclick="setTela('calendario')">Calendário / Agenda</button>
+      <p class="nav-label">Central de Atend.</p>
+      <button class="nav-btn${state.tela==="mesa_triagem"?" active":""}" onclick="setTela('mesa_triagem')">🧪 Minha Mesa (teste)</button>
     `:state.perfil==="comandante"?`
       <p class="nav-label">Comando</p>
       <button class="nav-btn${state.tela==="dashcomandante"?" active":""}" onclick="setTela('dashcomandante')">${(function(){ var nP=(state.alertasProjetos||[]).filter(function(a){return !a.lido;}).length; var nC=(state.alertasCrescimento||[]).filter(function(a){return !a.lido;}).length; var total=nP+nC; if(total>0) return "Painel do Comando <span style='background:var(--verm);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700'>"+total+"</span>"; return "Painel do Comando"; })()}</button>
