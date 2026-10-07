@@ -1226,13 +1226,13 @@ async function carregarDadosAppDoSheets(){
     state.db.acompanhamentos = _mergeById(state.db.acompanhamentos||[], acompanhamentosSheets);
     state.chamadas            = _mergeById(state.chamadas||[],            chamadasSheets);
     state.cargasArmamento     = _mergeById(state.cargasArmamento||[],     cargasSheets);
-    state.invItens            = _mergeByIdTimestamp(state.invItens||[],            invItensSheets);
+    state.invItens            = _invMergeItens(state.invItens||[],            invItensSheets);
     state.invMovimentacoes    = _mergeById(state.invMovimentacoes||[],    invMovSheets);
     // Mescla com a aba dedicada — só ACRESCENTA o que ainda não existe localmente (_mergeById,
     // não por timestamp: mesmo risco de reversão que o de Encaminhamentos se algum campo não
     // tiver um timestamp confiável dos dois lados).
     if(_rInvItensTabela && _rInvItensTabela.ok && Array.isArray(_rInvItensTabela.dados)){
-      state.invItens = _mergeById(state.invItens, _rInvItensTabela.dados);
+      state.invItens = _invMergeFotos(_mergeById(state.invItens, _rInvItensTabela.dados), state.invItens, _rInvItensTabela.dados);
     }
     if(_rInvMovTabela && _rInvMovTabela.ok && Array.isArray(_rInvMovTabela.dados)){
       state.invMovimentacoes = _mergeById(state.invMovimentacoes, _rInvMovTabela.dados);
@@ -24112,22 +24112,64 @@ async function _invUploadFoto(itemId, base64, nomeItem){
     // Apps Script pode retornar JSONP ou JSON puro
     var json=txt.replace(/^[^{]*({.*})[^}]*$/s,"$1");
     var data=JSON.parse(json);
-    if(data&&data.ok&&data.url) return data.url;
+    if(data&&data.ok&&data.url){ window._invFotoErro=""; return data.url; }
+    window._invFotoErro=(data&&data.erro)||"resposta inesperada do servidor";
+    console.warn("[INV] Upload foto recusado:",window._invFotoErro);
     return null;
   }catch(e){
+    window._invFotoErro=String(e&&e.message||e);
     console.warn("[INV] Upload foto falhou:",e);
     return null;
   }
 }
 
+// Mescla itens do inventário sem perder a foto: o _mergeByIdTimestamp troca o item inteiro
+// (ou mantém o local inteiro) conforme o timestamp — e com isso o foto_url enviado ao Drive
+// por outro aparelho não chegava, ou a foto base64 ainda não enviada era trocada por "[foto_local]".
+function _invMergeFotos(itens, antes, remoto){
+  var loc={}, rem={};
+  (antes||[]).forEach(function(x){ if(x&&x.id) loc[String(x.id)]=x; });
+  (remoto||[]).forEach(function(x){ if(x&&x.id) rem[String(x.id)]=x; });
+  return (itens||[]).map(function(x){
+    if(!x||!x.id) return x;
+    var k=String(x.id), l=loc[k], r=rem[k], fu=(r&&r.foto_url)||(l&&l.foto_url)||"";
+    if(!x.foto_url&&fu){ x=Object.assign({},x,{foto_url:fu}); }
+    // foto ainda só neste aparelho: não deixa o placeholder do Sheets apagá-la
+    if(l&&l.foto&&l.foto.length>500&&l.foto.indexOf("data:")===0&&!x.foto_url&&(!x.foto||x.foto.length<=500)){
+      x=Object.assign({},x,{foto:l.foto});
+    }
+    if(x.foto_url&&x.foto&&x.foto.length>500&&x.foto.indexOf("http")!==0){ x=Object.assign({},x,{foto:"[foto_drive]"}); }
+    return x;
+  });
+}
+function _invMergeItens(local, remoto){
+  return _invMergeFotos(_mergeByIdTimestamp(local||[], remoto||[]), local, remoto);
+}
+function _invFotosPendentes(){
+  return (state.invItens||[]).filter(function(x){
+    return x&&x.ativo!==false&&!x.foto_url&&x.foto&&x.foto.indexOf("data:")===0;
+  });
+}
+
 // Salva item e envia foto para Drive em background
+var _invFotoEnviando={}, _invFotoAvisou=false;
 function _invEnviarFotoEAtualizarItem(item){
   if(!item.foto||item.foto.startsWith("http")||item.foto==="[foto_local]"||item.foto==="[foto_drive]") return;
+  if(_invFotoEnviando[item.id]) return;
+  _invFotoEnviando[item.id]=1;
   _invUploadFoto(item.id, item.foto, item.descricao).then(function(url){
-    if(!url) return;
+    delete _invFotoEnviando[item.id];
+    if(!url){
+      if(!_invFotoAvisou){
+        _invFotoAvisou=true;
+        showToast("⚠️ Foto não foi para o Drive ("+(window._invFotoErro||"sem resposta")+"). Fica salva neste aparelho e será reenviada.","error");
+      }
+      return;
+    }
     var idx=(state.invItens||[]).findIndex(function(x){return x.id===item.id;});
     if(idx>=0){
       state.invItens[idx].foto_url=url;
+      state.invItens[idx].atualizadoEm=new Date().toISOString(); // senão os outros aparelhos mantêm a versão sem foto
       state.invItens[idx].foto="[foto_drive]"; // libera espaço no localStorage
       _invSalvarLocal();
       _invEnviarSheets("inv_item", state.invItens[idx]);
@@ -24291,7 +24333,7 @@ async function _invSincronizarDoSheets(){
     }
     function _mergeInvTs(local, remoto){
       if(!remoto||!remoto.ok||!Array.isArray(remoto.dados)||!remoto.dados.length) return local||[];
-      return _mergeByIdTimestamp(local||[], remoto.dados);
+      return _invMergeItens(local||[], remoto.dados);
     }
     if(rItens&&rItens.ok){
       state.invItens=_mergeInvTs(state.invItens, rItens);
@@ -26347,6 +26389,8 @@ function renderInventario(main){
   var _invSincCor=state.sincErro?"#A8492E":state.sincronizando?"#C8A84B":state._invLastSync?"#6E8F52":"#6B5236";
   h+="<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center'>";
   h+="<span style='font-size:10px;color:"+_invSincCor+";background:"+_invSincCor+"18;border:1px solid "+_invSincCor+"44;border-radius:6px;padding:4px 9px'>"+_invSincTxt+"</span>";
+  var _invFp=_invFotosPendentes().length;
+  if(_invFp) h+="<button onclick='_invFotoAvisou=false;_invReenviarFotosPendentes();showToast(\"📷 Reenviando fotos...\")' title='Fotos que estão só neste aparelho e ainda não foram para o Drive"+(window._invFotoErro?" — último erro: "+esc(window._invFotoErro):"")+"' style='font-size:10px;color:#C8A84B;background:#C8A84B18;border:1px solid #C8A84B66;border-radius:6px;padding:4px 9px;cursor:pointer'>📷 "+_invFp+" foto"+(_invFp>1?"s":"")+" só neste aparelho · reenviar</button>";
   h+="<div style='display:flex;border:1px solid #5e4636;border-radius:8px;overflow:hidden'>";
   h+="<button onclick='state._invLastSync=0;_invSincronizarDoSheets().then(function(){var m=document.getElementById(\"main-content\")||document.getElementById(\"main\");if(m&&state.tela===\"inventario\")renderInventario(m);showToast(\"✓ Sincronizado\");})' title='Sincronizar"+(state._invLastSync?" — última: "+new Date(state._invLastSync).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"")+"' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#a07c58;padding:8px 12px;font-size:13px;cursor:pointer'>🔄</button>";
   h+="<button onclick='_invRecarregarDoSheets()' title='Recarregar tudo do Sheets (descarta cache local)' style='background:transparent;border:none;border-right:1px solid #5e4636;color:#4a9fd4;padding:8px 12px;font-size:13px;cursor:pointer'>↓</button>";
