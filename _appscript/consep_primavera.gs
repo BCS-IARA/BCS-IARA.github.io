@@ -6,23 +6,25 @@
 //  Recebe os POSTs de registro-chapa.html e cadastro-assembleia.html:
 //    {token, tipo:"registro_chapa_consep_primavera",      registro:{...}}
 //    {token, tipo:"cadastro_assembleia_consep_primavera", registro:{...}}
-//  Grava cada um numa aba própria e salva as imagens (assinatura,
+//  Grava cada um numa aba própria da planilha CONSEP_ASSEMBLEIA e
+//  salva as imagens (assinatura,
 //  documento, comprovante) como arquivos no Drive, com o link na célula.
 //
 //  COMO INSTALAR:
 //  1. script.google.com → Novo projeto → nome: "CONSEP Primavera"
 //  2. Cole este arquivo inteiro, salve (Ctrl+S)
 //  3. Executar a função "testeSetup" uma vez (autorize quando pedir)
-//     → cria a planilha "CONSEP Primavera — Cadastros" e a pasta de
-//       anexos no seu Drive; o log mostra os links
+//     → cria as abas na planilha CONSEP_ASSEMBLEIA e a pasta de anexos
+//       no seu Drive; o log mostra os links
 //  4. Implantar → Nova implantação → tipo "App da Web"
 //       Executar como: Eu
 //       Quem tem acesso: Qualquer pessoa
 //  5. Copie a URL /exec gerada e cole no SHEETS_URL das duas páginas.
 // ══════════════════════════════════════════════════════════════════
 
-var TOKEN  = "consep-primavera-2026"; // igual ao TOKEN das páginas
-var VERSAO = "consep-primavera-1.0";
+var SHEET_ID = "1tF_gUEGx28THFv11EJwnF2kmsn6zY4-rNlbIITJ_f1g"; // planilha CONSEP_ASSEMBLEIA
+var TOKEN    = "consep-primavera-2026"; // igual ao TOKEN das páginas
+var VERSAO   = "consep-primavera-1.0";
 
 var TIPOS = {
   registro_chapa_consep_primavera: {
@@ -50,13 +52,7 @@ function _json(o) {
 
 function _props() { return PropertiesService.getScriptProperties(); }
 
-function _planilha() {
-  var id = _props().getProperty("SHEET_ID");
-  if (id) return SpreadsheetApp.openById(id);
-  var ss = SpreadsheetApp.create("CONSEP Primavera — Cadastros");
-  _props().setProperty("SHEET_ID", ss.getId());
-  return ss;
-}
+function _planilha() { return SpreadsheetApp.openById(SHEET_ID); }
 
 function _pasta() {
   var id = _props().getProperty("FOLDER_ID");
