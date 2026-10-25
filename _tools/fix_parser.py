@@ -65,7 +65,7 @@ new_parser = '''function _parsearWhatsApp(texto) {
       vitima_telefone:'', vitima_cpf:'', vitima_endereco:local,
       suspeito_nome:'', suspeito_apelido:'', suspeito_caracteristicas:'', veiculo:'',
       medida_protetiva:vd?'Sim':'Não', violencia_domestica:vd, requer_visita:vd, reincidente:false,
-      descricao:resumo.slice(0,150), descricao_dinamica:dinamica, medidas:medidas,
+      descricao:resumo, descricao_dinamica:dinamica, medidas:medidas,
       texto_original:dinamica, policiais:resp, fonte:'WhatsApp' };
   }
 
@@ -114,7 +114,7 @@ new_parser = '''function _parsearWhatsApp(texto) {
       vitima_telefone:'', vitima_cpf:vitCpf, vitima_endereco:vitEnd||local,
       suspeito_nome:suspNome, suspeito_apelido:'', suspeito_caracteristicas:'', veiculo:'',
       medida_protetiva:vd?'Sim':'Não', violencia_domestica:vd, requer_visita:vd, reincidente:false,
-      descricao:(descricao||dinamica).slice(0,150), descricao_dinamica:dinamica, medidas:medidas,
+      descricao:(descricao||dinamica), descricao_dinamica:dinamica, medidas:medidas,
       texto_original:dinamica||descricao, policiais:efetivo, fonte:'WhatsApp' };
   }
 
