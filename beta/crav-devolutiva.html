@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <title>Devolutiva de Atendimento — 77ª CIPM BCS</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+    .header{padding:20px 20px 16px;border-bottom:1px solid var(--cor-borda);text-align:center}
+    .header h1{font-size:16px;font-weight:700;letter-spacing:.5px}
+    .header p{font-size:12px;margin-top:3px;opacity:.6}
+    .badge-org{font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:1px;text-transform:uppercase;display:inline-block;margin-top:8px;border:1px solid var(--cor-borda)}
+    .caso-banner{border:1px solid var(--cor-borda);border-radius:10px;padding:14px 16px;margin:16px;display:flex;align-items:center;gap:10px}
+    .caso-banner .nome{font-size:15px;font-weight:700}
+    .caso-banner .meta{font-size:11px;margin-top:2px;opacity:.6}
+    .form-wrap{padding:0 16px 32px}
+    .section{border:1px solid var(--cor-borda);border-radius:12px;padding:16px;margin-bottom:14px}
+    .section h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--cor-borda);color:var(--cor-titulo)}
+    label.field{display:block;margin-bottom:12px}
+    label.field span{display:block;font-size:12px;margin-bottom:5px;font-weight:600;color:var(--cor-label)}
+    input[type=text],input[type=date],textarea,select{width:100%;border:1px solid var(--cor-borda);padding:11px 13px;border-radius:8px;font-size:14px;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none}
+    input:focus,textarea:focus,select:focus{border-color:var(--cor-principal)}
+    textarea{resize:vertical;min-height:80px;line-height:1.5}
+    .checks-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    @media(max-width:360px){.checks-grid{grid-template-columns:1fr}}
+    .check-item{border:1px solid var(--cor-borda);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:8px}
+    .check-item:has(input:checked){border-color:var(--cor-principal)}
+    .check-item input[type=checkbox]{width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:var(--cor-principal)}
+    .check-item .lbl{font-size:12px;cursor:pointer;user-select:none}
+    .check-full{grid-column:1/-1}
+    .sit-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .sit-btn{border:2px solid var(--cor-borda);border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .15s}
+    .sit-btn input{display:none}
+    .sit-btn .ico{font-size:22px;display:block;margin-bottom:4px}
+    .sit-btn .txt{font-size:11px;font-weight:600;color:var(--cor-label)}
+    .sit-btn:has(input:checked){border-color:var(--cor-principal)}
+    .btn-submit{width:100%;border:none;padding:16px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-top:6px;color:#fff;background:var(--cor-principal)}
+    .btn-submit:disabled{opacity:.5;cursor:not-allowed}
+    #status{display:none;text-align:center;padding:24px 16px;border-radius:12px;margin:16px;font-size:14px;font-weight:600;line-height:1.6}
+    #status.ok{background:#0a2e0a;border:1px solid #22c55e44;color:#86efac}
+    #status.err{background:#2e0a0a;border:1px solid #ef444444;color:#fca5a5}
+    .required{color:var(--cor-principal)}
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div class="header">
+    <div id="header-ico" style="font-size:32px;margin-bottom:10px">📋</div>
+    <h1 id="header-titulo">Devolutiva de Atendimento</h1>
+    <p id="header-sub">77ª CIPM · Base Comunitária de Segurança · Nova Cidade</p>
+    <span class="badge-org" id="header-badge">Carregando...</span>
+  </div>
+
+  <div id="caso-banner" style="display:none" class="caso-banner">
+    <div style="font-size:24px">👩</div>
+    <div>
+      <div class="nome" id="banner-nome">—</div>
+      <div class="meta" id="banner-meta">—</div>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="form-wrap" id="form-area">
+    <form id="form-dev" onsubmit="enviar(event)">
+
+      <div class="section">
+        <h2>📋 Identificação da Assistida</h2>
+        <label class="field">
+          <span>Nome completo <span class="required">*</span></span>
+          <input type="text" id="f-nome" required autocomplete="off"/>
+        </label>
+        <label class="field">
+          <span>Nº Protocolo / BO / Ocorrência BCS</span>
+          <input type="text" id="f-protocolo"/>
+        </label>
+        <label class="field">
+          <span>Data do atendimento <span class="required">*</span></span>
+          <input type="date" id="f-data" required/>
+        </label>
+      </div>
+
+      <div class="section">
+        <h2 id="sec-tipo-titulo">🩺 Tipo de Atendimento Realizado</h2>
+        <div class="checks-grid" id="checks-container"></div>
+        <label class="field" style="margin-top:12px">
+          <span>Detalhes / Encaminhamentos realizados</span>
+          <input type="text" id="f-encaminhamento" placeholder="Descreva encaminhamentos, cursos, serviços acionados..."/>
+        </label>
+      </div>
+
+      <div class="section">
+        <h2>📍 Situação Atual</h2>
+        <div class="sit-grid">
+          <label class="sit-btn"><input type="radio" name="situacao" value="Protegida / segura"><span class="ico">✅</span><span class="txt">Protegida</span></label>
+          <label class="sit-btn"><input type="radio" name="situacao" value="Em situação de risco"><span class="ico">⚠️</span><span class="txt">Em risco</span></label>
+          <label class="sit-btn"><input type="radio" name="situacao" value="Não localizada"><span class="ico">🔍</span><span class="txt">Não localizada</span></label>
+          <label class="sit-btn"><input type="radio" name="situacao" value="Situação desconhecida"><span class="ico">❓</span><span class="txt">Desconhecida</span></label>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>📝 Observações</h2>
+        <label class="field">
+          <span>Relato do atendimento</span>
+          <textarea id="f-obs" placeholder="Descreva a situação encontrada, ações realizadas, próximos passos..."></textarea>
+        </label>
+      </div>
+
+      <div class="section">
+        <h2 id="sec-resp-titulo">👤 Responsável pelo Atendimento</h2>
+        <label class="field">
+          <span>Nome completo <span class="required">*</span></span>
+          <input type="text" id="f-tecnica" required/>
+        </label>
+        <label class="field">
+          <span>Função / Cargo</span>
+          <select id="f-funcao"><option value="">Selecione...</option></select>
+        </label>
+      </div>
+
+      <button type="submit" class="btn-submit" id="btn-submit">Enviar Devolutiva</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbxKZVJcjgBSVUK7MXcH1ZuKY8-YhmidlTN-olcmLJ0T4ar9fPE05-iZbqJ4KUfHMgovRA/exec";
+const TOKEN = "bcs-token-secreto-2025";
+
+// ── Configuração por órgão ─────────────────────────────
+var ORGAOS = {
+  crav: {
+    nome:  "CRAV",
+    label: "Centro de Referência Albertina Vasconcelos",
+    ico:   "💜",
+    cor:   "#7c3aed",
+    borda: "#c4b5fd",
+    bg:    "#1a0a2e",
+    bgCard:"#2d1547",
+    texto: "#e9d5ff",
+    label_cor: "#c4b5fd",
+    titulo_cor:"#a78bfa",
+    tipos: [
+      "🔍 Busca ativa","⚖️ Atendimento jurídico","🧠 Atendimento psicológico",
+      "🤝 Atendimento social","📤 Encaminhamento","📚 Curso / capacitação",
+      "🏠 Acolhimento institucional","🔒 Casa abrigo","🛡 Renovação de medida protetiva"
+    ],
+    funcoes: ["Assistente Social","Psicóloga","Advogada","Educadora Social","Coordenadora","Outro"]
+  },
+  conselho_tutelar: {
+    nome:  "Conselho Tutelar",
+    label: "Conselho Tutelar",
+    ico:   "👶",
+    cor:   "#0284c7",
+    borda: "#7dd3fc",
+    bg:    "#0a1a2e",
+    bgCard:"#0f2a3f",
+    texto: "#e0f2fe",
+    label_cor:"#7dd3fc",
+    titulo_cor:"#38bdf8",
+    tipos: [
+      "🏠 Visita domiciliar","👦 Atendimento à criança/adolescente","🛡 Medida protetiva (ECA)",
+      "🏫 Encaminhamento para escola","🏥 Encaminhamento CRAS/CAPS","👨‍👩‍👧 Orientação à família",
+      "⚠️ Advertência","⚖️ Encaminhamento ao MP","🏛 Acolhimento institucional"
+    ],
+    funcoes: ["Conselheiro Tutelar","Coordenador","Assistente Administrativo","Outro"]
+  },
+  delegacia: {
+    nome:  "Delegacia",
+    label: "Delegacia de Polícia",
+    ico:   "🚔",
+    cor:   "#1d4ed8",
+    borda: "#93c5fd",
+    bg:    "#0a0f2e",
+    bgCard:"#0f1a3f",
+    texto: "#dbeafe",
+    label_cor:"#93c5fd",
+    titulo_cor:"#60a5fa",
+    tipos: [
+      "📋 Registro de BO","🔍 Instauração de inquérito","🚨 Prisão em flagrante",
+      "🛡 Medida protetiva solicitada","🔬 Perícia realizada","🎙 Oitiva da vítima",
+      "🎙 Oitiva do autor","📁 Indiciamento","⚖️ Encaminhamento ao MP"
+    ],
+    funcoes: ["Delegado(a)","Investigador(a)","Escrivão(ã)","Agente","Outro"]
+  },
+  deam: {
+    nome:  "DEAM",
+    label: "Delegacia Especializada de Atendimento à Mulher",
+    ico:   "👩‍⚖️",
+    cor:   "#be123c",
+    borda: "#fda4af",
+    bg:    "#1a0508",
+    bgCard:"#2a0a10",
+    texto: "#ffe4e6",
+    label_cor:"#fda4af",
+    titulo_cor:"#fb7185",
+    tipos: [
+      "📋 Registro de BO","🔍 Instauração de inquérito","🛡 Medida protetiva solicitada",
+      "🎙 Oitiva da vítima","🎙 Oitiva do autor","🔬 Perícia realizada",
+      "📁 Indiciamento","⚖️ Encaminhamento ao MP","🏠 Acolhimento institucional"
+    ],
+    funcoes: ["Delegada(o)","Investigador(a)","Escrivão(ã)","Assistente Social","Outro"]
+  },
+  cras: {
+    nome:  "CRAS",
+    label: "Centro de Referência de Assistência Social",
+    ico:   "🏠",
+    cor:   "#0d9488",
+    borda: "#5eead4",
+    bg:    "#001a17",
+    bgCard:"#00251f",
+    texto: "#ccfbf1",
+    label_cor:"#5eead4",
+    titulo_cor:"#2dd4bf",
+    tipos: [
+      "🤝 Acompanhamento familiar","📋 Cadastro / atualização CadÚnico","🏠 Visita domiciliar",
+      "🍲 Encaminhamento a benefício social","👨‍👩‍👧 Orientação socioassistencial",
+      "🔍 Encaminhamento ao CREAS","📚 Encaminhamento a curso / oficina","⚠️ Situação de vulnerabilidade identificada"
+    ],
+    funcoes: ["Assistente Social","Psicólogo(a)","Coordenador(a)","Educador(a) Social","Outro"]
+  },
+  creas: {
+    nome:  "CREAS",
+    label: "Centro de Referência Especializado de Assistência Social",
+    ico:   "🛡",
+    cor:   "#c2410c",
+    borda: "#fdba74",
+    bg:    "#1a0d00",
+    bgCard:"#2a1600",
+    texto: "#ffedd5",
+    label_cor:"#fdba74",
+    titulo_cor:"#fb923c",
+    tipos: [
+      "🛡 Atendimento PAEFI","🏠 Visita domiciliar","⚖️ Encaminhamento jurídico",
+      "🧠 Atendimento psicológico","👨‍👩‍👧 Acompanhamento familiar","🏛 Encaminhamento ao MP",
+      "📚 Encaminhamento a curso / oficina","🔒 Acompanhamento de medida protetiva"
+    ],
+    funcoes: ["Assistente Social","Psicólogo(a)","Advogado(a)","Coordenador(a)","Outro"]
+  },
+  ubs: {
+    nome:  "UBS",
+    label: "Unidade Básica de Saúde",
+    ico:   "🩺",
+    cor:   "#0891b2",
+    borda: "#67e8f9",
+    bg:    "#001318",
+    bgCard:"#001e26",
+    texto: "#cffafe",
+    label_cor:"#67e8f9",
+    titulo_cor:"#22d3ee",
+    tipos: [
+      "🩺 Consulta médica","💊 Acompanhamento de tratamento","🧠 Encaminhamento saúde mental / CAPS",
+      "🏠 Visita domiciliar (ACS)","🤰 Acompanhamento pré-natal","💉 Vacinação",
+      "📋 Atualização de prontuário"
+    ],
+    funcoes: ["Médico(a)","Enfermeiro(a)","Agente Comunitário de Saúde","Psicólogo(a)","Coordenador(a)","Outro"]
+  },
+  escola: {
+    nome:  "Escola",
+    label: "Unidade Escolar",
+    ico:   "🏫",
+    cor:   "#4338ca",
+    borda: "#a5b4fc",
+    bg:    "#0a0a1a",
+    bgCard:"#12122a",
+    texto: "#e0e7ff",
+    label_cor:"#a5b4fc",
+    titulo_cor:"#818cf8",
+    tipos: [
+      "📚 Acompanhamento pedagógico","👨‍👩‍👧 Reunião com responsáveis","🚸 Verificação de frequência",
+      "🧠 Encaminhamento psicopedagógico","⚠️ Notificação de risco / violência",
+      "🏛 Encaminhamento ao Conselho Tutelar","📋 Registro em ficha escolar"
+    ],
+    funcoes: ["Diretor(a)","Coordenador(a) Pedagógico(a)","Professor(a)","Orientador(a) Educacional","Outro"]
+  },
+  outros: {
+    nome:  "Outro Órgão",
+    label: "Órgão / Serviço",
+    ico:   "🏛",
+    cor:   "#059669",
+    borda: "#6ee7b7",
+    bg:    "#001a0a",
+    bgCard:"#002a10",
+    texto: "#d1fae5",
+    label_cor:"#6ee7b7",
+    titulo_cor:"#34d399",
+    tipos: [
+      "🤝 Atendimento social","⚖️ Encaminhamento jurídico","🧠 Apoio psicológico",
+      "🏠 Visita domiciliar","📋 Registro de ocorrência","📤 Encaminhamento externo",
+      "🏛 Medida protetiva","📚 Curso / capacitação","Outro atendimento"
+    ],
+    funcoes: ["Assistente Social","Psicólogo(a)","Advogado(a)","Agente","Coordenador(a)","Outro"]
+  }
+};
+
+// Apelidos — variações de escrita que podem chegar de links antigos, texto
+// livre, ou nomes com espaço/pontuação que a normalização abaixo não bate.
+ORGAOS.dean            = ORGAOS.deam; // chave antiga (erro de digitação), mantém link já gerado funcionando
+ORGAOS.constutelar     = ORGAOS.conselho_tutelar; // "Cons. Tutelar" → cons+tutelar
+ORGAOS.conselhotutelar = ORGAOS.conselho_tutelar;
+ORGAOS.ct              = ORGAOS.conselho_tutelar;
+ORGAOS.delegaciadamulher = ORGAOS.deam;
+
+// ── Lê URL params ──────────────────────────────────────
+var params  = new URLSearchParams(location.search);
+// Suporta tanto ?servico= (link antigo) quanto ?orgao= (link novo gerado pelo IARA)
+var servico = (params.get("servico") || params.get("orgao") || "crav").toLowerCase().replace(/[^a-z_]/g,"");
+var encId   = params.get("enc")   || "";  // ID do encaminhamento no IARA
+var ocId    = params.get("oc")    || encId || "";
+var nomePre = params.get("nome")  || "";
+var bairro  = params.get("bairro")|| "";
+var ref     = params.get("ref")   || params.get("token") || "";
+
+var org = ORGAOS[servico] || ORGAOS.outros;
+
+// ── Aplica tema ────────────────────────────────────────
+document.body.style.background = org.bg;
+document.body.style.color = org.texto;
+
+var root = document.documentElement;
+root.style.setProperty("--cor-principal", org.cor);
+root.style.setProperty("--cor-borda",     org.borda + "88");
+root.style.setProperty("--cor-titulo",    org.titulo_cor);
+root.style.setProperty("--cor-label",     org.label_cor);
+
+// Estilo dos inputs
+var styleEl = document.createElement("style");
+styleEl.textContent =
+  "input,textarea,select{background:"+org.bgCard+";color:"+org.texto+"}" +
+  ".section{background:"+org.bgCard+"}" +
+  ".check-item{background:"+org.bg+"}" +
+  ".check-item:has(input:checked){background:"+org.bgCard+"}" +
+  ".sit-btn{background:"+org.bg+"}" +
+  ".sit-btn:has(input:checked){background:"+org.bgCard+"}" +
+  "::placeholder{color:"+org.borda+"88}";
+document.head.appendChild(styleEl);
+
+// ── Cabeçalho ──────────────────────────────────────────
+document.getElementById("header-ico").textContent    = org.ico;
+document.getElementById("header-titulo").textContent = "Devolutiva — " + org.nome;
+document.getElementById("header-sub").textContent    = org.label + " → 77ª CIPM BCS";
+document.getElementById("header-badge").textContent  = "🔒 Documento Confidencial";
+document.getElementById("header-badge").style.background = org.cor + "22";
+document.getElementById("header-badge").style.color      = org.label_cor;
+document.getElementById("btn-submit").textContent    = org.ico + " Enviar Devolutiva";
+document.title = "Devolutiva " + org.nome + " — 77ª CIPM";
+
+// ── Banner da assistida ────────────────────────────────
+if(nomePre){
+  document.getElementById("caso-banner").style.display = "flex";
+  document.getElementById("caso-banner").style.background = org.bgCard;
+  document.getElementById("banner-nome").textContent = decodeURIComponent(nomePre);
+  var metas = [];
+  if(ref)    metas.push("Ref: " + decodeURIComponent(ref));
+  if(bairro) metas.push(decodeURIComponent(bairro));
+  if(ocId)   metas.push("ID: " + ocId);
+  document.getElementById("banner-meta").textContent = metas.join(" · ") || "Caso encaminhado pela 77ª CIPM";
+  document.getElementById("f-nome").value = decodeURIComponent(nomePre);
+  if(ref) document.getElementById("f-protocolo").value = decodeURIComponent(ref);
+}
+
+// ── Tipos de atendimento ───────────────────────────────
+var checksHtml = "";
+org.tipos.forEach(function(t, i){
+  var full = i === org.tipos.length - 1;
+  checksHtml += "<label class='check-item"+(full?" check-full":"")+"'>" +
+    "<input type='checkbox' name='tipo' value='"+t.replace(/[^a-zA-ZÀ-ú\s\/]/g,"").trim()+"'>" +
+    "<span class='lbl'>"+t+"</span></label>";
+});
+document.getElementById("checks-container").innerHTML = checksHtml;
+
+// ── Funções/cargos ─────────────────────────────────────
+var selFuncao = document.getElementById("f-funcao");
+org.funcoes.forEach(function(f){
+  var o = document.createElement("option");
+  o.value = o.textContent = f;
+  selFuncao.appendChild(o);
+});
+
+// ── Data hoje ──────────────────────────────────────────
+document.getElementById("f-data").value = new Date().toISOString().slice(0,10);
+
+// ── Envio ──────────────────────────────────────────────
+function enviar(e){
+  e.preventDefault();
+  var tipos = Array.from(document.querySelectorAll('input[name="tipo"]:checked')).map(function(c){return c.value;});
+  if(!tipos.length){ alert("Selecione pelo menos um tipo de atendimento."); return; }
+  var situacao = (document.querySelector('input[name="situacao"]:checked')||{value:""}).value;
+  if(!situacao){ alert("Informe a situação atual."); return; }
+
+  var reg = {
+    id:             "dev_"+Date.now()+Math.random().toString(36).slice(2,5),
+    encaminhamentoId: encId,
+    ocorrenciaId:   ocId,
+    servico:        servico,
+    orgao:          org.nome,
+    nome:           document.getElementById("f-nome").value.trim(),
+    protocolo:      document.getElementById("f-protocolo").value.trim(),
+    data:           document.getElementById("f-data").value,
+    tipos:          tipos,
+    tiposTexto:     tipos.join(", "),
+    encaminhamento: document.getElementById("f-encaminhamento").value.trim(),
+    situacao:       situacao,
+    observacoes:    document.getElementById("f-obs").value.trim(),
+    tecnica:        document.getElementById("f-tecnica").value.trim(),
+    funcao:         document.getElementById("f-funcao").value,
+    timestamp:      new Date().toISOString()
+  };
+
+  var btn = document.getElementById("btn-submit");
+  btn.disabled = true;
+  btn.textContent = "⏳ Enviando...";
+
+  // Trunca campos longos para não estourar o limite de URL do JSONP
+  var regEnvio = Object.assign({}, reg, {
+    observacoes:    (reg.observacoes||"").slice(0, 500),
+    encaminhamento: (reg.encaminhamento||"").slice(0, 500)
+  });
+
+  var cb = "dev_cb_"+Date.now();
+  var s  = document.createElement("script");
+  var ok = false;
+  var t  = setTimeout(function(){
+    if(ok) return;
+    s.remove(); delete window[cb];
+    try{ localStorage.setItem("dev_pendente_"+reg.id, JSON.stringify(reg)); }catch(err){}
+    mostrarStatus(false, "⚠️ Sem conexão. Tente novamente mais tarde.");
+    btn.disabled = false;
+    btn.textContent = org.ico + " Tentar novamente";
+  }, 12000);
+
+  window[cb] = function(resp){
+    ok = true; clearTimeout(t); s.remove(); delete window[cb];
+    if(resp && resp.ok === false){
+      mostrarStatus(false, "❌ Erro ao salvar: "+(resp.erro||"Resposta inválida do servidor."));
+      btn.disabled = false; btn.textContent = org.ico + " Tentar novamente";
+      return;
+    }
+    mostrarStatus(true, "✅ Devolutiva enviada!\n\nObrigada, "+reg.tecnica+". O registro de "+reg.nome+" foi atualizado no sistema da 77ª CIPM BCS.");
+    // Tenta também salvar na aba da planilha (se script novo estiver implantado)
+    var s2 = document.createElement("script");
+    s2.src = SHEETS_URL
+      + "?acao=salvar&tipo=devolutivas_crav"
+      + "&dados=" + encodeURIComponent(JSON.stringify(regEnvio))
+      + "&token=" + TOKEN;
+    document.head.appendChild(s2);
+    setTimeout(function(){ s2.remove(); }, 10000);
+  };
+
+  // Salva via salvarDadoApp (ScriptProperties) — funciona com qualquer versão do script
+  var chave = "devolutiva__" + (reg.encaminhamentoId || reg.id);
+  s.src = SHEETS_URL
+    + "?acao=salvarDadoApp"
+    + "&chave=" + encodeURIComponent(chave)
+    + "&valor=" + encodeURIComponent(JSON.stringify(regEnvio))
+    + "&token=" + TOKEN
+    + "&callback=" + cb;
+  document.head.appendChild(s);
+}
+
+function mostrarStatus(ok, msg){
+  var el = document.getElementById("status");
+  el.className = ok ? "ok" : "err";
+  el.style.display = "block";
+  el.textContent = msg;
+  document.getElementById("form-area").style.display = ok ? "none" : "block";
+  el.scrollIntoView({behavior:"smooth", block:"center"});
+}
+</script>
+<div id="_ver" style="text-align:center;padding:8px;font-size:9px;color:#555;opacity:.4">v75 — +CRAS/CREAS/UBS/Escola, DEAM corrigido</div>
+</body>
+</html>
