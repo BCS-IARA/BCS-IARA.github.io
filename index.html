@@ -14561,11 +14561,12 @@ function _nomeEncLimpo(e){
     var vit=(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;});
     if(vit) nome=vit.nome||"";
   }
-  if(!nome && e.ocorrencia_id){
-    var oc=(state.db.ocorrencias||[]).find(function(o){return o.id===e.ocorrencia_id;});
+  var _encOcId = e.ocorrencia_id||e.ocorrenciaId;
+  if(!nome && _encOcId){
+    var oc=(typeof _mtOc==="function"?_mtOc(_encOcId):null) || (state.db.ocorrencias||[]).find(function(o){return o.id===_encOcId;});
     if(oc) nome=oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||(oc.solicitante?oc.solicitante.nome:"")||"";
   }
-  if(!nome) nome=e.vitima_nome||"";
+  if(!nome) nome=e.vitima_nome||e.vitimaNome||"";
   // Remove sufixos do import antigo: ", sexo Feminino, idade 34 anos,"
   nome=nome.replace(/,?\s*sexo\s+\w+\s*/i,"").replace(/,?\s*idade\s+\d+\s*anos?\s*/i,"").replace(/,\s*$/,"").trim();
   return nome||"—";
@@ -14603,7 +14604,8 @@ window._gerarPdfEncaminhamento = function(encId) {
   var _unidade = "77ª CIPM — BCS / Barreiras-BA";
   var _dataHoje = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   // OC vinculada
-  var oc = e.ocorrencia_id ? ((typeof _mtOc==="function"?_mtOc(e.ocorrencia_id):null) || (state.db.ocorrencias||[]).find(function(o){ return o.id===e.ocorrencia_id; })) : null;
+  var _encOcIdPdf = e.ocorrencia_id||e.ocorrenciaId;
+  var oc = _encOcIdPdf ? ((typeof _mtOc==="function"?_mtOc(_encOcIdPdf):null) || (state.db.ocorrencias||[]).find(function(o){ return o.id===_encOcIdPdf; })) : null;
   var _boNum = oc ? (oc.numero_bo||oc.num_bo||oc.bo||oc.numero||oc.id||"") : "";
   var _boData = oc ? (oc.data||"") : "";
   var _boDataFmt = (function(d){
@@ -23008,9 +23010,16 @@ function _vcmEncaminhar(ocId, servico){
     showToast((_orgaoLabels[servico]||servico)+" já tem encaminhamento pendente para esta vítima","error");
     return;
   }
+  var _encNomeLower = (oc.vitima_nome||"").trim().toLowerCase();
+  var _encVitimaId = oc.vitima_id;
+  if(!_encVitimaId && _encNomeLower){
+    var _encVit = (state.vitimas||[]).find(function(v){ return (v.nome||"").replace(/,\s*(sexo|idade).*/i,"").trim().toLowerCase()===_encNomeLower; });
+    if(_encVit) _encVitimaId = _encVit.id;
+  }
   var enc={
-    id:"enc_"+Date.now(), ocorrenciaId:ocId,
-    vitimaNome:oc.vitima_nome||"", vitimaBairro:oc.bairro||"",
+    id:"enc_"+Date.now(), ocorrenciaId:ocId, ocorrencia_id:ocId,
+    vitimaNome:oc.vitima_nome||"", vitima_nome:oc.vitima_nome||"", vitima_id:_encVitimaId||"",
+    vitimaBairro:oc.bairro||"", descricao:oc.historico||oc.observacoes||"",
     ocNumero:oc.numero||oc.id||"", tipo:servico||"crav", orgao:servico||"crav",
     data:new Date().toISOString().slice(0,10),
     criadoEm:new Date().toISOString(), status:"pendente",
