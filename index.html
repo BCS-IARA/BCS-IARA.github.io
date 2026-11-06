@@ -14708,7 +14708,7 @@ function _ocNaFila(o){
 // Bairros da jurisdição — filtro padrão da Triagem. Substring-match (sem acento, case-insensitive)
 // pra pegar variações reais que aparecem nos dados importados do SIGESPOL, ex.: "Alto Maron" e
 // "Alto Marom" (grafias diferentes pro mesmo bairro), "Panorama"/"Panorama II"/"Alto do Panorama".
-var _TRIAGEM_BAIRROS_JURISDICAO = ["primavera","europa unida","panorama","alto maron","alto marom","cruzeiro","pedrinhas","guarani"];
+var _TRIAGEM_BAIRROS_JURISDICAO = ["primavera","europa unida","panorama","alto maron","alto marom","cruzeiro","pedrinhas","guarani","nova cidade"];
 function _triagemNormBairro(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 }
