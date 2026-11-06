@@ -13369,7 +13369,7 @@ window._buildDossieCorpo = function(identidade, opts) {
   if(!ocsVit.length) h+="<p style='color:#8a6a4a;font-size:12px'>Nenhuma ocorrência vinculada.</p>";
   ocsVit.forEach(function(o){
     var isVD=o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
-    var relato=o.descricao_dinamica||o.texto_original||o.narrativa||o.descricao||"";
+    var relato=(typeof _relatoCompleto==="function"?_relatoCompleto(o):"")||o.descricao_dinamica||o.texto_original||o.narrativa||o.descricao||"";
     h+="<div class='oc-item'>";
     h+="<div style='display:flex;align-items:center;margin-bottom:4px'><strong style='font-size:13px'>"+esc(o.tipo||"—")+"</strong>";
     if(isVD) h+="<span class='badge-vd'>VD</span>";
