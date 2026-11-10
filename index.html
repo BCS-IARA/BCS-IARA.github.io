@@ -24095,7 +24095,32 @@ function _invGetLocaisObj(){
       return {id:"loc_"+nome.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,""),nome:nome,sublocais:[]};
     });
   }
+  _invReconciliarLocais();
   return state.invLocais;
+}
+// state.invLocais (registro de localizações/sublocalizações) só existe no localStorage do
+// aparelho — não sincroniza pelo Sheets como os itens sincronizam. Isso fazia localizações e
+// sublocalizações em uso num aparelho não aparecerem no <select> de outro (e, sem nenhum aviso
+// visual pra localização — diferente da sublocalização —, o navegador caía pra 1ª opção da lista
+// e sobrescrevia silenciosamente a localização do item ao salvar). Aqui o registro é
+// reconstruído a partir do que os itens já usam de fato, toda vez que a tela abre.
+function _invReconciliarLocais(){
+  var mudou=false;
+  (state.invItens||[]).forEach(function(x){
+    if(x.ativo===false||!x.localizacao) return;
+    var loc=state.invLocais.find(function(l){return l.nome===x.localizacao;});
+    if(!loc){
+      loc={id:"loc_"+x.localizacao.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,""),nome:x.localizacao,sublocais:[]};
+      state.invLocais.push(loc);
+      mudou=true;
+    }
+    if(!loc.sublocais) loc.sublocais=[];
+    if(x.sublocalizacao && loc.sublocais.indexOf(x.sublocalizacao)<0){
+      loc.sublocais.push(x.sublocalizacao);
+      mudou=true;
+    }
+  });
+  if(mudou){ try{ localStorage.setItem("bcs_inv_locais", JSON.stringify(state.invLocais)); }catch(e){} }
 }
 
 // Normaliza URL do Drive pro formato que embute em <img> de outra origem.
@@ -24504,6 +24529,13 @@ function _invAbrirItem(id){
     var sel=(item&&item.localizacao===lo.nome)||(!item&&lo.nome==="Sala de Plantão")?" selected":"";
     return "<option value='"+esc(lo.nome)+"'"+sel+">"+esc(lo.nome)+"</option>";
   }).join("");
+  // Localização do item não está no registro local deste aparelho (registro não sincroniza
+  // pelo Sheets) — preserva o valor real em vez de deixar o <select> cair pra 1ª opção sem avisar,
+  // o que sobrescrevia a localização do item silenciosamente ao salvar (ex.: "BCS 01C" virava
+  // "Almoxarifado"). Mesmo tratamento já existia pra sublocalização, faltava aqui.
+  if(item&&item.localizacao&&!_locaisObj.some(function(lo){return lo.nome===item.localizacao;})){
+    locOpts="<option value='"+esc(item.localizacao)+"' selected style='color:#e87c23'>"+esc(item.localizacao)+" ⚠</option>"+locOpts;
+  }
   var _locSelNome=item?(item.localizacao||(_locaisObj[0]&&_locaisObj[0].nome)||""):"Sala de Plantão";
   var _locSelObj=_locaisObj.find(function(lo){return lo.nome===_locSelNome;})||{sublocais:[]};
   var _subAtual=item?(item.sublocalizacao||""):"";
