@@ -28041,6 +28041,45 @@ function _invGerarParecerComissao(confId){
 }
 window._invGerarParecerComissao=_invGerarParecerComissao;
 
+// Roda dentro da janela do relatório: aplica os filtros, renumera e recalcula totais/resumo
+function _invRelConfFiltroJs(){
+  var sel={};
+  ["loc","res","cat"].forEach(function(g){
+    var cks=document.querySelectorAll("input[data-g='"+g+"']");
+    sel[g]=cks.length?{}:null;
+    cks.forEach(function(c){ if(c.checked) sel[g][c.value]=1; });
+  });
+  var k={ok:0,divergencia:0,ausente:0,tot:0}, cats={}, n=0;
+  document.querySelectorAll("#tab-itens tr[data-res]").forEach(function(tr){
+    var r=tr.getAttribute("data-res"), c=tr.getAttribute("data-cat");
+    var vis=(!sel.loc||sel.loc[tr.getAttribute("data-loc")])&&(!sel.res||sel.res[r])&&(!c||!sel.cat||sel.cat[c]);
+    tr.style.display=vis?"":"none";
+    if(!vis) return;
+    tr.querySelector(".num").textContent=++n;
+    k.tot++; if(k[r]!==undefined) k[r]++;
+    if(c){ cats[c]=cats[c]||{div:0,aus:0}; if(r==="ausente") cats[c].aus++; else cats[c].div++; }
+  });
+  document.getElementById("k-ok").textContent=k.ok;
+  document.getElementById("k-div").textContent=k.divergencia;
+  document.getElementById("k-aus").textContent=k.ausente;
+  document.getElementById("k-tot").textContent=k.tot;
+  var nomes=Object.keys(cats).sort(function(a,b){return (cats[b].div+cats[b].aus)-(cats[a].div+cats[a].aus);});
+  var rh="";
+  if(nomes.length){
+    rh="<h2>Divergências por categoria</h2><table style='width:auto;min-width:50%'><tr><th>Categoria</th><th>Divergência</th><th>Ausente</th><th>Total</th></tr>";
+    nomes.forEach(function(x){ var d=cats[x]; rh+="<tr><td>"+x.replace(/</g,"&lt;")+"</td><td>"+d.div+"</td><td>"+d.aus+"</td><td><b>"+(d.div+d.aus)+"</b></td></tr>"; });
+    rh+="</table>";
+  }
+  document.getElementById("resumo-cat").innerHTML=rh;
+  var txt=[];
+  [["loc","Localização"],["res","Resultado"],["cat","Categoria"]].forEach(function(p){
+    var cks=document.querySelectorAll("input[data-g='"+p[0]+"']"); if(!cks.length) return;
+    var on=[]; cks.forEach(function(c){ if(c.checked) on.push(c.parentNode.textContent.replace(/\s*\(\d+\)$/,"").trim()); });
+    if(on.length<cks.length) txt.push(p[1]+": "+(on.join(", ")||"nenhum"));
+  });
+  document.getElementById("filtro-txt").textContent=txt.length?"Filtro aplicado — "+txt.join(" · "):"";
+}
+
 function _invGerarPDFConferencia(confId){
   var conf=(state.invConferencias||[]).find(function(x){return x.id===confId;});
   if(!conf){ showToast("Conferência não encontrada","error"); return; }
@@ -28062,21 +28101,45 @@ function _invGerarPDFConferencia(confId){
   h+="td{padding:5px 8px;border:1px solid #ddd;font-size:10px}";
   h+=".ok{color:green;font-weight:700}.div{color:#b45700;font-weight:700}.aus{color:red;font-weight:700}.pend{color:#888}";
   h+=".sig-area{border:1px solid #ccc;border-radius:6px;padding:10px;margin:8px 0;display:inline-block;min-width:220px}";
-  h+="@media print{body{padding:10px}}";
+  h+=".barra{background:#f6f3ea;border:1px solid #d8cfb8;border-radius:6px;padding:8px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px;font-size:11px}";
+  h+=".barra label{margin-right:12px;white-space:nowrap;cursor:pointer}.barra .n{color:#888}";
+  h+=".bt{padding:7px 18px;font-size:12px;cursor:pointer;background:#1B3A6B;color:#fff;border:none;border-radius:6px}";
+  h+="@media print{body{padding:10px}.no-print{display:none!important}}";
   h+="</style></head><body>";
   h+="<div style='background:#1B3A6B;padding:12px 18px;display:flex;align-items:center;gap:14px;border-radius:4px 4px 0 0;margin-bottom:10px'>";
   h+="<img src='"+BCS_LOGO_B64+"' style='width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0'>";
   h+="<div><div style='color:#fff;font-size:17px;font-weight:700'>Conferência de Inventário</div>";
   h+="<div style='color:#adc8ff;font-size:11px;margin-top:2px'>77ª CIPM · Base Comunitária de Segurança Nova Cidade</div></div>";
   h+="<div style='margin-left:auto;text-align:right;color:#adc8ff;font-size:10px'>Iniciada: "+dt+"<br>Concluída: "+dtConc+"</div></div>";
-  h+="<div style='margin-bottom:14px'>";
-  h+="<div class='kpi' style='border-color:green'><b class='ok'>"+nOk+"</b>OK</div>";
-  h+="<div class='kpi' style='border-color:#b45700'><b class='div'>"+nDiv+"</b>Divergência</div>";
-  h+="<div class='kpi' style='border-color:red'><b class='aus'>"+nAus+"</b>Ausente</div>";
-  h+="<div class='kpi'><b>"+itens.length+"</b>Total</div>";
+  // Linhas do relatório (com dados para o filtro na própria janela)
+  var _linhas=itens.map(function(item){
+    var raw=conf.itens[item.id];
+    var det=(raw&&typeof raw==="object")?raw:{status:raw||"pendente"};
+    var res=det.status||"pendente";
+    var cat="";
+    if(res==="divergencia"||res==="ausente"){
+      cat=det.categoria||"Não informada";
+      var ex=det.categoriaExtra;
+      if(ex&&(ex.portaria||ex.bir)) cat+=" — Portaria "+(ex.portaria||"—")+" · "+(ex.data||"")+" · BIR "+(ex.bir||"—");
+    }
+    return {item:item, det:det, res:res, cat:cat, loc:String(det.localizacao||item.localizacao||"—").trim()||"—"};
+  });
+  var _locs={}, _cats={};
+  _linhas.forEach(function(l){ _locs[l.loc]=(_locs[l.loc]||0)+1; if(l.cat) _cats[(l.det.categoria||"Não informada")]=1; });
+  var _ck=function(grupo,val,txt){ return "<label><input type='checkbox' data-g='"+grupo+"' value='"+esc(val)+"' checked onchange='filtrar()'> "+txt+"</label>"; };
+  h+="<div class='no-print barra'>";
+  h+="<div><b>Localização:</b> "+Object.keys(_locs).sort().map(function(k){return _ck("loc",k,esc(k)+" <span class='n'>("+_locs[k]+")</span>");}).join("")+"</div>";
+  h+="<div><b>Resultado:</b> "+_ck("res","ok","✓ OK")+_ck("res","divergencia","⚠ Divergência")+_ck("res","ausente","✗ Ausente")+_ck("res","pendente","— Pendente")+"</div>";
+  if(Object.keys(_cats).length) h+="<div><b>Categoria da divergência:</b> "+Object.keys(_cats).sort().map(function(k){return _ck("cat",k,esc(k));}).join("")+"</div>";
+  h+="<div><button onclick='window.print()' class='bt'>🖨 Imprimir / Salvar PDF</button></div>";
   h+="</div>";
-  // Tabela de itens
-  h+="<h2>Itens Conferidos</h2>";
+  h+="<div id='filtro-txt' style='font-size:10px;color:#555;margin-bottom:6px'></div>";
+  h+="<div style='margin-bottom:14px'>";
+  h+="<div class='kpi' style='border-color:green'><b class='ok' id='k-ok'>"+nOk+"</b>OK</div>";
+  h+="<div class='kpi' style='border-color:#b45700'><b class='div' id='k-div'>"+nDiv+"</b>Divergência</div>";
+  h+="<div class='kpi' style='border-color:red'><b class='aus' id='k-aus'>"+nAus+"</b>Ausente</div>";
+  h+="<div class='kpi'><b id='k-tot'>"+itens.length+"</b>Total</div>";
+  h+="</div>";
   // Parecer
   if(conf.resultado){
     var pCor={aprovado:"#10b981",pendencia:"#f59e0b",reprovado:"#ef4444"}[conf.resultado]||"#888";
@@ -28087,19 +28150,18 @@ function _invGerarPDFConferencia(confId){
     if(conf.parecer_obs) h+="<p style='margin:6px 0 0;font-size:11px;color:#333'>"+esc(conf.parecer_obs)+"</p>";
     h+="</div>";
   }
-  h+="<table><tr><th>#</th><th>Tombamento</th><th>S/N</th><th>Descrição</th><th>Localização</th><th>Conservação</th><th>Resultado</th><th>Observações</th><th>Conferente</th></tr>";
-  itens.forEach(function(item,i){
-    var raw=conf.itens[item.id];
-    var det=(raw&&typeof raw==="object")?raw:{status:raw||"pendente"};
-    var res=det.status||"pendente";
-    var _resCat = det.categoria?(det.categoria.substring(0,30)):"";
-    var resLabel={ok:"✓ OK",divergencia:"⚠ Divergência"+(_resCat?" ("+_resCat+")":""),ausente:"✗ Ausente"+(_resCat?" ("+_resCat+")":""),pendente:"— Pendente"}[res]||res;
+  // Resumo por categoria (recalculado pelo filtro)
+  h+="<div id='resumo-cat'></div>";
+  h+="<h2>Itens Conferidos</h2>";
+  h+="<table id='tab-itens'><tr><th>#</th><th>Tombamento</th><th>S/N</th><th>Descrição</th><th>Localização</th><th>Conservação</th><th>Resultado</th><th>Categoria da divergência</th><th>Observações</th><th>Conferente</th></tr>";
+  _linhas.forEach(function(l){
+    var item=l.item, det=l.det, res=l.res;
+    var resLabel={ok:"✓ OK",divergencia:"⚠ Divergência",ausente:"✗ Ausente",pendente:"— Pendente"}[res]||res;
     var resCls={ok:"ok",divergencia:"div",ausente:"aus",pendente:"pend"}[res]||"";
-    var loc=det.localizacao||item.localizacao||"—";
     var est={bom:"Bom",regular:"Regular",danificado:"Danificado"}[det.estado]||"—";
     var obs=det.obs||det.observacoes||"";
     var conf_nome=det.conferente?(det.conferente.posto?det.conferente.posto+" ":"")+det.conferente.nome:"—";
-    h+="<tr><td>"+(i+1)+"</td><td>"+esc(item.tombamento||"—")+"</td><td>"+esc(item.numero_serie||"—")+"</td><td>"+esc(item.descricao)+"</td><td>"+esc(loc)+"</td><td>"+esc(est)+"</td><td class='"+resCls+"'>"+resLabel+"</td><td>"+esc(obs)+"</td><td>"+esc(conf_nome)+"</td></tr>";
+    h+="<tr data-loc='"+esc(l.loc)+"' data-res='"+esc(res)+"' data-cat='"+esc(l.cat?(det.categoria||"Não informada"):"")+"'><td class='num'></td><td>"+esc(item.tombamento||"—")+"</td><td>"+esc(item.numero_serie||"—")+"</td><td>"+esc(item.descricao)+"</td><td>"+esc(l.loc)+"</td><td>"+esc(est)+"</td><td class='"+resCls+"'>"+resLabel+"</td><td class='"+resCls+"'>"+esc(l.cat||"")+"</td><td>"+esc(obs)+"</td><td>"+esc(conf_nome)+"</td></tr>";
   });
   h+="</table>";
   // Assinaturas
@@ -28113,9 +28175,11 @@ function _invGerarPDFConferencia(confId){
     h+="<div style='margin-top:6px;font-size:10px;font-weight:700'>"+esc(resp||"Responsável "+n)+"</div>";
     h+="</div>";
   });
-  h+="</div></div></body></html>";
+  h+="</div></div>";
+  h+="<script>"+_invRelConfFiltroJs.toString()+";var filtrar=_invRelConfFiltroJs;filtrar();<\/script>";
+  h+="</body></html>";
   var w=window.open("","_blank");
-  if(w){ w.document.write(h); w.document.close(); setTimeout(function(){w.print();},400); }
+  if(w){ w.document.write(h); w.document.close(); }
 }
 // ── Parecer Oficial da Comissão de Inventário ───────────────
 function _invAbrirParecerModal(confId){
