@@ -13369,7 +13369,7 @@ window._buildDossieCorpo = function(identidade, opts) {
   if(!ocsVit.length) h+="<p style='color:#8a6a4a;font-size:12px'>Nenhuma ocorrência vinculada.</p>";
   ocsVit.forEach(function(o){
     var isVD=o.violencia_domestica||/maria da penha|violên?cia dom[eé]stica/i.test(o.tipo||"");
-    var relato=o.descricao_dinamica||o.texto_original||o.narrativa||o.descricao||"";
+    var relato=(typeof _relatoCompleto==="function"?_relatoCompleto(o):"")||o.descricao_dinamica||o.texto_original||o.narrativa||o.descricao||"";
     h+="<div class='oc-item'>";
     h+="<div style='display:flex;align-items:center;margin-bottom:4px'><strong style='font-size:13px'>"+esc(o.tipo||"—")+"</strong>";
     if(isVD) h+="<span class='badge-vd'>VD</span>";
@@ -14561,11 +14561,12 @@ function _nomeEncLimpo(e){
     var vit=(state.vitimas||[]).find(function(v){return v.id===e.vitima_id;});
     if(vit) nome=vit.nome||"";
   }
-  if(!nome && e.ocorrencia_id){
-    var oc=(state.db.ocorrencias||[]).find(function(o){return o.id===e.ocorrencia_id;});
+  var _encOcId = e.ocorrencia_id||e.ocorrenciaId;
+  if(!nome && _encOcId){
+    var oc=(typeof _mtOc==="function"?_mtOc(_encOcId):null) || (state.db.ocorrencias||[]).find(function(o){return o.id===_encOcId;});
     if(oc) nome=oc.vitima_nome||oc.nome_vitima||(oc.vitimas&&oc.vitimas[0]?oc.vitimas[0].nome:"")||(oc.solicitante?oc.solicitante.nome:"")||"";
   }
-  if(!nome) nome=e.vitima_nome||"";
+  if(!nome) nome=e.vitima_nome||e.vitimaNome||"";
   // Remove sufixos do import antigo: ", sexo Feminino, idade 34 anos,"
   nome=nome.replace(/,?\s*sexo\s+\w+\s*/i,"").replace(/,?\s*idade\s+\d+\s*anos?\s*/i,"").replace(/,\s*$/,"").trim();
   return nome||"—";
@@ -14603,7 +14604,8 @@ window._gerarPdfEncaminhamento = function(encId) {
   var _unidade = "77ª CIPM — BCS / Barreiras-BA";
   var _dataHoje = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   // OC vinculada
-  var oc = e.ocorrencia_id ? ((typeof _mtOc==="function"?_mtOc(e.ocorrencia_id):null) || (state.db.ocorrencias||[]).find(function(o){ return o.id===e.ocorrencia_id; })) : null;
+  var _encOcIdPdf = e.ocorrencia_id||e.ocorrenciaId;
+  var oc = _encOcIdPdf ? ((typeof _mtOc==="function"?_mtOc(_encOcIdPdf):null) || (state.db.ocorrencias||[]).find(function(o){ return o.id===_encOcIdPdf; })) : null;
   var _boNum = oc ? (oc.numero_bo||oc.num_bo||oc.bo||oc.numero||oc.id||"") : "";
   var _boData = oc ? (oc.data||"") : "";
   var _boDataFmt = (function(d){
@@ -14706,7 +14708,7 @@ function _ocNaFila(o){
 // Bairros da jurisdição — filtro padrão da Triagem. Substring-match (sem acento, case-insensitive)
 // pra pegar variações reais que aparecem nos dados importados do SIGESPOL, ex.: "Alto Maron" e
 // "Alto Marom" (grafias diferentes pro mesmo bairro), "Panorama"/"Panorama II"/"Alto do Panorama".
-var _TRIAGEM_BAIRROS_JURISDICAO = ["primavera","europa unida","panorama","alto maron","alto marom","cruzeiro","pedrinhas","guarani"];
+var _TRIAGEM_BAIRROS_JURISDICAO = ["primavera","europa unida","panorama","alto maron","alto marom","cruzeiro","pedrinhas","guarani","nova cidade"];
 function _triagemNormBairro(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 }
@@ -23008,9 +23010,16 @@ function _vcmEncaminhar(ocId, servico){
     showToast((_orgaoLabels[servico]||servico)+" já tem encaminhamento pendente para esta vítima","error");
     return;
   }
+  var _encNomeLower = (oc.vitima_nome||"").trim().toLowerCase();
+  var _encVitimaId = oc.vitima_id;
+  if(!_encVitimaId && _encNomeLower){
+    var _encVit = (state.vitimas||[]).find(function(v){ return (v.nome||"").replace(/,\s*(sexo|idade).*/i,"").trim().toLowerCase()===_encNomeLower; });
+    if(_encVit) _encVitimaId = _encVit.id;
+  }
   var enc={
-    id:"enc_"+Date.now(), ocorrenciaId:ocId,
-    vitimaNome:oc.vitima_nome||"", vitimaBairro:oc.bairro||"",
+    id:"enc_"+Date.now(), ocorrenciaId:ocId, ocorrencia_id:ocId,
+    vitimaNome:oc.vitima_nome||"", vitima_nome:oc.vitima_nome||"", vitima_id:_encVitimaId||"",
+    vitimaBairro:oc.bairro||"", descricao:oc.historico||oc.observacoes||"",
     ocNumero:oc.numero||oc.id||"", tipo:servico||"crav", orgao:servico||"crav",
     data:new Date().toISOString().slice(0,10),
     criadoEm:new Date().toISOString(), status:"pendente",
@@ -24086,7 +24095,32 @@ function _invGetLocaisObj(){
       return {id:"loc_"+nome.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,""),nome:nome,sublocais:[]};
     });
   }
+  _invReconciliarLocais();
   return state.invLocais;
+}
+// state.invLocais (registro de localizações/sublocalizações) só existe no localStorage do
+// aparelho — não sincroniza pelo Sheets como os itens sincronizam. Isso fazia localizações e
+// sublocalizações em uso num aparelho não aparecerem no <select> de outro (e, sem nenhum aviso
+// visual pra localização — diferente da sublocalização —, o navegador caía pra 1ª opção da lista
+// e sobrescrevia silenciosamente a localização do item ao salvar). Aqui o registro é
+// reconstruído a partir do que os itens já usam de fato, toda vez que a tela abre.
+function _invReconciliarLocais(){
+  var mudou=false;
+  (state.invItens||[]).forEach(function(x){
+    if(x.ativo===false||!x.localizacao) return;
+    var loc=state.invLocais.find(function(l){return l.nome===x.localizacao;});
+    if(!loc){
+      loc={id:"loc_"+x.localizacao.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,""),nome:x.localizacao,sublocais:[]};
+      state.invLocais.push(loc);
+      mudou=true;
+    }
+    if(!loc.sublocais) loc.sublocais=[];
+    if(x.sublocalizacao && loc.sublocais.indexOf(x.sublocalizacao)<0){
+      loc.sublocais.push(x.sublocalizacao);
+      mudou=true;
+    }
+  });
+  if(mudou){ try{ localStorage.setItem("bcs_inv_locais", JSON.stringify(state.invLocais)); }catch(e){} }
 }
 
 // Normaliza URL do Drive pro formato que embute em <img> de outra origem.
@@ -24495,6 +24529,13 @@ function _invAbrirItem(id){
     var sel=(item&&item.localizacao===lo.nome)||(!item&&lo.nome==="Sala de Plantão")?" selected":"";
     return "<option value='"+esc(lo.nome)+"'"+sel+">"+esc(lo.nome)+"</option>";
   }).join("");
+  // Localização do item não está no registro local deste aparelho (registro não sincroniza
+  // pelo Sheets) — preserva o valor real em vez de deixar o <select> cair pra 1ª opção sem avisar,
+  // o que sobrescrevia a localização do item silenciosamente ao salvar (ex.: "BCS 01C" virava
+  // "Almoxarifado"). Mesmo tratamento já existia pra sublocalização, faltava aqui.
+  if(item&&item.localizacao&&!_locaisObj.some(function(lo){return lo.nome===item.localizacao;})){
+    locOpts="<option value='"+esc(item.localizacao)+"' selected style='color:#e87c23'>"+esc(item.localizacao)+" ⚠</option>"+locOpts;
+  }
   var _locSelNome=item?(item.localizacao||(_locaisObj[0]&&_locaisObj[0].nome)||""):"Sala de Plantão";
   var _locSelObj=_locaisObj.find(function(lo){return lo.nome===_locSelNome;})||{sublocais:[]};
   var _subAtual=item?(item.sublocalizacao||""):"";
