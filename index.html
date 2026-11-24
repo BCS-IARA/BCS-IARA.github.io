@@ -1488,7 +1488,7 @@ async function carregarDoSheets() {
     // Inicializar com dados da primeira página
     let todasOcs = rj0.dados.ocorrencias || [];
     if((rj0.dados.atendimentos||[]).length) state.db.atendimentos = rj0.dados.atendimentos;
-    if((rj0.dados.frida||[]).length) state.db.frida = rj0.dados.frida;
+    if((rj0.dados.frida||[]).length) state.db.frida = _mergeById(state.db.frida||[], rj0.dados.frida); // mescla: não apaga FRIDA aplicado aqui e ainda não gravado no Sheets
     if((rj0.dados.visitas||[]).length) state.db.visitas = rj0.dados.visitas;
     if((rj0.dados.agendamentos||[]).length) {
       var _agsRaw = (rj0.dados.agendamentos||[]).filter(function(ag){
@@ -15418,8 +15418,8 @@ function _mtBuscar(q){
   return out.sort(function(a,b){ return _mtIso(b.data).localeCompare(_mtIso(a.data)); }).slice(0,60);
 }
 function _mtFrida(ocId){
-  return (state.db.frida||[]).filter(function(f){ return f.ocorrenciaId===ocId && f.nivel && f.nivel!=="?"; })
-    .sort(function(a,b){ return (b.data||"").localeCompare(a.data||""); })[0]||null;
+  var o=(typeof _mtOc==="function"?_mtOc(ocId):null)||(state.db.ocorrencias||[]).find(function(x){return x.id===ocId;});
+  return o?(_fridaDoCaso(o)[0]||null):null;
 }
 function _mtEncsOc(ocId){ return (state.encaminhamentos||[]).filter(function(e){ return String(e.ocorrencia_id||e.ocorrenciaId||"")===String(ocId); }); }
 function _mtPrazo(e){ var p=_mtIso(e.prazo); if(p) return p; var b=_mtIso(e.data_envio||e.data||""); if(!b) return ""; var d=new Date(b+"T12:00"); if(isNaN(d.getTime())) return ""; d.setDate(d.getDate()+15); return d.toISOString().slice(0,10); }
@@ -16084,18 +16084,45 @@ function _fridaNomeChave(s){
     .replace(/,?\s*sexo\s+\w+/g,"").replace(/,?\s*idade\s+\d+\s*anos?/g,"")
     .replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
 }
+function _fridaNivelNorm(n){
+  var c=String(n||"").trim().toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g,"").charAt(0);
+  return (c==="B"||c==="M"||c==="E")?c:"";
+}
+// Tokens do nome sem preposições: "Camila Amorim de Andrade" ≈ "CAMILA AMORIM ANDRADE"
+function _fridaTokens(n){
+  return _fridaNomeChave(n).split(" ").filter(function(t){ return t.length>1 && ["de","da","do","das","dos","e"].indexOf(t)<0; });
+}
+function _fridaMesmoNome(a, b){
+  var ta=_fridaTokens(a), tb=_fridaTokens(b);
+  if(ta.length<2||tb.length<2) return false;
+  var curto=ta.length<=tb.length?ta:tb, longo=ta.length<=tb.length?tb:ta;
+  // todos os nomes do mais curto aparecem no mais longo, e o primeiro nome é o mesmo
+  return curto[0]===longo[0] && curto.every(function(t){ return longo.indexOf(t)>=0; });
+}
+function _fridaNomesOc(x){
+  var l=[x.vitima_nome, x.nome_vitima];
+  (x.vitimas||[]).forEach(function(v){ l.push(v&&v.nome); });
+  if(x.solicitante) l.push(x.solicitante.nome);
+  if(x.vitima_id){ var v=(state.vitimas||[]).find(function(y){return y.id===x.vitima_id;}); if(v) l.push(v.nome); }
+  return l.filter(function(n){ return n && String(n).trim(); });
+}
 function _fridaDoCaso(o, nomeExtra){
-  var todos=(state.db.frida||[]).filter(function(f){ return f && /^[BME]$/.test(f.nivel||""); });
-  if(!todos.length) return [];
-  var ids={}, nomes={};
-  if(o&&o.id) ids[String(o.id)]=1;
-  [o&&o.vitima_nome, nomeExtra].forEach(function(n){ var k=_fridaNomeChave(n); if(k.length>=5) nomes[k]=1; });
+  var nomes=(o?_fridaNomesOc(o):[]).concat(nomeExtra?[nomeExtra]:[]);
+  function casaNome(lista){ return lista.some(function(n){ return nomes.some(function(m){ return _fridaMesmoNome(n,m); }); }); }
+  var ids={}, ocsCaso=[];
+  if(o&&o.id){ ids[String(o.id)]=1; ocsCaso.push(o); }
   var cpf=o?String(o.vitima_cpf||"").replace(/\D/g,""):"";
   (state.db.ocorrencias||[]).forEach(function(x){
-    if(!x||!x.id) return;
-    if((o&&o.vitima_id&&x.vitima_id===o.vitima_id) || (cpf.length>=11&&String(x.vitima_cpf||"").replace(/\D/g,"")===cpf) || nomes[_fridaNomeChave(x.vitima_nome)]) ids[String(x.id)]=1;
+    if(!x||!x.id||ids[String(x.id)]) return;
+    if((o&&o.vitima_id&&x.vitima_id===o.vitima_id) || (cpf.length>=11&&String(x.vitima_cpf||"").replace(/\D/g,"")===cpf) || casaNome(_fridaNomesOc(x))){ ids[String(x.id)]=1; ocsCaso.push(x); }
   });
-  var achados=todos.filter(function(f){ return ids[String(f.ocorrenciaId||"")] || nomes[_fridaNomeChave(f.vitima_nome)]; });
+  var achados=(state.db.frida||[]).filter(function(f){
+    return f && _fridaNivelNorm(f.nivel) && (ids[String(f.ocorrenciaId||"")] || (f.vitima_nome&&casaNome([f.vitima_nome])));
+  }).map(function(f){ return _fridaNivelNorm(f.nivel)===f.nivel?f:Object.assign({},f,{nivel:_fridaNivelNorm(f.nivel)}); });
+  // Último recurso: nível guardado na própria ocorrência (_fridaNivel) sem o registro completo
+  if(!achados.length) ocsCaso.forEach(function(x){
+    if(_fridaNivelNorm(x._fridaNivel)) achados.push({id:"oc_"+x.id, ocorrenciaId:x.id, nivel:_fridaNivelNorm(x._fridaNivel), sim:x._fridaSim, data:x._fridaData||"", relatorio:x._fridaRelatorio||"", respostas:"[]"});
+  });
   // "fr_at_" são registros de acompanhamento que repetem o nível; só usa se não houver avaliação completa
   var reais=achados.filter(function(f){ return String(f.id||"").indexOf("fr_at_")!==0; });
   var lista=reais.length?reais:achados, vistos={};
