@@ -13309,6 +13309,8 @@ window._buildDossieCorpo = function(identidade, opts) {
 
   var fridas=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId&&ocsIds.indexOf(f.ocorrenciaId)>=0;})
     .sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  // registros "fr_at_" (acompanhamento) repetem o nível da avaliação: só entram se não houver avaliação completa
+  if(fridas.some(function(f){return String(f.id||"").indexOf("fr_at_")!==0;})) fridas=fridas.filter(function(f){return String(f.id||"").indexOf("fr_at_")!==0;});
 
   var visitas=(state.db.visitas||[]).filter(function(v){
     return (v.vitima_nome||v.nome||"").toLowerCase().indexOf(nomeLower)>=0
@@ -14640,6 +14642,8 @@ window._gerarPdfEncaminhamento = function(encId) {
   html += "<div class='campo'><label>Vítima</label><span>"+esc(nomeVit)+"</span></div>";
   if(_boNum) html += "<div class='campo'><label>Nº B.O. / OC</label><span>"+esc(_boNum)+(_boDataFmt?" · "+esc(_boDataFmt):"")+"</span></div>";
   html += "</div>";
+  var _frOf = _fridaBlocoPdf(_fridaDoCaso(oc, nomeVit), !oc || (oc.violencia_domestica||/maria da penha|viol[eê]ncia dom[eé]stica/i.test(oc.tipo||"")));
+  if(_frOf) html += "<div class='secao'>Avaliação de Risco (FRIDA)</div>"+_frOf;
   if(e.descricao) html += "<div style='margin-bottom:8px'><label style='font-size:10px;font-weight:700;text-transform:uppercase;color:#777;display:block;margin-bottom:2px'>Histórico / Contexto</label><p style='font-size:11px;color:#1a1a1a;line-height:1.6'>"+esc(e.descricao)+"</p></div>";
   html += "<div class='secao'>Link de Devolutiva — Acesso exclusivo para "+esc(_orgNome)+"</div>";
   html += "<div class='qr-section'>";
@@ -14668,7 +14672,7 @@ window._gerarPdfEncaminhamento = function(encId) {
   if(typeof _buildDossieCorpo === "function"){
     var _dc = _buildDossieCorpo(
       _vitIdParaDossie ? {vitimaId:_vitIdParaDossie} : {nome:nomeVit, ocIdRef: oc?oc.id:null},
-      {semCabecalho:true}
+      {semCabecalho:true, ocIdHint: oc?oc.id:null}
     );
     if(_dc){
       html += "<div style='page-break-before:always'></div>";
@@ -16071,6 +16075,70 @@ function _mtTempo(o){
 }
 
 
+// ── FRIDA do caso (para PDFs) ────────────────────────────────────────────
+// A avaliação fica gravada no BO aberto na hora (no painel VCM, o 1º BO da vítima).
+// Para o PDF de um BO mais novo, busca também nos outros BOs da mesma vítima
+// (vitima_id, nome ou CPF) e pelo nome gravado no próprio FRIDA.
+function _fridaNomeChave(s){
+  return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .replace(/,?\s*sexo\s+\w+/g,"").replace(/,?\s*idade\s+\d+\s*anos?/g,"")
+    .replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+}
+function _fridaDoCaso(o, nomeExtra){
+  var todos=(state.db.frida||[]).filter(function(f){ return f && /^[BME]$/.test(f.nivel||""); });
+  if(!todos.length) return [];
+  var ids={}, nomes={};
+  if(o&&o.id) ids[String(o.id)]=1;
+  [o&&o.vitima_nome, nomeExtra].forEach(function(n){ var k=_fridaNomeChave(n); if(k.length>=5) nomes[k]=1; });
+  var cpf=o?String(o.vitima_cpf||"").replace(/\D/g,""):"";
+  (state.db.ocorrencias||[]).forEach(function(x){
+    if(!x||!x.id) return;
+    if((o&&o.vitima_id&&x.vitima_id===o.vitima_id) || (cpf.length>=11&&String(x.vitima_cpf||"").replace(/\D/g,"")===cpf) || nomes[_fridaNomeChave(x.vitima_nome)]) ids[String(x.id)]=1;
+  });
+  var achados=todos.filter(function(f){ return ids[String(f.ocorrenciaId||"")] || nomes[_fridaNomeChave(f.vitima_nome)]; });
+  // "fr_at_" são registros de acompanhamento que repetem o nível; só usa se não houver avaliação completa
+  var reais=achados.filter(function(f){ return String(f.id||"").indexOf("fr_at_")!==0; });
+  var lista=reais.length?reais:achados, vistos={};
+  lista=lista.filter(function(f){ var k=f.id||(f.data+f.nivel); if(vistos[k]) return false; vistos[k]=1; return true; });
+  return lista.sort(function(a,b){ return String(_fridaIso(b.data)).localeCompare(String(_fridaIso(a.data))); });
+}
+function _fridaIso(d){
+  var s=String(d||""); var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[0];
+  m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if(m) return m[3]+"-"+m[2]+"-"+m[1];
+  var t=new Date(s); return isNaN(t.getTime())?s:t.toISOString().slice(0,10);
+}
+// Quadro de risco para PDF: nível mais recente em destaque, fatores "sim" e histórico
+function _fridaBlocoPdf(frs, isVD){
+  var COR={E:["#b91c1c","#fde8e8","RISCO ELEVADO","Encaminhar imediatamente aos serviços especializados; avaliar medida protetiva."],
+           M:["#b45309","#fdf3e3","RISCO MÉDIO","Monitorar o caso e avaliar medidas protetivas."],
+           B:["#15803d","#e8f5ec","RISCO BAIXO","Orientar e manter acompanhamento preventivo."]};
+  function dt(d){ var i=_fridaIso(d); return /^\d{4}-\d{2}-\d{2}$/.test(i)?i.split("-").reverse().join("/"):esc(String(d||"—")); }
+  var h="<div style='page-break-inside:avoid;margin:10px 0 4px'>";
+  if(!frs||!frs.length){
+    if(!isVD) return "";
+    return h+"<div style='border:1.5px dashed #999;border-radius:6px;padding:8px 12px;font-size:11px;color:#555'><b>Avaliação de risco FRIDA:</b> não aplicada neste caso até a data deste documento.</div></div>";
+  }
+  var f=frs[0], c=COR[f.nivel]||COR.M;
+  var resp=[]; try{ resp=typeof f.respostas==="string"?JSON.parse(f.respostas||"[]"):(f.respostas||[]); }catch(ex){}
+  var fatores=[]; (resp||[]).forEach(function(r,i){ if(r==="sim"&&FRIDA_PERGUNTAS[i]) fatores.push(FRIDA_PERGUNTAS[i]); });
+  h+="<div style='border:2px solid "+c[0]+";background:"+c[1]+";border-radius:6px;padding:10px 14px'>";
+  h+="<div style='display:flex;align-items:center;gap:10px;flex-wrap:wrap'>";
+  h+="<span style='background:"+c[0]+";color:#fff;font-weight:700;font-size:12px;padding:3px 10px;border-radius:4px;letter-spacing:.5px'>"+c[2]+"</span>";
+  h+="<span style='font-size:11px;color:#333'>Avaliação FRIDA de <b>"+dt(f.data)+"</b>"+(f.responsavel?" · por "+esc(f.responsavel):"")+(f.sim!==undefined&&f.sim!==""?" · "+esc(String(f.sim))+" de "+FRIDA_PERGUNTAS.length+" fatores presentes":"")+"</span></div>";
+  h+="<p style='font-size:11px;color:"+c[0]+";font-weight:700;margin:6px 0 0'>"+c[3]+"</p>";
+  if(fatores.length){
+    h+="<p style='font-size:10px;font-weight:700;text-transform:uppercase;color:#555;margin:8px 0 3px'>Fatores de risco identificados</p><ul style='margin:0;padding-left:18px;font-size:11px;line-height:1.5;color:#222'>";
+    fatores.forEach(function(q){ h+="<li>"+esc(q)+"</li>"; });
+    h+="</ul>";
+  }
+  if(f.relatorio) h+="<p style='font-size:11px;color:#333;margin:6px 0 0'><b>Observação:</b> "+esc(f.relatorio)+"</p>";
+  if(frs.length>1){
+    var NV={B:"Baixo",M:"Médio",E:"Elevado"};
+    h+="<p style='font-size:10px;color:#555;margin:8px 0 0'><b>Histórico:</b> "+frs.slice().reverse().map(function(x){ return dt(x.data)+" "+(NV[x.nivel]||x.nivel); }).join(" → ")+"</p>";
+  }
+  return h+"</div></div>";
+}
+
 // PDF consolidado do atendimento: dados do BO, FRIDA, ligações, encaminhamentos
 // (com devolutiva ou aguardando) e linha do tempo — mesmo padrão dos outros PDFs do app
 function _mtGerarPdf(ocId){
@@ -16078,7 +16146,7 @@ function _mtGerarPdf(ocId){
   function E(v){ return esc(v==null||v===""?"—":String(v)); }
   function dt(v){ var i=_mtIso(v); return i?i.split("-").reverse().join("/"):"—"; }
   var SIT={nova:"Aguardando triagem",em_acompanhamento:"Em atendimento",encerrada:"Encerrado",historico:"Histórico",arquivada:"Arquivado"};
-  var frs=(state.db.frida||[]).filter(function(f){return f.ocorrenciaId===o.id&&f.nivel;}).sort(function(a,b){return (a.data||"").localeCompare(b.data||"");});
+  var frs=_fridaDoCaso(o);
   var ligs=_mtLigacoesOc(o.id).slice().sort(function(a,b){return _mtIso(a.data_confirmacao||a.data).localeCompare(_mtIso(b.data_confirmacao||b.data));});
   var encs=_mtEncsOc(o.id);
   var nDev=encs.filter(function(e){return e.relato_devolutiva;}).length;
@@ -16101,6 +16169,9 @@ function _mtGerarPdf(ocId){
   h+="<div class='cab'><img src='"+brasao+"' onerror=\"this.style.display='none'\"><div><h1>POLÍCIA MILITAR DA BAHIA — 77ª CIPM</h1><p>Base Comunitária de Segurança · Relatório Consolidado de Atendimento</p></div></div>";
   h+="<h2>"+E(o.tipo)+"</h2><div class='sub'>BO nº "+E(o.numero)+" · "+dt(o.data)+(o.hora?" "+E(o.hora):"")+" · "+E(o.bairro)+" · Situação: <b>"+E(SIT[o.situacao]||o.situacao)+"</b></div>";
   h+="<div class='resumo'><div><b>"+ligs.filter(function(a){return a.status==="Realizado"||a.status==="NaoRealizado";}).length+"</b>ligações feitas</div><div><b>"+encs.length+"</b>encaminhamentos</div><div><b>"+nDev+" de "+encs.length+"</b>devolutivas recebidas</div>"+(frs.length?"<div><b>"+({B:"Baixo",M:"Médio",E:"Elevado"}[frs[frs.length-1].nivel]||frs[frs.length-1].nivel)+"</b>risco FRIDA</div>":"")+"</div>";
+  // Risco FRIDA em destaque, logo no topo
+  var _frBl=_fridaBlocoPdf(frs, _mtIsVD(o));
+  if(_frBl) h+="<div class='sec'>Avaliação de risco (FRIDA)</div>"+_frBl;
   // Vítima / autor
   h+="<div class='sec'>Vítima</div><div class='grid'>";
   [["Nome",o.vitima_nome],["Idade",o.vitima_idade],["Sexo",o.vitima_sexo],["Telefone",o.vitima_telefone],["Endereço",o.vitima_endereco||o.local],["Bairro",o.bairro]].forEach(function(c){ h+="<div class='c'><label>"+c[0]+"</label><span>"+E(c[1])+"</span></div>"; });
@@ -16111,12 +16182,6 @@ function _mtGerarPdf(ocId){
   var rel=_relatoCompleto(o);
   h+="<div class='sec'>O que aconteceu (BO)</div><p class='txt'>"+E(rel)+"</p>";
   if(o.medidas) h+="<div class='sec'>Medidas adotadas no BO</div><p class='txt'>"+E(o.medidas)+"</p>";
-  // FRIDA
-  if(frs.length){
-    h+="<div class='sec'>Avaliação de risco (FRIDA)</div><table><tr><th>Data</th><th>Nível</th><th>Respostas \"sim\"</th></tr>";
-    frs.forEach(function(f){ h+="<tr><td>"+dt(f.data)+"</td><td>"+E({B:"Baixo",M:"Médio",E:"Elevado"}[f.nivel]||f.nivel)+"</td><td>"+E(f.sim!=null?f.sim:"")+"</td></tr>"; });
-    h+="</table>";
-  }
   // Ligações
   h+="<div class='sec'>Contatos telefônicos</div>";
   if(!ligs.length) h+="<p class='txt'>Nenhum contato telefônico registrado.</p>";
