@@ -2239,7 +2239,7 @@ function renderImportarZap(main) {
       <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#7ac24a;font-size:12px;background:#0d1a0d;border:1px solid #2a4a2a;border-radius:8px;padding:6px 12px">
           <input type="checkbox" id="pl-filtro-bcs" checked style="width:14px;height:14px;accent-color:#22c55e">
-          🏘 Apenas bairros BCS (Primavera, Panorama, Pedrinhas, Alto Marom, Europa Unida, Cruzeiro, Guarani)
+          🏘 Apenas bairros BCS (Primavera, Panorama, Pedrinhas, Alto Marom, Europa Unida, Cruzeiro, Guarani, Nova Cidade)
         </label>
       </div>
       <button onclick="_planilhaPreview()" style="margin-top:10px;background:#22c55e22;border:1px solid #22c55e;color:#22c55e;padding:8px 20px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">👁 Pré-visualizar</button>
@@ -2488,12 +2488,7 @@ function renderImportarZap(main) {
     var linhas = text.split(/\r?\n/).filter(function(l){ return l.trim(); });
     if(linhas.length < 2) return [];
 
-    var BAIRROS_BCS_PL = ["primavera","panorama","pedrinhas","alto marom","europa unida","cruzeiro","guarani"];
-    function _ehBarroBCS(val){
-      if(!val) return false;
-      var v = val.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
-      return BAIRROS_BCS_PL.some(function(b){ return v===b || v.indexOf(b)!==-1 || b.indexOf(v)!==-1; });
-    }
+    function _ehBarroBCS(val){ return !!_bcsBairroCanon(val); }
     // Extrai bairro do campo Local: "Rua X, Nº 1., Guarani - Zona Urbana" → "Guarani"
     function _extrairBairroDoLocal(local){
       if(!local) return "";
@@ -4246,11 +4241,33 @@ function renderChat() {
 // ══════════════════════════════════════════════════
 // DASHBOARD VCM
 // ══════════════════════════════════════════════════
-var BAIRROS_BCS=["primavera","panorama","pedrinhas","alto marom","europa unida","cruzeiro","guarani"];
-function _bairroBCS(o){
-  var b=(o.bairro||"").trim().toLowerCase();
-  return BAIRROS_BCS.some(function(bv){return b===bv||b.includes(bv)||bv.includes(b);});
+// ══════════════════════════════════════════════════════════════════
+//  ÁREA DA BCS — fonte única dos bairros (filtros, painéis, importação, triagem, mapa)
+//  Para incluir/renomear um bairro, mexa só aqui. "k" = trechos aceitos (sem acento, minúsculo):
+//  pega variações reais do SIGESPOL ("Alto Maron", "Panorama II", "Alto do Panorama"...).
+// ══════════════════════════════════════════════════════════════════
+var BCS_AREA=[
+  {nome:"Primavera",    k:["primavera"]},
+  {nome:"Panorama",     k:["panorama"]},
+  {nome:"Pedrinhas",    k:["pedrinhas"]},
+  {nome:"Alto Marom",   k:["alto marom","alto maron"]},
+  {nome:"Europa Unida", k:["europa unida"]},
+  {nome:"Cruzeiro",     k:["cruzeiro"]},
+  {nome:"Guarani",      k:["guarani"]},
+  {nome:"Nova Cidade",  k:["nova cidade"]}
+];
+function _bcsNorm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim(); }
+function _bcsNomes(){ return BCS_AREA.map(function(b){ return b.nome; }); }
+// Nome oficial do bairro BCS contido no texto, ou "" se não for da área
+function _bcsBairroCanon(txt){
+  var t=_bcsNorm(txt); if(!t) return "";
+  for(var i=0;i<BCS_AREA.length;i++){ if(BCS_AREA[i].k.some(function(k){ return t.indexOf(k)>=0; })) return BCS_AREA[i].nome; }
+  return "";
 }
+// Bairro BCS da ocorrência: campo bairro; se vazio ou fora da lista, tenta o endereço (local)
+function _bcsBairroDaOc(o){ return o ? (_bcsBairroCanon(o.bairro) || _bcsBairroCanon(o.local)) : ""; }
+
+function _bairroBCS(o){ return !!_bcsBairroDaOc(o); }
 // ══════════════════════════════════════════════════════════════════
 //  FLUXO VCM — máquina de estados + periodicidade automática por risco
 // ══════════════════════════════════════════════════════════════════
@@ -4613,7 +4630,7 @@ function renderDashboardVCM(main){
   var h="<div style='max-width:1200px;margin:0 auto;padding:16px'>";
   h+="<div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px'>";
   h+="<div><h2 style='font-size:20px;font-weight:700;color:#c06080;margin:0 0 2px'>🛡 Proteção VCM</h2>";
-  h+="<p style='color:#7a5050;font-size:12px;margin:0'>Bairros: Primavera · Panorama · Pedrinhas · Alto Marom · Europa Unida · Cruzeiro · Guarani</p></div>";
+  h+="<p style='color:#7a5050;font-size:12px;margin:0'>Bairros: "+_bcsNomes().join(" · ")+"</p></div>";
   h+="<div style='display:flex;flex-direction:column;align-items:flex-end;gap:8px'>";
   h+="<a href='https://delegaciavirtual.sinesp.gov.br/portal/comunicacaofato/BA/natureza' target='_blank' rel='noopener' style='background:linear-gradient(135deg,#6a1a2a,#9a2a3a);border:1px solid #ef4444;color:#ffaaaa;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block'>🚨 Delegacia Virtual</a>";
   h+="<p style='color:#5a4040;font-size:9px;margin:0;text-transform:uppercase;letter-spacing:1px'>Período dos gráficos</p>";
@@ -14712,15 +14729,11 @@ function _ocNaFila(o){
 // Bairros da jurisdição — filtro padrão da Triagem. Substring-match (sem acento, case-insensitive)
 // pra pegar variações reais que aparecem nos dados importados do SIGESPOL, ex.: "Alto Maron" e
 // "Alto Marom" (grafias diferentes pro mesmo bairro), "Panorama"/"Panorama II"/"Alto do Panorama".
-var _TRIAGEM_BAIRROS_JURISDICAO = ["primavera","europa unida","panorama","alto maron","alto marom","cruzeiro","pedrinhas","guarani","nova cidade"];
+var _TRIAGEM_BAIRROS_JURISDICAO = BCS_AREA.reduce(function(a,b){ return a.concat(b.k); },[]); // fonte única: BCS_AREA
 function _triagemNormBairro(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 }
-function _triagemBairroNaJurisdicao(o){
-  var b = _triagemNormBairro(o.bairro);
-  if(!b) return false;
-  return _TRIAGEM_BAIRROS_JURISDICAO.some(function(k){ return b.indexOf(k)>=0; });
-}
+function _triagemBairroNaJurisdicao(o){ return !!_bcsBairroDaOc(o); }
 
 function renderTriagem(main) {
   // Aba "Triagem · Novo Fluxo" (Fila do Dia): mesma fila, formulário com o fluxo novo
@@ -16768,8 +16781,7 @@ function renderTela() {
       var mes=new Date(agora.getFullYear(), agora.getMonth(), 1);
       var trim=new Date(agora.getFullYear(), Math.floor(agora.getMonth()/3)*3, 1);
       
-      var bairros=["Primavera","Panorama","Pedrinhas","Alto Marom","Europa Unida","Cruzeiro","Guarani"];
-      var bairrosLower=bairros.map(function(b){return b.toLowerCase();});
+      var bairros=_bcsNomes();
       
       // Período padrão: 7 dias
       var diasPad = state.filtroOcPeriodo!==undefined ? state.filtroOcPeriodo : 7;
@@ -16785,13 +16797,7 @@ function renderTela() {
       });
       
       // Base BAIRROS: período + bairros com match parcial (para o gráfico)
-      var ocBase = ocBaseTodos.filter(function(o){
-        var b=(o.bairro||"").trim().toLowerCase();
-        for(var i=0;i<bairrosLower.length;i++){
-          if(b===bairrosLower[i]||b.includes(bairrosLower[i])||bairrosLower[i].includes(b)) return true;
-        }
-        return false;
-      });
+      var ocBase = ocBaseTodos.filter(function(o){ return !!_bcsBairroDaOc(o); });
       
       // Filtros normalizados — tipo sempre em lowercase sem acentos para comparar
       var ocFurtos    = ocBaseTodos.filter(function(o){ var t=(o.tipo||"").toLowerCase(); return t.includes("furto"); });
@@ -16916,22 +16922,9 @@ function renderTela() {
       var bairrosNaoEncontrados={};
       ocBaseTodos.forEach(function(o){
         var b=(o.bairro||"").trim().toLowerCase();
-        // Tentar match exato primeiro
-        var idx=bairrosLower.indexOf(b);
-        if(idx>=0){
-          contagem[bairros[idx]]++;
-          return;
-        }
-        // Match parcial: verifica se algum bairro está contido no campo
-        var matched=false;
-        for(var i=0;i<bairrosLower.length;i++){
-          if(b.includes(bairrosLower[i])||bairrosLower[i].includes(b)){
-            contagem[bairros[i]]++;
-            matched=true;
-            break;
-          }
-        }
-        if(!matched && b) bairrosNaoEncontrados[b]=(bairrosNaoEncontrados[b]||0)+1;
+        var cb=_bcsBairroDaOc(o);
+        if(cb){ contagem[cb]++; return; }
+        if(b) bairrosNaoEncontrados[b]=(bairrosNaoEncontrados[b]||0)+1;
       });
       
       var maxBairro="", maxVal=0;
@@ -17087,7 +17080,7 @@ function renderTela() {
       h.push("<div><label style='"+LS+"'>Ponto de Referência</label><input id='oc-referencia' type='text' placeholder='Ex: Próximo ao mercado...' style='"+IS+"'></div>");
       h.push("</div>");
       h.push("<div style='display:grid;grid-template-columns:2fr 1fr;gap:10px'>");
-      h.push("<div><label style='"+LS+"'>Bairro *</label><input id='oc-bairro' type='text' list='bairros-list' placeholder='Bairro onde ocorreu' style='"+IS+"'><datalist id='bairros-list'><option>Primavera</option><option>Panorama</option><option>Pedrinhas</option><option>Alto Marom</option><option>Europa Unida</option><option>Cruzeiro</option><option>Guarani</option><option>Centro</option><option>Brasil</option><option>Recreio</option><option>Ibirapuera</option><option>Lagoa das Flores</option><option>Candeias</option><option>Zabelê</option></datalist></div>");
+      h.push("<div><label style='"+LS+"'>Bairro *</label><input id='oc-bairro' type='text' list='bairros-list' placeholder='Bairro onde ocorreu' style='"+IS+"'><datalist id='bairros-list'><option>Primavera</option><option>Panorama</option><option>Pedrinhas</option><option>Alto Marom</option><option>Europa Unida</option><option>Cruzeiro</option><option>Guarani</option><option>Nova Cidade</option><option>Centro</option><option>Brasil</option><option>Recreio</option><option>Ibirapuera</option><option>Lagoa das Flores</option><option>Candeias</option><option>Zabelê</option></datalist></div>");
       h.push("<div><label style='"+LS+"'>Município</label><input id='oc-municipio' type='text' value='Vitória da Conquista' style='"+IS+"'></div>");
       h.push("</div>");
       h.push("</div>");
@@ -17501,16 +17494,8 @@ function renderTela() {
       var agora=new Date();
       var h24=new Date(agora-24*60*60*1000);
       var h720=new Date(agora-30*24*60*60*1000);
-      var bairros=["Primavera","Panorama","Pedrinhas","Alto Marom","Europa Unida","Cruzeiro","Guarani"];
-      var bairrosLowerA=bairros.map(function(b){return b.toLowerCase();});
-
-      function matchBairroA(b){
-        var bl=(b||"").trim().toLowerCase();
-        for(var i=0;i<bairrosLowerA.length;i++){
-          if(bl===bairrosLowerA[i]||bl.includes(bairrosLowerA[i])||bairrosLowerA[i].includes(bl)) return bairros[i];
-        }
-        return null;
-      }
+      var bairros=_bcsNomes();
+      function matchBairroA(b){ return _bcsBairroCanon(b)||null; }
 
       var aOcs=state.db.ocorrencias||[];
       var ocs24=aOcs.filter(function(o){ var dt=_pdLocal(o.data); return dt&&dt>=h24; });
@@ -18486,7 +18471,7 @@ function salvarVisita(){
 // NAVEGAÇÃO
 // ══════════════════════════════════════════════════
 // ── Bairros da Base Comunitária
-var BAIRROS_BCS=["Primavera","Panorama","Pedrinhas","Alto Marom","Europa Unida","Cruzeiro","Guarani"];
+var BAIRROS_BCS=_bcsNomes(); // fonte única: BCS_AREA
 
 function _htmlFiltrosBairro(renderFn, cor){
   cor=cor||"#d4a87a";
@@ -18505,8 +18490,9 @@ function _htmlFiltrosBairro(renderFn, cor){
 
 function _matchBairro(o){
   if(!state.filtroBairro) return true;
-  var b=state.filtroBairro.toLowerCase();
-  return (o.bairro||"").toLowerCase().includes(b)||(o.local||"").toLowerCase().includes(b);
+  if(_bcsBairroCanon(state.filtroBairro)===state.filtroBairro) return _bcsBairroDaOc(o)===state.filtroBairro;
+  var b=_bcsNorm(state.filtroBairro);
+  return _bcsNorm(o.bairro).indexOf(b)>=0||_bcsNorm(o.local).indexOf(b)>=0;
 }
 
 function _salvarRascOcForm(){
@@ -20978,9 +20964,8 @@ function renderMapaCalor(el, tipoFiltro, periodoFiltro){
 
   const cnt={};Object.keys(BAIRROS).forEach(function(b){cnt[b]=[];});
   ocs.forEach(function(o){
-    const bN=(o.bairro||"").toLowerCase();
-    const b=Object.keys(BAIRROS).find(function(b){return bN.includes(b.toLowerCase());});
-    if(b)cnt[b].push(o);
+    const b=_bcsBairroDaOc(o);
+    if(b&&cnt[b])cnt[b].push(o);
   });
   const mx=Math.max.apply(null,Object.values(cnt).map(function(v){return v.length;}).concat([1]));
   const totalOcs=ocs.length;
